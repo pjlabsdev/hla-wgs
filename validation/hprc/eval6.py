@@ -35,7 +35,7 @@ for s in sorted(set(k[0] for k in dmin)):
     for l in open(f"{D}/{s}.conf.tsv").read().splitlines()[1:]:
         r=l.split("\t"); det=set()
         if len(r)>12 and r[12]!='-':
-            det={int(x.split(':')[0]) for x in r[12].split(',') if 'blind' not in x and 'unphased' not in x}
+            det={int(x.split(':')[0]) for x in ('' if r[12].startswith('known:') else r[12]).split(',') if x and 'blind' not in x and 'unphased' not in x}
         conf[r[0]].append((r[2],int(r[4]),det,int(r[11]) if len(r)>11 and r[11]!='-' else 0,r[12] if len(r)>12 else '-'))
     names=sorted({x[0] for v in conf.values() for x in v})
     hits={}

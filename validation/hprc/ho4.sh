@@ -1,5 +1,5 @@
 #!/bin/bash
-# unseen samples for the 4-field statement: assemblies -> full-gene truth inputs, reads -> hla-wgs 1.0.0
+# samples not used for the four-field rules: assemblies -> full-gene truth inputs, reads -> hla-wgs 1.0.0
 cd ${HLA_WORK:-$PWD}; s=$1; B=hla-wgs
 [ -s newg_ho/$s.json ] && ls truth/$s.*.exony.tsv >/dev/null 2>&1 && exit 0
 bash scripts/fetch_r2.sh $s

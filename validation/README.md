@@ -8,10 +8,11 @@ are fetched.
 
 | folder | content |
 |---|---|
-| `hprc/` | truth from HPRC release 2 haplotype assemblies: `fetch_r2.sh` (assemblies, MHC contigs), `truth_exonx.py`, `truth_exony.py`, `truth_tablex.py`, `truth_tabley.py`, `truth4.py` (nearest full-gene allele and differences per haplotype), `extract_sr.sh` (reads from the 1000 Genomes 30x CRAM), `eval6.py` (exact four-field evaluation), `eval23.py` (two- and three-field agreement), `run_t1k.sh` (T1K with the same reads) |
+| `hprc/` | truth from HPRC release 2 haplotype assemblies: `fetch_r2.sh` (assemblies, MHC contigs), `truth_exonx.py`, `truth_exony.py`, `truth_tablex.py`, `truth_tabley.py`, `truth4.py` (nearest full-gene allele and differences per haplotype), `extract_sr.sh` (reads from the 1000 Genomes 30x CRAM), `eval6.py` (exact four-field evaluation; its table is stored as `results/*/eval6.tsv`), `eval23.py` (two- and three-field agreement), `run_t1k.sh` (T1K with the same reads) |
 | `giab/` | GIAB trios HG002/3/4 and HG005/6/7: `run23.sh`, `trio23.py` (Mendelian consistency) |
 | `lab/` | 1000 Genomes laboratory typing (Gourraud et al. 2014; Abi-Rached et al. 2018): `run24.sh`, `eval24.py`. The frequency prior was counted from the same laboratory data, so the samples are split in two folds (`folds.tsv`) and each sample is typed with the prior of the other fold |
 | `results/dev80/` | `truth4.tsv` and `truth4diff.tsv`: truth for the 80 HPRC samples used during development |
+| `results/check30/` | the same for 30 further samples (`hprc/samples_check30.txt`, run with `hprc/ho4.sh`) that were not used for the four-field rules; they had been the first held-out round of the two-field typer |
 | `results/heldout_vs_t1k/` | `strata.tsv`: hla-wgs and T1K against assembly truth by population and gene, 150 held-out samples of rounds 1 to 3 (round 4 added 34 samples: two fields 543/543 against 541/543, copy number 102/102 against 64/102) |
 | `results/giab/`, `results/lab/` | calls of the trio members and of the 45 laboratory-typed samples |
 

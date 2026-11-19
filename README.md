@@ -55,6 +55,7 @@ All scripts and result tables are in [`validation/`](validation/).
 |---|---|
 | 80 HPRC samples, truth from both assembled haplotypes, 18 genes | two fields 2,486 / 2,489, three fields 2,482 / 2,489 |
 | Same samples, alleles reported as certain at four fields | 1,569 of 1,591 exactly equal to the assembled gene sequence (98.6 %) |
+| 30 further HPRC samples not used for the four-field rules | 607 of 621 certain four-field alleles exact (97.7 %) |
 | Same samples, copy number of DRB3/4/5, H and K | all correct |
 | 45 further 1000 Genomes samples with laboratory typing (A, B, C, DRB1, DQB1) | 438 / 450 at two fields; of 12 differences 5 are resolution limits of the laboratory method, 3 are probable laboratory errors (B\*27:05 against 27:03), 4 are open |
 | GIAB trios (Ashkenazi, Han Chinese), 60x to 100x | no Mendelian conflict at two or three fields in any gene; none at four fields among calls reported as certain |
@@ -63,8 +64,12 @@ The 22 certain four-field calls that are not exact: 9 differ only in the length 
 short tandem repeat, 4 are phase swaps at the 3' end of HLA-B that short reads cannot resolve, 9
 are single missed variants in other genes.
 
-The 80 HPRC samples were used to develop the four-field logic, so the four-field figures are not
-from unseen data; the two-field comparison with T1K above is.
+The 80 HPRC samples were used to develop the four-field logic. On 30 further HPRC samples that played
+no part in developing these rules (they had been the first held-out round of the two-field typer),
+607 of 621 alleles reported as certain at four fields were exact (97.7 %), two fields 935 / 935 and
+three fields 934 / 935. A test on genomes never used at any stage is still missing.
+
+The full report is in [`docs/paper/hla-wgs-report.pdf`](docs/paper/hla-wgs-report.pdf).
 
 ## Install
 
@@ -140,7 +145,8 @@ DPB1  1     DPB1*01:01:01:02  DPB1*01:01:01     3           29.8     29.8     29
 
 - Short reads only (2x100 to 2x150, about 15x or more; validated at 30x and above). No RNA-seq, no
   exome or amplicon data, no long reads.
-- A four-field call reported as certain was exact in 98.6 % of cases, not in all. Homopolymer and
+- A four-field call reported as certain was exact in 98.6 % (development samples) and 97.7 % (30
+  further samples) of cases, not in all. Homopolymer and
   repeat lengths and the phase of variants at the far 3' end of HLA-B are the known weak points.
 - A variant further from the next heterozygous position than a read pair reaches cannot be assigned
   to a haplotype; such sites are marked `either`.

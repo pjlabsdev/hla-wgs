@@ -1,0 +1,110 @@
+{
+  "database": "IPD-IMGT/HLA 3.66",
+  "heldout_round4": {
+    "samples": 34,
+    "two_field": {
+      "hla-wgs": [
+        543,
+        543
+      ],
+      "T1K": [
+        541,
+        543
+      ]
+    },
+    "copy_number": {
+      "hla-wgs": [
+        102,
+        102
+      ],
+      "T1K": [
+        64,
+        102
+      ]
+    }
+  },
+  "timing": {
+    "note": "4 cores, reads of the MHC region plus unmapped reads of a 30x genome",
+    "prototype_v16": {
+      "wall_s": 62,
+      "peak_gb": 1.4
+    },
+    "T1K_1.0.10": {
+      "wall_s": 150,
+      "peak_gb": 3.2
+    }
+  },
+  "lab": {
+    "samples": 45,
+    "agree": 438,
+    "total": 450,
+    "per_gene": {
+      "A": [
+        90,
+        90
+      ],
+      "B": [
+        87,
+        90
+      ],
+      "C": [
+        88,
+        90
+      ],
+      "DRB1": [
+        88,
+        90
+      ],
+      "DQB1": [
+        85,
+        90
+      ]
+    },
+    "differences": {
+      "method_resolution": 5,
+      "probable_lab_error": 3,
+      "open": 4
+    }
+  },
+  "trios": {
+    "ashkenazi": {
+      "members": [
+        "HG002",
+        "HG003",
+        "HG004"
+      ],
+      "genes_present": 17,
+      "consistent_2": 17,
+      "consistent_3": 17,
+      "consistent_4": 16,
+      "all_safe_genes": 4,
+      "all_safe_consistent": 4
+    },
+    "han": {
+      "members": [
+        "HG005",
+        "HG006",
+        "HG007"
+      ],
+      "genes_present": 16,
+      "consistent_2": 16,
+      "consistent_3": 16,
+      "consistent_4": 14,
+      "all_safe_genes": 6,
+      "all_safe_consistent": 6
+    }
+  },
+  "dev80_inexact_safe4": {
+    "homopolymer_or_str_only": 9,
+    "b_3prime_phase": 4,
+    "other": 9
+  },
+  "check30": {
+    "samples": 30,
+    "note": "first held-out round of the two-field typer; not used for the four-field certainty rules",
+    "inexact_safe4": {
+      "homopolymer_or_str_only": 9,
+      "other": 5
+    }
+  }
+}
