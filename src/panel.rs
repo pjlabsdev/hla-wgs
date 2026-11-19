@@ -1,6 +1,6 @@
 //! Stage 0: map the extracted read pairs to the gene panel (minimap2 sr, paired, -N 20) and
 //! assign every pair to the gene(s) with the best summed alignment score.
-use crate::util::{open_reader, read_fq};
+use crate::util::open_reader;
 use ahash::AHashMap;
 use minimap2::Aligner;
 use rayon::prelude::*;
@@ -83,11 +83,9 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
     };
     let reader = std::thread::spawn(move || match inp {
         Input::Fastq(r1s, r2s) => {
-            let (mut f1, mut f2) = (open_reader(&r1s), open_reader(&r2s));
+            let mut src = crate::util::PairedFq::new(&r1s, &r2s);
             loop {
-                let b1 = read_fq(&mut *f1, 50_000);
-                let b2 = read_fq(&mut *f2, 50_000);
-                assert_eq!(b1.len(), b2.len(), "mates out of sync");
+                let (b1, b2) = src.batch(50_000);
                 if b1.is_empty() {
                     break;
                 }
@@ -104,7 +102,29 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
     let mut seqs: Vec<[Option<Vec<u8>>; 2]> = vec![];
     // per read: genes in first-hit order with best AS per mate
     let mut gscore: Vec<Vec<(String, [i64; 2])>> = vec![];
+    // optional read cache (env HLA_SAVE_READS=PREFIX): the pairs that pass the 21-mer prefilter
+    // are written to PREFIX.R1.fq.gz / PREFIX.R2.fq.gz in input order. Typing these files as
+    // FASTQ gives the same result as the original input, without reading the BAM/FASTQ again.
+    let mut cache = std::env::var("HLA_SAVE_READS").ok().map(|pre| {
+        let w = |m: u8| {
+            let f = std::fs::File::create(format!("{pre}.R{m}.fq.gz")).unwrap_or_else(|e| panic!("{pre}.R{m}.fq.gz: {e}"));
+            flate2::write::GzEncoder::new(std::io::BufWriter::with_capacity(1 << 20, f), flate2::Compression::fast())
+        };
+        (w(1), w(2))
+    });
     for (b1, b2) in rx {
+        if let Some((w1, w2)) = cache.as_mut() {
+            use std::io::Write;
+            let keep: Vec<bool> = b1.par_iter().zip(b2.par_iter()).map(|(x, y)| has_kmer(&x.seq, &set) || has_kmer(&y.seq, &set)).collect();
+            for ((x, y), k) in b1.iter().zip(b2.iter()).zip(keep) {
+                if k {
+                    for (w, r) in [(&mut *w1, x), (&mut *w2, y)] {
+                        let q = vec![b'I'; r.seq.len()];
+                        w.write_all(b"@").and_then(|_| w.write_all(r.name.as_bytes())).and_then(|_| w.write_all(b"\n")).and_then(|_| w.write_all(&r.seq)).and_then(|_| w.write_all(b"\n+\n")).and_then(|_| w.write_all(&q)).and_then(|_| w.write_all(b"\n")).expect("read cache write");
+                    }
+                }
+            }
+        }
         let res: Vec<Option<(String, [Option<Vec<u8>>; 2], Vec<(String, [i64; 2])>)>> = b1
             .par_iter()
             .zip(b2.par_iter())
@@ -205,6 +225,10 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
         }
     }
     reader.join().unwrap();
+    if let Some((w1, w2)) = cache {
+        w1.finish().and_then(|mut b| std::io::Write::flush(&mut b)).expect("read cache R1");
+        w2.finish().and_then(|mut b| std::io::Write::flush(&mut b)).expect("read cache R2");
+    }
     let mut assign: AHashMap<String, Vec<usize>> = AHashMap::new();
     for (q, gs) in gscore.iter().enumerate() {
         let tot: Vec<i64> = gs.iter().map(|(_, v)| v[0].max(0) + v[1].max(0)).collect();

@@ -15,16 +15,40 @@ pub struct Fq {
     pub seq: Vec<u8>,
 }
 
-/// next n FASTQ records (name = header up to first space, /1 /2 stripped)
-pub fn read_fq(r: &mut dyn BufRead, n: usize) -> Vec<Fq> {
+/// how often an I/O error on the input is retried (env HLA_IO_RETRIES, default 6)
+pub fn io_retries() -> u32 {
+    std::env::var("HLA_IO_RETRIES").ok().and_then(|v| v.parse().ok()).unwrap_or(6)
+}
+
+/// Test hook: env HLA_TEST_IO_FAULT=N makes the first read pass fail once after N records
+/// (BAM/CRAM) or pairs (FASTQ), so that the retry path can be checked without pulling a disk.
+pub fn test_fault(n: u64) -> bool {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static FIRED: AtomicBool = AtomicBool::new(false);
+    match std::env::var("HLA_TEST_IO_FAULT").ok().and_then(|v| v.parse::<u64>().ok()) {
+        Some(at) if n >= at && !FIRED.swap(true, Ordering::SeqCst) => true,
+        _ => false,
+    }
+}
+
+/// pause before retry k (1-based): 5, 10, 20, 40, 80, 160 s, at most 300 s
+pub fn backoff(k: u32) -> u64 {
+    if std::env::var("HLA_TEST_IO_FAULT").is_ok() {
+        return 1;
+    }
+    (5u64 << (k.saturating_sub(1)).min(6)).min(300)
+}
+
+/// next n FASTQ records (name = header up to first space, /1 /2 stripped); I/O errors are returned
+pub fn read_fq_res(r: &mut dyn BufRead, n: usize) -> std::io::Result<Vec<Fq>> {
     let mut out = Vec::with_capacity(n);
     let mut l = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
     for _ in 0..n {
         for (i, x) in l.iter_mut().enumerate() {
             x.clear();
-            if r.read_until(b'\n', x).unwrap() == 0 {
+            if r.read_until(b'\n', x)? == 0 {
                 if i == 0 {
-                    return out;
+                    return Ok(out);
                 }
                 panic!("truncated fastq");
             }
@@ -40,7 +64,80 @@ pub fn read_fq(r: &mut dyn BufRead, n: usize) -> Vec<Fq> {
         }
         out.push(Fq { name: String::from_utf8_lossy(nm).into_owned(), seq: l[1].clone() });
     }
-    out
+    Ok(out)
+}
+
+/// open_reader that reports a missing or unreadable file instead of aborting
+pub fn try_open_reader(p: &str) -> std::io::Result<Box<dyn BufRead>> {
+    let f = std::fs::File::open(p)?;
+    Ok(if p.ends_with(".gz") {
+        Box::new(BufReader::with_capacity(1 << 20, MultiGzDecoder::new(f)))
+    } else {
+        Box::new(BufReader::with_capacity(1 << 20, f))
+    })
+}
+
+/// Paired FASTQ reader that survives I/O errors: after a pause both files are reopened and the
+/// records already delivered are skipped, so the caller sees the same sequence of batches as
+/// in an uninterrupted read.
+pub struct PairedFq {
+    paths: [String; 2],
+    rd: Option<[Box<dyn BufRead>; 2]>,
+    done: u64,
+}
+
+impl PairedFq {
+    pub fn new(r1: &str, r2: &str) -> Self {
+        PairedFq { paths: [r1.to_string(), r2.to_string()], rd: None, done: 0 }
+    }
+
+    fn try_batch(&mut self, n: usize) -> std::io::Result<(Vec<Fq>, Vec<Fq>)> {
+        if self.rd.is_none() {
+            let mut a = try_open_reader(&self.paths[0])?;
+            let mut b = try_open_reader(&self.paths[1])?;
+            let mut left = self.done;
+            while left > 0 {
+                let k = left.min(50_000) as usize;
+                let (x, y) = (read_fq_res(&mut *a, k)?, read_fq_res(&mut *b, k)?);
+                if x.len() != k || y.len() != k {
+                    return Err(std::io::Error::other("input shorter than before the I/O error"));
+                }
+                left -= k as u64;
+            }
+            self.rd = Some([a, b]);
+        }
+        let [a, b] = self.rd.as_mut().unwrap();
+        let b1 = read_fq_res(&mut **a, n)?;
+        let b2 = read_fq_res(&mut **b, n)?;
+        assert_eq!(b1.len(), b2.len(), "mates out of sync");
+        self.done += b1.len() as u64;
+        if test_fault(self.done) {
+            self.done -= b1.len() as u64;
+            return Err(std::io::Error::other("injected test fault (HLA_TEST_IO_FAULT)"));
+        }
+        Ok((b1, b2))
+    }
+
+    /// next batch of up to n pairs; empty at the end of the input
+    pub fn batch(&mut self, n: usize) -> (Vec<Fq>, Vec<Fq>) {
+        let tries = io_retries();
+        let mut attempt = 0;
+        loop {
+            match self.try_batch(n) {
+                Ok(x) => return x,
+                Err(e) => {
+                    self.rd = None;
+                    attempt += 1;
+                    if attempt > tries {
+                        panic!("{}: {e} (gave up after {tries} retries)", self.paths[0]);
+                    }
+                    let wait = backoff(attempt);
+                    eprintln!("[input] {}: I/O error after {} pairs: {e}; retry {attempt}/{tries} in {wait}s", self.paths[0], self.done);
+                    std::thread::sleep(std::time::Duration::from_secs(wait));
+                }
+            }
+        }
+    }
 }
 
 pub fn revcomp(s: &[u8]) -> Vec<u8> {
