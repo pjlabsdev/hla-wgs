@@ -84,10 +84,10 @@ summary b{font-weight:500;min-width:4.5em}
 .reason{font-size:12px;color:var(--mut);border-left:2px solid var(--acc);padding:2px 0 2px 10px;margin:4px 0 14px}
 .ok{color:var(--ok)}
 .nm{white-space:nowrap;font-weight:500;letter-spacing:.01em}.nm .gn{color:var(--soft-fg);font-weight:400}
-.fd{display:inline-block;padding:0 1px;border-bottom:3px solid transparent;line-height:1.35;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.fd.k1{color:var(--f1);border-bottom-color:var(--f1)}.fd.k2{color:var(--f2);border-bottom-color:var(--f2)}.fd.k3{color:var(--f3);border-bottom-color:var(--f3)}.fd.k4{color:var(--f4);border-bottom-color:var(--f4)}
-.fd.off{color:var(--soft-fg);font-weight:400;border-bottom:2px dashed var(--line)}
-.c{color:var(--soft-fg);padding:0 1px}
+.fd{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.fd.k1{color:var(--f1)}.fd.k2{color:var(--f2)}.fd.k3{color:var(--f3)}.fd.k4{color:var(--f4)}
+.fd.off{color:var(--soft-fg);font-weight:400}
+.c{color:var(--soft-fg)}
 svg.fdia{-webkit-print-color-adjust:exact;print-color-adjust:exact;display:block;max-width:100%;height:auto;margin:6px 0 10px;overflow:visible}
 svg.fdia .fn{font:500 18px 'IBM Plex Mono',ui-monospace,monospace;fill:var(--fg)}svg.fdia .fg{fill:var(--soft-fg);font-weight:400}
 svg.fdia .fs{fill:var(--soft-fg)}svg.fdia .off{fill:var(--soft-fg);font-weight:400}
