@@ -480,7 +480,7 @@ def main(argv=None):
     p.add_argument("--fonts")
     p.add_argument("--version", default="1.0.0")
     p.add_argument("--date", default="19 November 2026")
-    p.add_argument("--doi", default="pending")
+    p.add_argument("--doi", default="10.5281/zenodo.24367470")
     args = p.parse_args(argv)
     sys.stdout.write(number_citations(build(Data(), args.fonts, args.version, args.date, args.doi)))
     return 0

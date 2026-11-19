@@ -62,7 +62,7 @@ ol.refs { font-size: 7.6pt; padding-left: 14pt; line-height: 1.33; } ol.refs li 
 
 <h1>hla-wgs: HLA typing from whole-genome sequencing that states how many fields of each allele are certain</h1>
 <div class="meta"><strong>Peter Jungwirth, MSc</strong> · PJ Labs, Austria</div>
-<div class="small">Software: https://github.com/pjlabsdev/hla-wgs · DOI: <span id="doi">pending</span> · Licence: MIT</div>
+<div class="small">Software: https://github.com/pjlabsdev/hla-wgs · DOI: <span id="doi">10.5281/zenodo.24367470</span> · Licence: MIT</div>
 
 <div class="top">
 <div class="summary">
@@ -157,7 +157,7 @@ ol.refs { font-size: 7.6pt; padding-left: 14pt; line-height: 1.33; } ol.refs li 
 <p>Assemblies of HPRC release 2 were downloaded, contigs with HLA sequence extracted, and each gene located by alignment of the database alleles. The truth for a haplotype is the nearest database allele at full genomic length together with the list of differences. Reads were taken from the 1000 Genomes 30× CRAM files (MHC region, ALT and HLA contigs, unmapped reads). A four-field call counts as exact only if the assembled sequence is identical to the called allele. All scripts are in the repository under <code>validation/</code>.</p>
 
 <h2>Resource availability</h2>
-<p><strong>Repository:</strong> https://github.com/pjlabsdev/hla-wgs · <strong>Archived version:</strong> DOI pending · <strong>Operating systems:</strong> Linux, macOS · <strong>Requirements:</strong> Rust 1.85 or newer, a C compiler; IPD-IMGT/HLA <code>hla.dat</code> and a GRCh38 FASTA to build the reference · <strong>Licence:</strong> MIT. The IPD-IMGT/HLA database is distributed by its owners under CC BY-ND and is not included.</p>
+<p><strong>Repository:</strong> https://github.com/pjlabsdev/hla-wgs · <strong>Archived version:</strong> DOI 10.5281/zenodo.24367470 · <strong>Operating systems:</strong> Linux, macOS · <strong>Requirements:</strong> Rust 1.85 or newer, a C compiler; IPD-IMGT/HLA <code>hla.dat</code> and a GRCh38 FASTA to build the reference · <strong>Licence:</strong> MIT. The IPD-IMGT/HLA database is distributed by its owners under CC BY-ND and is not included.</p>
 <pre>hla-wgs build-db hla.dat data/freq_1000g_2field.json hladb
 hla-wgs build-mask hladb GRCh38.fa
 hla-wgs hladb sample.cram out/sample 4 GRCh38.fa</pre>

@@ -1,5 +1,7 @@
 # hla-wgs
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24367470.svg)](https://doi.org/10.5281/zenodo.24367470)
+
 **HLA typing from short-read whole-genome sequencing, with a statement of what is certain for
 every allele.** One Rust program, no external aligner or interpreter at run time. It types 18 genes
 (A, B, C, DRB1, DRB3, DRB4, DRB5, DQA1, DQB1, DPA1, DPB1, DRA, E, F, G, H, K, V) from FASTQ, BAM or
@@ -162,4 +164,7 @@ CC BY-ND 3.0; this repository contains no sequences from it, only allele names i
 
 ## Citation
 
-See [CITATION.cff](CITATION.cff).
+Jungwirth P. hla-wgs: HLA typing from whole-genome sequencing with a per-allele statement of what is
+certain. Version 1.0.0, 2026. https://doi.org/10.5281/zenodo.24367470
+
+See also [CITATION.cff](CITATION.cff).
