@@ -15,6 +15,11 @@
   IPD-IMGT/HLA release lie in the database directory, `expression` for alleles with a suffix
   (N, L, S, Q, C, A), and `pharmacogenetic_alleles` (B*57:01, B*15:02, A*31:01, B*58:01 with copy
   count and whether the two-field statement is certain).
+- Eight more genes: DMA, DMB, DOA, DOB, MICA, MICB, TAP1 and TAP2 (26 in total). Against the
+  assemblies of the 80 development samples DMA, DMB, DOA and DOB agree at two and at three fields on
+  640 of 640 haplotypes. MICA, MICB, TAP1 and TAP2 are experimental: agreement on the first two
+  name fields is 140/148, 153/154, 101/108 and 145/160. The calls of the first 18 genes are
+  unchanged.
 - Input: an I/O error (for example a USB disk that drops out) no longer aborts the run. The input is
   reopened after a pause and reading resumes after the last record (`HLA_IO_RETRIES`, default 6).
 - `HLA_SAVE_READS=PREFIX` writes the read pairs that pass the panel prefilter as FASTQ; typing these

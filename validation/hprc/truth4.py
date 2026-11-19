@@ -10,7 +10,7 @@ for g in db['genes']:
         if len(s)>=200: G[g['gene']].append((a['name'],s))
 two=lambda n:':'.join(re.sub(r'[A-Z]$','',n.split('*')[1]).split(':')[:2])
 tr=collections.defaultdict(lambda:collections.defaultdict(set))
-for f in ("truth/truth.tsv","truth/truthx.tsv","truth/truthy.tsv"):
+for f in os.environ.get("TRUTHSRC","truth/truth.tsv,truth/truthx.tsv,truth/truthy.tsv").split(","):
     for l in open(f):
         r=l.rstrip("\n").split("\t")
         if len(r)>=6 and r[3] and r[3]!='-':
@@ -19,9 +19,10 @@ for f in ("truth/truth.tsv","truth/truthx.tsv","truth/truthy.tsv"):
                 if x: tr[(r[0],r[1])][r[2]].add(x)
 samples=open(os.environ.get('SAMPLES','newg/both.txt')).read().split()
 done=set()
-if os.path.exists('truth/truth4.tsv'):
-    for l in open('truth/truth4.tsv'): done.add(tuple(l.split('\t')[:2]))
-out=open('truth/truth4.tsv','a')
+T4=os.environ.get('T4OUT','truth/truth4.tsv')
+if os.path.exists(T4):
+    for l in open(T4): done.add(tuple(l.split('\t')[:2]))
+out=open(T4,'a')
 for s in samples:
     for fa in sorted(glob.glob(f'truth/{s}.*.mhc.fa')):
         h=fa.split('.')[1]

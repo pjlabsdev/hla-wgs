@@ -9,7 +9,7 @@ for g in db['genes']:
         seq[a['name']]=a.get('orig') if a.get('extended') and a.get('orig') else a['genomic']
 rc=lambda s:s[::-1].translate(str.maketrans('ACGTacgt','TGCAtgca'))
 dmin=collections.defaultdict(dict)
-for l in open('truth/truth4.tsv'):
+for l in open(os.environ.get('T4OUT','truth/truth4.tsv')):
     r=l.rstrip('\n').split('\t')
     if r[2]=='_done' or r[3]=='-': continue
     dmin[(r[0],r[2])][r[1]]=(int(r[3]),r[4].split(','))
