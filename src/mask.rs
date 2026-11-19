@@ -57,36 +57,24 @@ pub fn intervals(counts: &[u32]) -> Vec<(usize, usize)> {
             }
         }
     }
-    iv.into_iter()
-        .filter(|x| x.1 - x.0 >= MIN_LEN)
-        .map(|(a, b)| (a, b.min(counts.len())))
-        .collect()
+    iv.into_iter().filter(|x| x.1 - x.0 >= MIN_LEN).map(|(a, b)| (a, b.min(counts.len()))).collect()
 }
 
 pub fn run(args: &[String]) {
     if args.len() < 2 {
         eprintln!("usage: hla-wgs build-mask DBDIR GENOME.fa [EXCLUDE.bed]");
-        eprintln!(
-            "       GENOME.fa: the reference the reads were (or would be) aligned to, plain FASTA"
-        );
-        eprintln!(
-            "       EXCLUDE.bed: regions to leave out instead of the GRCh38 MHC (for other builds)"
-        );
+        eprintln!("       GENOME.fa: the reference the reads were (or would be) aligned to, plain FASTA");
+        eprintln!("       EXCLUDE.bed: regions to leave out instead of the GRCh38 MHC (for other builds)");
         std::process::exit(2);
     }
     let (dir, genome) = (&args[0], &args[1]);
     let panel = format!("{dir}/panel.fa");
     let mut excl: AHashMap<String, Vec<(usize, usize)>> = AHashMap::new();
     if let Some(bed) = args.get(2) {
-        for l in std::fs::read_to_string(bed)
-            .unwrap_or_else(|e| panic!("{bed}: {e}"))
-            .lines()
-        {
+        for l in std::fs::read_to_string(bed).unwrap_or_else(|e| panic!("{bed}: {e}")).lines() {
             let f: Vec<&str> = l.split('\t').collect();
             if f.len() >= 3 {
-                excl.entry(f[0].to_string())
-                    .or_default()
-                    .push((f[1].parse().unwrap(), f[2].parse().unwrap()));
+                excl.entry(f[0].to_string()).or_default().push((f[1].parse().unwrap(), f[2].parse().unwrap()));
             }
         }
     } else {
@@ -95,9 +83,7 @@ pub fn run(args: &[String]) {
         }
     }
     let mut pan: Vec<(String, Vec<u8>)> = vec![];
-    for l in BufReader::new(std::fs::File::open(&panel).unwrap_or_else(|e| panic!("{panel}: {e}")))
-        .lines()
-    {
+    for l in BufReader::new(std::fs::File::open(&panel).unwrap_or_else(|e| panic!("{panel}: {e}"))).lines() {
         let l = l.unwrap();
         if let Some(n) = l.strip_prefix('>') {
             pan.push((n.split_whitespace().next().unwrap().to_string(), vec![]));
@@ -111,11 +97,7 @@ pub fn run(args: &[String]) {
             cnt.entry(k).or_insert(0);
         });
     }
-    eprintln!(
-        "[mask] {} panel alleles, {} distinct 21-mers",
-        pan.len(),
-        cnt.len()
-    );
+    eprintln!("[mask] {} panel alleles, {} distinct 21-mers", pan.len(), cnt.len());
     let mask = (1u64 << (2 * K)) - 1;
     let mut cur: Vec<(usize, usize)> = vec![];
     let (mut skip, mut pos) = (false, 0usize);
@@ -124,11 +106,7 @@ pub fn run(args: &[String]) {
     for l in BufReader::with_capacity(1 << 22, f).split(b'\n') {
         let l = l.unwrap();
         if l.first() == Some(&b'>') {
-            let name = String::from_utf8_lossy(&l[1..])
-                .split_whitespace()
-                .next()
-                .unwrap_or("")
-                .to_string();
+            let name = String::from_utf8_lossy(&l[1..]).split_whitespace().next().unwrap_or("").to_string();
             skip = name.contains("_alt") || name.starts_with("HLA");
             cur = excl.get(&name).cloned().unwrap_or_default();
             pos = 0;
@@ -163,9 +141,7 @@ pub fn run(args: &[String]) {
         }
     }
     let out = format!("{panel}.mask.bed");
-    let mut o = std::io::BufWriter::new(
-        std::fs::File::create(&out).unwrap_or_else(|e| panic!("{out}: {e}")),
-    );
+    let mut o = std::io::BufWriter::new(std::fs::File::create(&out).unwrap_or_else(|e| panic!("{out}: {e}")));
     let (mut ni, mut na) = (0usize, 0usize);
     for (name, s) in &pan {
         let mut v = vec![0u32; s.len()];
@@ -212,16 +188,7 @@ mod tests {
     #[test]
     fn canonical_kmer_is_strand_independent() {
         let s = b"ACGTTGCAAGGCTTAACCGGTTAAC";
-        let rc: Vec<u8> = s
-            .iter()
-            .rev()
-            .map(|b| match b {
-                b'A' => b'T',
-                b'C' => b'G',
-                b'G' => b'C',
-                _ => b'A',
-            })
-            .collect();
+        let rc: Vec<u8> = s.iter().rev().map(|b| match b { b'A' => b'T', b'C' => b'G', b'G' => b'C', _ => b'A' }).collect();
         let (mut a, mut b) = (vec![], vec![]);
         kmers(s, |_, k| a.push(k));
         kmers(&rc, |_, k| b.push(k));

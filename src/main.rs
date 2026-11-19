@@ -3,29 +3,26 @@ mod bamin;
 mod builddb;
 mod db;
 mod groups;
-mod html;
 mod kern;
-mod long;
-mod mask;
-mod names;
-mod novel;
-mod output;
-mod panel;
 mod prior;
 mod refine;
-mod stagea;
 mod stageb;
+mod names;
+mod html;
+mod long;
+mod mask;
+mod novel;
+mod panel;
+mod stagea;
+mod output;
 mod util;
 
 use ahash::{AHashMap, AHashSet};
 use names::{three, two};
-use rayon::prelude::*;
 use std::time::Instant;
+use rayon::prelude::*;
 
-pub const FOCUS: [&str; 26] = [
-    "A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DRA", "E", "F",
-    "G", "H", "K", "V", "DMA", "DMB", "DOA", "DOB", "MICA", "MICB", "TAP1", "TAP2",
-];
+pub const FOCUS: [&str; 26] = ["A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DRA", "E", "F", "G", "H", "K", "V", "DMA", "DMB", "DOA", "DOB", "MICA", "MICB", "TAP1", "TAP2"];
 
 pub fn related(g: &str) -> &'static [&'static str] {
     match g {
@@ -60,47 +57,24 @@ fn main() {
     if a.len() < if aligned { 5 } else { 6 } {
         eprintln!("usage: hla-wgs DBDIR R1.fq.gz R2.fq.gz OUTPREFIX [threads]");
         eprintln!("       hla-wgs DBDIR INPUT.bam|INPUT.cram OUTPREFIX [threads] [REF.fa (CRAM)]");
-        eprintln!(
-            "       hla-wgs long DBDIR READS.fastq[.gz]|READS.bam OUTPREFIX [threads]   (PacBio HiFi)"
-        );
+        eprintln!("       hla-wgs long DBDIR READS.fastq[.gz]|READS.bam OUTPREFIX [threads]   (PacBio HiFi)");
         eprintln!("       hla-wgs build-db hla.dat freq.json DBDIR");
         eprintln!("       hla-wgs build-mask DBDIR GENOME.fa [EXCLUDE.bed]");
         eprintln!("       (DBDIR may also be given as its two files: hladb.json.gz panel.fa)");
         std::process::exit(2);
     }
     let (input, out, ti) = if aligned {
-        (
-            panel::Input::Aligned(a[3].clone(), a.get(6).cloned()),
-            a[4].clone(),
-            5,
-        )
+        (panel::Input::Aligned(a[3].clone(), a.get(6).cloned()), a[4].clone(), 5)
     } else {
-        (
-            panel::Input::Fastq(a[3].clone(), a[4].clone()),
-            a[5].clone(),
-            6,
-        )
+        (panel::Input::Fastq(a[3].clone(), a[4].clone()), a[5].clone(), 6)
     };
     let threads: usize = a.get(ti).and_then(|x| x.parse().ok()).unwrap_or(4);
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(threads)
-        .build_global()
-        .ok();
+    rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().ok();
     let t0 = Instant::now();
     let log = |s: String| eprintln!("[{:6.1}s] {}", t0.elapsed().as_secs_f64(), s);
-    let (p, db) = rayon::join(
-        || panel::run(&a[2], &input, threads),
-        || db::Db::load(&a[1]),
-    );
+    let (p, db) = rayon::join(|| panel::run(&a[2], &input, threads), || db::Db::load(&a[1]));
     let reads = &p.reads;
-    log(format!(
-        "panel mapped reads: {}",
-        reads
-            .seq
-            .iter()
-            .filter(|r| r[0].is_some() || r[1].is_some())
-            .count()
-    ));
+    log(format!("panel mapped reads: {}", reads.seq.iter().filter(|r| r[0].is_some() || r[1].is_some()).count()));
     if std::env::var("DUMP0").is_ok() {
         let mut gg: Vec<_> = p.assign.iter().collect();
         gg.sort();
@@ -119,192 +93,110 @@ fn main() {
         println!("READS\t{}", h);
     }
     let genes: Vec<&str> = match std::env::var("GENES") {
-        Ok(v) => FOCUS
-            .iter()
-            .copied()
-            .filter(|g| v.split(',').any(|x| x == *g))
-            .collect(),
+        Ok(v) => FOCUS.iter().copied().filter(|g| v.split(',').any(|x| x == *g)).collect(),
         Err(_) => FOCUS.to_vec(),
     };
     let empty = vec![];
     let ctx = stageb::Ctx::new(&db, reads);
-    let mut res: AHashMap<String, (stageb::StageB, Option<Vec<String>>, refine::RMarg)> =
-        AHashMap::new();
+    let mut res: AHashMap<String, (stageb::StageB, Option<Vec<String>>, refine::RMarg)> = AHashMap::new();
     let mut depth: AHashMap<String, usize> = AHashMap::new();
     type GeneRes = (stageb::StageB, Option<Vec<String>>, refine::RMarg);
     type Nov = [Vec<novel::Site>; 2];
-    let outs: Vec<(String, usize, Option<GeneRes>, Option<Nov>)> = genes
-        .par_iter()
-        .map(|g| {
-            let mut dg = 0usize;
-            let qn_a: &Vec<usize> = p.assign.get(*g).unwrap_or(&empty);
-            let mut qn: Vec<usize> = qn_a.clone();
-            if !related(g).is_empty() {
-                let mut set: std::collections::BTreeSet<&str> =
-                    qn_a.iter().map(|&q| reads.names[q].as_str()).collect();
-                let mut byname: AHashMap<&str, usize> = AHashMap::new();
-                for x in std::iter::once(*g).chain(related(g).iter().copied()) {
-                    for &q in p.assign.get(x).unwrap_or(&empty) {
-                        set.insert(reads.names[q].as_str());
-                        byname.insert(reads.names[q].as_str(), q);
+    let outs: Vec<(String, usize, Option<GeneRes>, Option<Nov>)> = genes.par_iter().map(|g| {
+        let mut dg = 0usize;
+        let qn_a: &Vec<usize> = p.assign.get(*g).unwrap_or(&empty);
+        let mut qn: Vec<usize> = qn_a.clone();
+        if !related(g).is_empty() {
+            let mut set: std::collections::BTreeSet<&str> = qn_a.iter().map(|&q| reads.names[q].as_str()).collect();
+            let mut byname: AHashMap<&str, usize> = AHashMap::new();
+            for x in std::iter::once(*g).chain(related(g).iter().copied()) {
+                for &q in p.assign.get(x).unwrap_or(&empty) {
+                    set.insert(reads.names[q].as_str());
+                    byname.insert(reads.names[q].as_str(), q);
+                }
+            }
+            qn = set.into_iter().map(|n| byname[n]).collect();
+        }
+        dg = qn.len();
+        if qn.len() < 20 {
+            return (g.to_string(), dg, None, None);
+        }
+        let al = &db.ref_[*g];
+        let idx = stagea::build_index(al);
+        let sa = stagea::run(g, al, &idx, reads, qn_a);
+        log(sa.log.clone());
+        log(format!("{} reads {} candidates {}", g, qn.len(), sa.cand.len()));
+        if std::env::var("DUMPA").is_ok() {
+            println!("{}\t{}", g, sa.cand.iter().map(|&i| al[i].name.as_str()).collect::<Vec<_>>().join(","));
+        }
+        let cand = sa.cand;
+        if cand.is_empty() {
+            return (g.to_string(), dg, None, None);
+        }
+        let mut r1 = ctx.stage_b(g, &qn, &cand);
+        if let Some(r) = &r1 {
+            // pass 2: expand the exon classes of the best pair(s) to all members
+            let mut win: AHashSet<usize> = r.ties.iter().take(6).flat_map(|p| [cand[p.0], cand[p.1]]).collect();
+            let byname: AHashMap<&str, usize> = al.iter().enumerate().map(|(i, a)| (a.name.as_str(), i)).collect();
+            let par: Vec<usize> = win.iter().filter_map(|&i| al[i].imputed_from.as_deref().and_then(|n| byname.get(n).copied())).collect();
+            win.extend(par);
+            let mut ws: Vec<usize> = win.iter().copied().collect();
+            ws.sort();
+            let mut f2l: Vec<String> = ws.iter().map(|&i| two(&al[i].name)).collect();
+            let nwin = f2l.len();
+            let first_set: AHashSet<&String> = f2l[..nwin].iter().collect();
+            let lim = first_set.len().max(6);
+            f2l.extend(r.near.iter().flat_map(|p| [two(&al[cand[p.0]].name), two(&al[cand[p.1]].name)]));
+            let mut uniq: Vec<String> = vec![];
+            for x in &f2l {
+                if !uniq.contains(x) {
+                    uniq.push(x.clone());
+                }
+            }
+            let mut f2: AHashSet<String> = uniq.into_iter().take(lim).collect();
+            f2.extend(r.alts.iter().cloned());
+            let f3: AHashSet<String> = ws.iter().map(|&i| three(&al[i].name)).collect();
+            let (mut pri, mut sec) = (vec![], vec![]);
+            for (i, a) in al.iter().enumerate() {
+                if f3.contains(&three(&a.name)) {
+                    pri.push(i);
+                } else if f2.contains(&two(&a.name)) && !a.imputed {
+                    sec.push(i);
+                }
+            }
+            let mut c2: std::collections::BTreeSet<usize> = pri.into_iter().chain(sec).take(400).collect();
+            c2.extend(ws.iter().copied());
+            let cand2: Vec<usize> = c2.into_iter().collect();
+            if let Some(x) = ctx.stage_b(g, &qn, &cand2) {
+                r1 = Some(x);
+            }
+            log(format!("{} pass2 candidates {}", g, cand2.len()));
+        }
+        if let Some(r) = r1 {
+            let n = |k: usize| al[r.cand[k]].name.as_str();
+            if std::env::var("DUMPB").is_ok() {
+                println!("{}\t{}\t{}\t{:.3}\t{:.3}\t{}\t{}", g, n(r.pair.0), n(r.pair.1), r.ll, r.gap, r.nreads, r.ties.len());
+            }
+            let mut rm = refine::RMarg::new();
+            let names = refine::exon_refine(&ctx, g, &qn, &r, &mut rm, &log);
+            let fin: [String; 2] = match &names {
+                Some(v) => [v[0].clone(), v[1].clone()],
+                None => [al[r.cand[r.pair.0]].name.clone(), al[r.cand[r.pair.1]].name.clone()],
+            };
+            let nv = if std::env::var("HLA_NONOVEL").is_ok() { None } else { Some(novel::sites(&ctx, g, &qn, [fin[0].as_str(), fin[1].as_str()])) };
+            if let Some(n) = &nv {
+                for (k, v) in n.iter().enumerate() {
+                    if !v.is_empty() {
+                        log(format!("{} novel slot{} {} sites {}", g, k + 1, v.len(), v.iter().take(8).map(|s| format!("{}:{}:{}/{}{}", s.pos, s.what, s.alt, s.depth, if s.exon { ":exon" } else { "" })).collect::<Vec<_>>().join(" ")));
                     }
                 }
-                qn = set.into_iter().map(|n| byname[n]).collect();
-            }
-            dg = qn.len();
-            if qn.len() < 20 {
-                return (g.to_string(), dg, None, None);
-            }
-            let al = &db.ref_[*g];
-            let idx = stagea::build_index(al);
-            let sa = stagea::run(g, al, &idx, reads, qn_a);
-            log(sa.log.clone());
-            log(format!(
-                "{} reads {} candidates {}",
-                g,
-                qn.len(),
-                sa.cand.len()
-            ));
-            if std::env::var("DUMPA").is_ok() {
-                println!(
-                    "{}\t{}",
-                    g,
-                    sa.cand
-                        .iter()
-                        .map(|&i| al[i].name.as_str())
-                        .collect::<Vec<_>>()
-                        .join(",")
-                );
-            }
-            let cand = sa.cand;
-            if cand.is_empty() {
-                return (g.to_string(), dg, None, None);
-            }
-            let mut r1 = ctx.stage_b(g, &qn, &cand);
-            if let Some(r) = &r1 {
-                // pass 2: expand the exon classes of the best pair(s) to all members
-                let mut win: AHashSet<usize> = r
-                    .ties
-                    .iter()
-                    .take(6)
-                    .flat_map(|p| [cand[p.0], cand[p.1]])
-                    .collect();
-                let byname: AHashMap<&str, usize> = al
-                    .iter()
-                    .enumerate()
-                    .map(|(i, a)| (a.name.as_str(), i))
-                    .collect();
-                let par: Vec<usize> = win
-                    .iter()
-                    .filter_map(|&i| {
-                        al[i]
-                            .imputed_from
-                            .as_deref()
-                            .and_then(|n| byname.get(n).copied())
-                    })
-                    .collect();
-                win.extend(par);
-                let mut ws: Vec<usize> = win.iter().copied().collect();
-                ws.sort();
-                let mut f2l: Vec<String> = ws.iter().map(|&i| two(&al[i].name)).collect();
-                let nwin = f2l.len();
-                let first_set: AHashSet<&String> = f2l[..nwin].iter().collect();
-                let lim = first_set.len().max(6);
-                f2l.extend(
-                    r.near
-                        .iter()
-                        .flat_map(|p| [two(&al[cand[p.0]].name), two(&al[cand[p.1]].name)]),
-                );
-                let mut uniq: Vec<String> = vec![];
-                for x in &f2l {
-                    if !uniq.contains(x) {
-                        uniq.push(x.clone());
-                    }
-                }
-                let mut f2: AHashSet<String> = uniq.into_iter().take(lim).collect();
-                f2.extend(r.alts.iter().cloned());
-                let f3: AHashSet<String> = ws.iter().map(|&i| three(&al[i].name)).collect();
-                let (mut pri, mut sec) = (vec![], vec![]);
-                for (i, a) in al.iter().enumerate() {
-                    if f3.contains(&three(&a.name)) {
-                        pri.push(i);
-                    } else if f2.contains(&two(&a.name)) && !a.imputed {
-                        sec.push(i);
-                    }
-                }
-                let mut c2: std::collections::BTreeSet<usize> =
-                    pri.into_iter().chain(sec).take(400).collect();
-                c2.extend(ws.iter().copied());
-                let cand2: Vec<usize> = c2.into_iter().collect();
-                if let Some(x) = ctx.stage_b(g, &qn, &cand2) {
-                    r1 = Some(x);
-                }
-                log(format!("{} pass2 candidates {}", g, cand2.len()));
-            }
-            if let Some(r) = r1 {
-                let n = |k: usize| al[r.cand[k]].name.as_str();
-                if std::env::var("DUMPB").is_ok() {
-                    println!(
-                        "{}\t{}\t{}\t{:.3}\t{:.3}\t{}\t{}",
-                        g,
-                        n(r.pair.0),
-                        n(r.pair.1),
-                        r.ll,
-                        r.gap,
-                        r.nreads,
-                        r.ties.len()
-                    );
-                }
-                let mut rm = refine::RMarg::new();
-                let names = refine::exon_refine(&ctx, g, &qn, &r, &mut rm, &log);
-                let fin: [String; 2] = match &names {
-                    Some(v) => [v[0].clone(), v[1].clone()],
-                    None => [
-                        al[r.cand[r.pair.0]].name.clone(),
-                        al[r.cand[r.pair.1]].name.clone(),
-                    ],
-                };
-                let nv = if std::env::var("HLA_NONOVEL").is_ok() {
-                    None
-                } else {
-                    Some(novel::sites(
-                        &ctx,
-                        g,
-                        &qn,
-                        [fin[0].as_str(), fin[1].as_str()],
-                    ))
-                };
-                if let Some(n) = &nv {
-                    for (k, v) in n.iter().enumerate() {
-                        if !v.is_empty() {
-                            log(format!(
-                                "{} novel slot{} {} sites {}",
-                                g,
-                                k + 1,
-                                v.len(),
-                                v.iter()
-                                    .take(8)
-                                    .map(|s| format!(
-                                        "{}:{}:{}/{}{}",
-                                        s.pos,
-                                        s.what,
-                                        s.alt,
-                                        s.depth,
-                                        if s.exon { ":exon" } else { "" }
-                                    ))
-                                    .collect::<Vec<_>>()
-                                    .join(" ")
-                            ));
-                        }
-                    }
-                }
-                log(format!("{} done", g));
-                return (g.to_string(), dg, Some((r, names, rm)), nv);
             }
             log(format!("{} done", g));
-            (g.to_string(), dg, None, None)
-        })
-        .collect();
+            return (g.to_string(), dg, Some((r, names, rm)), nv);
+        }
+        log(format!("{} done", g));
+        (g.to_string(), dg, None, None)
+    }).collect();
     let mut nov: AHashMap<String, Nov> = AHashMap::new();
     let mut known: AHashMap<String, [Option<String>; 2]> = AHashMap::new();
     for (g, d, r, n) in outs {
@@ -315,24 +207,12 @@ fn main() {
                     let al = ctx.al(&g);
                     let fin: [String; 2] = match names {
                         Some(v) => [v[0].clone(), v[1].clone()],
-                        None => [
-                            al[r.cand[r.pair.0]].name.clone(),
-                            al[r.cand[r.pair.1]].name.clone(),
-                        ],
+                        None => [al[r.cand[r.pair.0]].name.clone(), al[r.cand[r.pair.1]].name.clone()],
                     };
-                    let k = [
-                        novel::db_match(&ctx, &g, &fin[0], &x[0]),
-                        novel::db_match(&ctx, &g, &fin[1], &x[1]),
-                    ];
+                    let k = [novel::db_match(&ctx, &g, &fin[0], &x[0]), novel::db_match(&ctx, &g, &fin[1], &x[1])];
                     for (i, m) in k.iter().enumerate() {
                         if let Some(m) = m {
-                            log(format!(
-                                "{} slot{} {} plus its residual variants is {}",
-                                g,
-                                i + 1,
-                                fin[i],
-                                m
-                            ));
+                            log(format!("{} slot{} {} plus its residual variants is {}", g, i + 1, fin[i], m));
                         }
                     }
                     known.insert(g.clone(), k);
@@ -346,14 +226,8 @@ fn main() {
     }
 
     let drb = drb_copies(&ctx, &res, &p.assign, &log);
-    let grp = groups::Groups::load(
-        std::path::Path::new(&a[1])
-            .parent()
-            .unwrap_or(std::path::Path::new(".")),
-    );
-    output::write(
-        &out, &genes, &ctx, &res, &depth, &drb, &nov, &known, &grp, &log,
-    );
+    let grp = groups::Groups::load(std::path::Path::new(&a[1]).parent().unwrap_or(std::path::Path::new(".")));
+    output::write(&out, &genes, &ctx, &res, &depth, &drb, &nov, &known, &grp, &log);
     log("total".to_string());
 }
 
@@ -395,13 +269,7 @@ fn drb_copies(
         }
     }
     let mut gl: Vec<&str> = vec!["DRB1", "DRB3", "DRB4", "DRB5"];
-    gl.extend(
-        ctx.db
-            .genes
-            .iter()
-            .map(|x| x.as_str())
-            .filter(|x| x.starts_with("DRB")),
-    );
+    gl.extend(ctx.db.genes.iter().map(|x| x.as_str()).filter(|x| x.starts_with("DRB")));
     let mut qs: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
     for g in gl {
         for &q in assign.get(g).map(|v| v.as_slice()).unwrap_or(&[]) {
@@ -410,9 +278,7 @@ fn drb_copies(
     }
     let qn: Vec<usize> = qs.values().copied().collect();
     let mut out = AHashMap::new();
-    let Some((e, qn_used)) = kern::edit_matrix(ctx.reads, &qn, &seqs) else {
-        return out;
-    };
+    let Some((e, qn_used)) = kern::edit_matrix(ctx.reads, &qn, &seqs) else { return out };
     let dump = std::env::var("HLA_DRBDUMP").is_ok();
     let mut cnt: AHashMap<&str, usize> = AHashMap::new();
     for (ri, row) in e.iter().enumerate() {
@@ -426,27 +292,13 @@ fn drb_copies(
             continue;
         }
         let gb = owner[o0];
-        let om = row
-            .iter()
-            .zip(owner.iter())
-            .filter(|(_, o)| **o != gb)
-            .map(|(v, _)| *v)
-            .fold(f64::INFINITY, f64::min);
+        let om = row.iter().zip(owner.iter()).filter(|(_, o)| **o != gb).map(|(v, _)| *v).fold(f64::INFINITY, f64::min);
         if om.is_finite() && om < row[o0] + 3.0 {
             continue;
         }
         *cnt.entry(gb).or_default() += 1;
         if dump {
-            eprintln!(
-                "DRBUNIQ\t{}\t{}\t{}\t{}",
-                gb,
-                ctx.reads.names[qn_used[ri]],
-                row[o0],
-                ctx.reads.seq[qn_used[ri]]
-                    .iter()
-                    .filter(|x| x.is_some())
-                    .count()
-            );
+            eprintln!("DRBUNIQ\t{}\t{}\t{}\t{}", gb, ctx.reads.names[qn_used[ri]], row[o0], ctx.reads.seq[qn_used[ri]].iter().filter(|x| x.is_some()).count());
         }
     }
     let mut lens: AHashMap<&str, f64> = AHashMap::new();
@@ -461,12 +313,7 @@ fn drb_copies(
         let d = if l > 0.0 { c(g) / l.max(1.0) } else { 0.0 };
         let ratio = if per_copy > 0.0 { d / per_copy } else { 0.0 };
         out.insert(g.to_string(), ratio);
-        log(format!(
-            "{} joint-DRB unique reads {} ratio per DRB1 copy {:.3}",
-            g,
-            c(g),
-            ratio
-        ));
+        log(format!("{} joint-DRB unique reads {} ratio per DRB1 copy {:.3}", g, c(g), ratio));
     }
     out
 }

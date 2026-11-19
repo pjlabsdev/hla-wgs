@@ -40,14 +40,5 @@ pub fn diff_level(a: &str, b: &str) -> u32 {
 }
 /// sort key: [int(f) if f.isdigit() else 999 for f in fields]
 pub fn num_key(name: &str) -> Vec<i64> {
-    fields(name)
-        .iter()
-        .map(|f| {
-            if !f.is_empty() && f.bytes().all(|c| c.is_ascii_digit()) {
-                f.parse().unwrap_or(999)
-            } else {
-                999
-            }
-        })
-        .collect()
+    fields(name).iter().map(|f| if !f.is_empty() && f.bytes().all(|c| c.is_ascii_digit()) { f.parse().unwrap_or(999) } else { 999 }).collect()
 }

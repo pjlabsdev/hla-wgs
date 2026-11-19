@@ -8,22 +8,10 @@ use noodles::sam::alignment::record::Flags;
 use std::sync::mpsc::SyncSender;
 
 const MHC_ALTS: [&str; 16] = [
-    "chr6_GL000250v2_alt",
-    "chr6_GL000251v2_alt",
-    "chr6_GL000252v2_alt",
-    "chr6_GL000253v2_alt",
-    "chr6_GL000254v2_alt",
-    "chr6_GL000255v2_alt",
-    "chr6_GL000256v2_alt",
-    "chr6_GL383533v1_alt",
-    "chr6_KB021644v2_alt",
-    "chr6_KI270758v1_alt",
-    "chr6_KI270797v1_alt",
-    "chr6_KI270798v1_alt",
-    "chr6_KI270799v1_alt",
-    "chr6_KI270800v1_alt",
-    "chr6_KI270801v1_alt",
-    "chr6_KI270802v1_alt",
+    "chr6_GL000250v2_alt", "chr6_GL000251v2_alt", "chr6_GL000252v2_alt", "chr6_GL000253v2_alt",
+    "chr6_GL000254v2_alt", "chr6_GL000255v2_alt", "chr6_GL000256v2_alt", "chr6_GL383533v1_alt",
+    "chr6_KB021644v2_alt", "chr6_KI270758v1_alt", "chr6_KI270797v1_alt", "chr6_KI270798v1_alt",
+    "chr6_KI270799v1_alt", "chr6_KI270800v1_alt", "chr6_KI270801v1_alt", "chr6_KI270802v1_alt",
 ];
 const GRCH38_CHR6: usize = 170_805_979;
 const GRCH37_CHR6: usize = 171_115_067;
@@ -43,10 +31,7 @@ pub fn regions(refs: &[(String, usize)]) -> Vec<String> {
                 }
             };
             out.push(format!("{n}:{s}-{e}"));
-        } else if n.starts_with("HLA-")
-            || MHC_ALTS.contains(&n)
-            || MHC_ALTS.iter().any(|a| a.strip_prefix("chr") == Some(n))
-        {
+        } else if n.starts_with("HLA-") || MHC_ALTS.contains(&n) || MHC_ALTS.iter().any(|a| a.strip_prefix("chr") == Some(n)) {
             out.push(format!("{n}:1-{len}"));
         }
     }
@@ -73,31 +58,15 @@ impl Pairer {
         if flags.intersects(Flags::SECONDARY.union(Flags::SUPPLEMENTARY)) || !flags.is_segmented() {
             return;
         }
-        let mate = if flags.is_first_segment() {
-            0
-        } else if flags.is_last_segment() {
-            1
-        } else {
-            return;
-        };
-        let seq = if flags.is_reverse_complemented() {
-            revcomp_into(&seq)
-        } else {
-            seq
-        };
+        let mate = if flags.is_first_segment() { 0 } else if flags.is_last_segment() { 1 } else { return };
+        let seq = if flags.is_reverse_complemented() { revcomp_into(&seq) } else { seq };
         let e = self.open.entry(name.to_vec()).or_insert([None, None]);
         e[mate] = Some(seq);
         if e[0].is_some() && e[1].is_some() {
             let [a, b] = self.open.remove(name).unwrap();
             let nm = String::from_utf8_lossy(name).into_owned();
-            self.b1.push(Fq {
-                name: nm.clone(),
-                seq: a.unwrap(),
-            });
-            self.b2.push(Fq {
-                name: nm,
-                seq: b.unwrap(),
-            });
+            self.b1.push(Fq { name: nm.clone(), seq: a.unwrap() });
+            self.b2.push(Fq { name: nm, seq: b.unwrap() });
             self.pairs += 1;
             if self.b1.len() >= 50_000 {
                 self.flush();
@@ -117,20 +86,8 @@ impl Pairer {
 /// An I/O error (USB disk dropping out, volume briefly unmounted) does not abort the run: the
 /// file is reopened after a pause and reading resumes after the last record already consumed.
 /// Records arrive in the same order as in an uninterrupted pass, so results are unchanged.
-pub fn stream(
-    path: &str,
-    reference: Option<&str>,
-    threads: usize,
-    tx: SyncSender<(Vec<Fq>, Vec<Fq>)>,
-) -> (u64, u64, usize) {
-    let mut p = Pairer {
-        open: AHashMap::new(),
-        b1: vec![],
-        b2: vec![],
-        tx,
-        records: 0,
-        pairs: 0,
-    };
+pub fn stream(path: &str, reference: Option<&str>, threads: usize, tx: SyncSender<(Vec<Fq>, Vec<Fq>)>) -> (u64, u64, usize) {
+    let mut p = Pairer { open: AHashMap::new(), b1: vec![], b2: vec![], tx, records: 0, pairs: 0 };
     let tries = crate::util::io_retries();
     let mut attempt = 0;
     loop {
@@ -143,10 +100,7 @@ pub fn stream(
                     panic!("{path}: {e} (gave up after {tries} retries)");
                 }
                 let wait = crate::util::backoff(attempt);
-                eprintln!(
-                    "[input] {path}: I/O error after {} records: {e}; retry {attempt}/{tries} in {wait}s",
-                    p.records
-                );
+                eprintln!("[input] {path}: I/O error after {} records: {e}; retry {attempt}/{tries} in {wait}s", p.records);
                 std::thread::sleep(std::time::Duration::from_secs(wait));
             }
         }
@@ -160,36 +114,20 @@ fn err<E: std::fmt::Display>(e: E) -> std::io::Error {
 }
 
 /// one pass over regions and unmapped tail; records 1..=skip are read but not handed on
-fn pass(
-    path: &str,
-    reference: Option<&str>,
-    threads: usize,
-    skip: u64,
-    p: &mut Pairer,
-) -> std::io::Result<()> {
+fn pass(path: &str, reference: Option<&str>, threads: usize, skip: u64, p: &mut Pairer) -> std::io::Result<()> {
     let mut seen: u64 = 0;
     let lower = path.to_ascii_lowercase();
     if lower.ends_with(".cram") {
         use noodles::{cram, fasta};
         let repo = reference
-            .map(|src| {
-                fasta::io::indexed_reader::Builder::default()
-                    .build_from_path(src)
-                    .expect("reference fasta (.fai needed)")
-            })
+            .map(|src| fasta::io::indexed_reader::Builder::default().build_from_path(src).expect("reference fasta (.fai needed)"))
             .map(fasta::repository::adapters::IndexedReader::new)
             .map(fasta::Repository::new)
             .unwrap_or_default();
-        let mut rd = cram::io::reader::Builder::default()
-            .set_reference_sequence_repository(repo)
-            .build_from_path(path)?;
+        let mut rd = cram::io::reader::Builder::default().set_reference_sequence_repository(repo).build_from_path(path)?;
         let header = rd.read_header()?;
         let index = cram::fs::read_associated_index(path)?;
-        let refs: Vec<(String, usize)> = header
-            .reference_sequences()
-            .iter()
-            .map(|(n, m)| (n.to_string(), m.length().get()))
-            .collect();
+        let refs: Vec<(String, usize)> = header.reference_sequences().iter().map(|(n, m)| (n.to_string(), m.length().get())).collect();
         for reg in regions(&refs) {
             let region = reg.parse().unwrap();
             for r in rd.query(&header, &index, &region)?.records() {
@@ -224,18 +162,11 @@ fn pass(
         let header = rd.read_header()?;
         let index = bam::fs::read_associated_index(path)
             .or_else(|_| {
-                let alt = path
-                    .strip_suffix(".bam")
-                    .map(|b| format!("{b}.bai"))
-                    .unwrap_or_default();
+                let alt = path.strip_suffix(".bam").map(|b| format!("{b}.bai")).unwrap_or_default();
                 noodles::bam::bai::fs::read(&alt).map(noodles::bam::Index::Bai)
             })
             .map_err(|e| err(format!("index .bam.bai/.bai/.csi needed: {e}")))?;
-        let refs: Vec<(String, usize)> = header
-            .reference_sequences()
-            .iter()
-            .map(|(n, m)| (n.to_string(), m.length().get()))
-            .collect();
+        let refs: Vec<(String, usize)> = header.reference_sequences().iter().map(|(n, m)| (n.to_string(), m.length().get())).collect();
         for reg in regions(&refs) {
             let region = reg.parse().unwrap();
             for r in rd.query(&header, &index, &region)?.records() {
