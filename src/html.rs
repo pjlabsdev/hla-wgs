@@ -97,7 +97,7 @@ svg.fdia tspan.fk1{fill:var(--f1)}svg.fdia tspan.fk2{fill:var(--f2)}svg.fdia tsp
 svg.fdia .br.off,svg.fdia .ln.off{stroke:var(--line);stroke-dasharray:3 3}svg.fdia circle.off{fill:var(--line);stroke:none}svg.fdia circle{stroke:none}
 svg.fdia .br,svg.fdia .ln{fill:none!important}
 svg.fdia .lb{font:400 12px 'IBM Plex Mono',ui-monospace,monospace;fill:var(--mut)}svg.fdia .lb.off{fill:var(--soft-fg)}
-.legend{background:var(--surface);border:1px solid var(--hair);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 20px 6px;margin:0 0 14px;overflow-x:auto}.legend .note{margin:2px 0 10px}.legend h3{font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--soft-fg);margin:0 0 6px}
+.legend{background:var(--surface);border:1px solid var(--hair);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 20px 6px;margin:0 0 14px;overflow-x:auto}.legend .note{margin:2px 0 10px}h4.ah{font-size:12px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--acc-t);margin:18px 0 2px;padding-top:12px;border-top:1px solid var(--hair)}details h4.ah:first-of-type{border-top:0;padding-top:0}.legend h3{font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--soft-fg);margin:0 0 6px}
 .alert{margin:22px 0 0;padding:12px 16px;border-radius:var(--r);background:color-mix(in srgb,var(--acc) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);font-size:12px;line-height:1.55}.alert.soft{background:var(--surface);border-color:var(--hair)}
 @media print{.bar,nav.tabs{display:none}section.tab-r,section.tab-d{display:block!important}section.tab-d{break-before:page}}
 body[data-tab=r] section.tab-d,body[data-tab=d] section.tab-r{display:none}
@@ -141,11 +141,39 @@ fn name_html(full: &str, res: u64) -> String {
 }
 
 /// what each field of an allele name stands for, drawn on an example name
-fn legend(t: &dyn Fn(&'static str, &'static str) -> &'static str, example: &(String, u64)) -> String {
-    let labels: Vec<String> = (1..=4).map(|k| format!("{} {}", field_meaning(t, k), if k as u64 <= example.1 { "✓" } else { "?" })).collect();
+fn legend(t: &dyn Fn(&'static str, &'static str) -> &'static str, example: &(String, u64, Value), thr: &dyn Fn(&str) -> f64) -> String {
+    let labels: Vec<String> = (1..=4u64).map(|k| {
+        if k <= example.1 {
+            format!("{} · {}", field_meaning(t, k as usize), t("✓ gesichert", "✓ supported"))
+        } else if k == example.1 + 1 {
+            format!("{} · {}: {}", field_meaning(t, k as usize), t("? nicht gesichert", "? not supported"), short_reason(&example.2, t, thr))
+        } else {
+            format!("{} · {}", field_meaning(t, k as usize), t("? nicht gesichert", "? not supported"))
+        }
+    }).collect();
     format!("<div class=\"legend\"><h3>{}</h3>{}<p class=\"note\">{}</p></div>\n", t("So liest man einen Allelnamen", "How to read an allele name"), field_diagram(&example.0, example.1, &labels), t(
-        "Jedes Feld ist in seiner Farbe unterstrichen, wenn die Reads es sichern. Grau und gestrichelt: Feld des nächstliegenden Datenbank-Allels, das nicht gesichert ist.",
-        "Each field is underlined in its colour when the reads support it. Grey and dashed: a field of the nearest database allele that is not supported."))
+        "Beispiel aus dieser Probe. ✓ gesichert: die Reads belegen das Feld. ? nicht gesichert: das Feld gehört zum nächstliegenden Datenbank-Allel, die Reads können es nicht prüfen; der Grund steht dabei. In der Tabelle sind gesicherte Felder farbig, nicht gesicherte grau.",
+        "Example from this sample. ✓ supported: the reads prove the field. ? not supported: the field belongs to the nearest database allele and the reads cannot check it; the reason is given. In the table supported fields are coloured, unsupported ones grey."))
+}
+
+/// the reason why a field is not supported, in a few words (the full text is in the details)
+fn short_reason(a: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static str, thr: &dyn Fn(&str) -> f64) -> &'static str {
+    let r = a["resolution"].as_u64().unwrap_or(0);
+    let next = (r + 1).max(2).to_string();
+    if a["margin"][next.as_str()].as_f64().map(|m| m < thr(&next)).unwrap_or(false) {
+        return t("Reads unterscheiden nicht klar vom nächsten Allel", "reads do not clearly tell it from the next allele");
+    }
+    let sites = a["new_sites"].as_array().cloned().unwrap_or_default();
+    if !sites.is_empty() && sites.iter().all(|x| x["change"].as_str().unwrap_or("").starts_with("blind")) {
+        return t("Strecke ohne eindeutig zuordenbare Reads", "stretch without uniquely placed reads");
+    }
+    if sites.iter().any(|x| x["exon"].as_bool().unwrap_or(false)) {
+        return t("abweichende Stelle im Exon", "differing site in an exon");
+    }
+    if !sites.is_empty() {
+        return t("abweichende Stelle außerhalb der Exons", "differing site outside the exons");
+    }
+    t("Datenlage reicht nicht", "not enough evidence")
 }
 
 fn field_meaning(t: &dyn Fn(&'static str, &'static str) -> &'static str, k: usize) -> &'static str {
@@ -372,8 +400,8 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
 
     // the example for the figure: an allele of this sample with four fields of which not all are supported
     // (shows both kinds), else the first with four fields
-    let all: Vec<(String, u64)> = genes.iter().filter(|g| g["copies"].as_u64().unwrap_or(2) > 0).flat_map(|g| g["alleles"].as_array().cloned().unwrap_or_default()).map(|a| (a["allele"].as_str().unwrap_or("").to_string(), a["resolution"].as_u64().unwrap_or(0))).filter(|(n, _)| n.split(':').count() == 4).collect();
-    let example = all.iter().find(|(_, r)| *r == 3).or(all.first()).cloned().unwrap_or_else(|| ("A*02:01:01:01".to_string(), 4));
+    let all: Vec<(String, u64, Value)> = genes.iter().filter(|g| g["copies"].as_u64().unwrap_or(2) > 0).flat_map(|g| g["alleles"].as_array().cloned().unwrap_or_default()).map(|a| (a["allele"].as_str().unwrap_or("").to_string(), a["resolution"].as_u64().unwrap_or(0), a)).filter(|(n, _, _)| n.split(':').count() == 4).collect();
+    let example = all.iter().find(|(_, r, _)| *r == 3).or(all.first()).cloned().unwrap_or_else(|| ("A*02:01:01:01".to_string(), 4, Value::Null));
     let mut h = String::with_capacity(32_000);
     h.push_str(&format!(
         "{}",
@@ -413,7 +441,7 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
     h.push_str(&format!(
         "<h2>{}</h2>\n{}<div class=\"panel\"><table><thead><tr><th>{}</th><th>{} 1</th><th>{} 2</th><th>{}</th><th class=\"hide\">{}</th></tr></thead><tbody>\n{rows}</tbody></table></div>\n<p class=\"note\">{}</p>\n",
         t("Ergebnis", "Result"),
-        legend(&t, &example),
+        legend(&t, &example, &thr),
         t("Gen", "Gene"),
         t("Allel", "Allele"),
         t("Allel", "Allele"),
@@ -438,8 +466,8 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         "</section>\n<section class=\"tab-d\">\n<h2>{}</h2>\n<p class=\"note\">{}</p>\n{details}</section>\n",
         t("Details je Gen", "Details per gene"),
         t(
-            "Alle Werte aus .tsv und .conf.tsv. Vorsprung: wie viel besser (Log-Likelihood) das gewählte Allel die Reads erklärt als das beste Allel, das sich in diesem Feld unterscheidet; ab der Schwelle gilt das Feld als gesichert. Ein Klick öffnet ein Gen; beim Drucken sind alle offen.",
-            "All values of .tsv and .conf.tsv. Lead: how much better (log-likelihood) the chosen allele explains the reads than the best allele that differs in this field; at or above the threshold the field counts as supported. Click a gene to open it; all are open when printed."
+            "Allel 1 und Allel 2 sind die beiden Kopien des Gens, eine von der Mutter und eine vom Vater; die Nummer sagt nicht, von wem welche stammt. Alle Werte aus .tsv und .conf.tsv. Vorsprung: wie viel besser (Log-Likelihood) das gewählte Allel die Reads erklärt als das beste Allel, das sich in diesem Feld unterscheidet; ab der Schwelle gilt das Feld als gesichert. Ein Klick öffnet ein Gen; beim Drucken sind alle offen.",
+            "Allele 1 and allele 2 are the two copies of the gene, one from the mother and one from the father; the number does not say which is which. All values of .tsv and .conf.tsv. Lead: how much better (log-likelihood) the chosen allele explains the reads than the best allele that differs in this field; at or above the threshold the field counts as supported. Click a gene to open it; all are open when printed."
         )
     ));
     h.push_str(&format!(
@@ -490,19 +518,17 @@ fn gene_details(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static st
             let st = if (k as u64) <= res { t("✓ gesichert", "✓ supported") } else { t("? nicht gesichert", "? not supported") };
             if (k as u64) == res + 1 {
                 // the first missing field points to the reason, which is not always the lead
-                return format!("{} · {st} ({})", field_meaning(t, k), t("Grund unten", "reason below"));
+                return format!("{} · {st}: {}", field_meaning(t, k), short_reason(a, t, thr));
             }
             match m {
                 Some(m) if (k as u64) <= res => format!("{} · {st} ({} {m:.1}, {} {:.0})", field_meaning(t, k), t("Vorsprung", "lead"), t("Schwelle", "threshold"), thr(&k.to_string())),
                 _ => format!("{} · {st}", field_meaning(t, k)),
             }
         }).collect();
+        o.push_str(&format!("<h4 class=\"ah\">{}</h4>\n", if copies >= 2 { format!("{} {}", t("Allel", "Allele"), i + 1) } else { t("Allel (eine Kopie)", "Allele (one copy)").to_string() }));
         o.push_str(&field_diagram(full, res, &labels));
         o.push_str(&format!(
-            "<div class=\"kv\">{} {}: {} · {}: {} · {}: {} · G: {} · P: {}{}{}</div>\n",
-            t("Allel", "Allele"),
-            i + 1,
-            name_html(full, a["resolution"].as_u64().unwrap_or(0)),
+            "<div class=\"kv\">{}: {} · {}: {} · G: {} · P: {}{}{}</div>\n",
             t("sicherer Ruf", "safe call"),
             esc(a["safe_call"].as_str().unwrap_or("")),
             t("gesicherte Felder", "supported fields"),
