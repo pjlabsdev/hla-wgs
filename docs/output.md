@@ -98,7 +98,7 @@ One line per gene sequence found in the long reads.
 | `equal_alternatives` | other alleles at the same distance |
 | `note` | `minor`: a third sequence of a gene or one with few reads; not written to the FASTA |
 
-One line for a gene means that both copies are identical or that there is one copy. A gene with `copies` 0 has no line. Besides the typed
+One line for a gene means that both copies are identical or that there is one copy. Besides the typed
 genes the table lists what else lies on the reads (for example HLA-J, L, DPA2, DPB2, DQA2).
 `PREFIX.long.fa` holds each sequence over the extent of its nearest allele.
 
