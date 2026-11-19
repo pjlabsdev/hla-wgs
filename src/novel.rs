@@ -169,6 +169,8 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
     // repeat lengths: per repeat the length change seen in reads that span it with both flanks
     let reps: Vec<Vec<(usize, usize)>> = (0..na).map(|k| if std::env::var("HLA_NOREP").is_ok() { vec![] } else { repeats(seqs[k]) }).collect();
     let mut replen: Vec<Vec<AHashMap<i64, (u32, u32)>>> = (0..na).map(|k| vec![AHashMap::new(); reps[k].len()]).collect();
+    // not for HLA-V: no gain there on the development samples (one true site lost, one false removed)
+    let dmin: AHashMap<usize, f64> = if std::env::var("HLA_NOPARA").is_err() && g != "V" && (!crate::stageb::decoys(g).is_empty() || ctx.db.genome_decoy.contains_key(g)) { ctx.decoy_min(g, qnames) } else { AHashMap::new() };
     for &q in qnames {
         let Some(r) = ctx.reads.get(q) else { continue };
         let mut per: Vec<Option<(i64, Vec<Aln>)>> = vec![];
@@ -191,6 +193,11 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
         let Some(bn) = bestnm else { continue };
         // a pair may carry several new variants; junk is kept out by the repeat mask and the clip penalty
         if bn > 8 {
+            continue;
+        }
+        // a pair that a related gene explains better (HLA-Y, -J, -K beside HLA-A, DQA2 beside DQA1) is
+        // left out, as it is when the alleles are scored
+        if dmin.get(&q).map_or(false, |d| *d < bn as f64) {
             continue;
         }
         let winners: Vec<usize> = (0..na).filter(|&k| per[k].as_ref().map_or(false, |x| x.0 == bn)).collect();
