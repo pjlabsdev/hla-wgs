@@ -108,6 +108,9 @@ fn best(al: &minimap2::Aligner<minimap2::Built>, q: &[u8], t: &[u8]) -> Option<A
     Some(Aln { nm: nm + clip, raw: nm, st: ts, en: te, diffs, clips })
 }
 
+/// bases a read must cover on both sides of a repeat to count as spanning it
+const REP_FLANK: usize = 10;
+
 fn hp_run(s: &[u8], p: usize) -> usize {
     let lo = p.saturating_sub(8);
     let hi = (p + 8).min(s.len());
@@ -116,6 +119,31 @@ fn hp_run(s: &[u8], p: usize) -> usize {
         if s[k] == s[k - 1] { run += 1; best = best.max(run); } else { run = 1; }
     }
     best
+}
+
+/// Single-base runs of 8 or more and short tandem repeats (unit 2 to 6, four copies and 12 bases or
+/// more) as half-open intervals. Their length is where short reads and assemblies disagree most.
+pub fn repeats(s: &[u8]) -> Vec<(usize, usize)> {
+    let mut out: Vec<(usize, usize)> = vec![];
+    let n = s.len();
+    for u in 1..=6usize {
+        let mut i = 0;
+        while i + 2 * u <= n {
+            let mut j = i + u;
+            while j < n && s[j] == s[j - u] { j += 1; }
+            let len = j - i;
+            let ok = if u == 1 { len >= 8 } else { len >= 4 * u && len >= 12 };
+            // a unit that is itself a run of one base is the single-base case
+            if ok && !(u > 1 && s[i..i + u].iter().all(|&c| c == s[i])) {
+                if !out.iter().any(|&(a, b)| i < b && a < j) { out.push((i, j)); }
+                i = j;
+            } else {
+                i += 1;
+            }
+        }
+    }
+    out.sort();
+    out
 }
 
 /// sites per called allele (index 0 = first name, 1 = second; identical names share one entry)
@@ -138,6 +166,9 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
     let mut dlink = dspec.clone();
     let mut clipn: Vec<AHashMap<usize, u32>> = (0..na).map(|_| AHashMap::new()).collect();
     let mut altl: Vec<AHashMap<(usize, String), u32>> = (0..na).map(|_| AHashMap::new()).collect();
+    // repeat lengths: per repeat the length change seen in reads that span it with both flanks
+    let reps: Vec<Vec<(usize, usize)>> = (0..na).map(|k| if std::env::var("HLA_NOREP").is_ok() { vec![] } else { repeats(seqs[k]) }).collect();
+    let mut replen: Vec<Vec<AHashMap<i64, (u32, u32)>>> = (0..na).map(|k| vec![AHashMap::new(); reps[k].len()]).collect();
     for &q in qnames {
         let Some(r) = ctx.reads.get(q) else { continue };
         let mut per: Vec<Option<(i64, Vec<Aln>)>> = vec![];
@@ -193,6 +224,18 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
                 let d = if shared { &mut dshared[k] } else { &mut dspec[k] };
                 for p in a.st..a.en.min(seqs[k].len()) {
                     d[p] += 1;
+                }
+                let i0 = reps[k].partition_point(|&(_, e)| e + REP_FLANK <= a.st);
+                for (ri, &(rs, re)) in reps[k].iter().enumerate().skip(i0) {
+                    if rs >= a.en { break; }
+                    if a.st + REP_FLANK > rs || re + REP_FLANK > a.en { continue; }
+                    let mut d = 0i64;
+                    for (p, w) in &a.diffs {
+                        if *p + 1 < rs || *p > re { continue; }
+                        if w.starts_with("ins") { d += w.len() as i64 - 3; } else if w.starts_with("del") { d -= w.len() as i64 - 3; }
+                    }
+                    let e = replen[k][ri].entry(d).or_insert((0, 0));
+                    if shared { e.1 += 1 } else { e.0 += 1 }
                 }
                 for (p, w) in &a.diffs {
                     // ignore the last bases of an alignment, where a clipped indel shows as substitutions
@@ -267,6 +310,37 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
             // thin coverage: enough to doubt the fourth field, not enough to doubt the protein
             let thin = ((ds + dsh) as f64) < 0.4 * med as f64;
             v.push(Site { pos: *p, what: w.clone(), alt: n as usize, depth: (ds + dsh) as usize, exon: !thin && ex.iter().any(|&(s, e)| *p >= s && *p < e), either: !hom && *cs == 0 });
+        }
+        // repeat length: the reads that span a repeat agree on another length than the allele has
+        for (ri, &(rs, re)) in reps[k].iter().enumerate() {
+            if rs < own_s + 10 || re + 10 > own_e { continue; }
+            let (mut ns, mut nsh) = (0u32, 0u32);
+            for (_, (a, b)) in &replen[k][ri] { ns += a; nsh += b; }
+            let Some((d, (cs, csh))) = replen[k][ri].iter().filter(|(d, _)| **d != 0).max_by_key(|(d, (a, b))| (a + b, -d.abs())).map(|(d, c)| (*d, *c)) else { continue };
+            let n = cs + csh;
+            if n < 4 || (n as f64) < 0.6 * ns as f64 + 0.3 * nsh as f64 || ns + nsh > 2 * med { continue; }
+            if v.iter().any(|s| s.pos + 1 >= rs && s.pos <= re) { continue; }
+            v.push(Site { pos: rs, what: format!("rep{:+}", d), alt: n as usize, depth: (ns + nsh) as usize, exon: ex.iter().any(|&(s, e)| rs < e && s < re), either: !hom && cs == 0 });
+        }
+        if std::env::var("HLA_REPDUMP").is_ok() {
+            for (ri, &(rs, re)) in reps[k].iter().enumerate() {
+                let (a0, b0) = replen[k][ri].get(&0).copied().unwrap_or((0, 0));
+                let oth: u32 = replen[k][ri].iter().filter(|(d, _)| **d != 0).map(|(_, (x, y))| x + y).sum();
+                eprintln!("REPSPAN\t{g}\t{k}\t{}\t{rs}\t{re}\t{}\t{}\t{oth}\t{med}", a.name, a0, b0);
+            }
+        }
+        // long repeat whose length too few reads confirm: its length is not verified, so neither is the fourth field
+        if let Ok(x) = std::env::var("HLA_REPV") {
+            let (minlen, frac): (usize, f64) = { let mut it = x.split(':'); (it.next().and_then(|v| v.parse().ok()).unwrap_or(15), it.next().and_then(|v| v.parse().ok()).unwrap_or(0.35)) };
+            for (ri, &(rs, re)) in reps[k].iter().enumerate() {
+                if re - rs < minlen || rs < own_s + 10 || re + 10 > own_e { continue; }
+                if v.iter().any(|s| s.pos + 1 >= rs && s.pos <= re) { continue; }
+                let (a0, b0) = replen[k][ri].get(&0).copied().unwrap_or((0, 0));
+                let span = a0 + b0;
+                if (span as f64) < frac * med as f64 || span < 3 {
+                    v.push(Site { pos: rs, what: format!("repunverified{}bp", re - rs), alt: span as usize, depth: med as usize, exon: false, either: false });
+                }
+            }
         }
         if std::env::var("HLA_NOV20").is_err() {
             // phase conflict: reads that fit both alleles equally carry the other base where this allele's own reads do not
@@ -392,4 +466,16 @@ pub fn db_match(ctx: &Ctx, g: &str, name: &str, sites: &[Site]) -> Option<String
     }
     hits.sort();
     hits.first().map(|x| x.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::repeats;
+    #[test]
+    fn finds_runs_and_tandem_repeats() {
+        let s = b"ACGTTTTTTTTTTGCACACACACACAGGATCCATG";
+        let r = repeats(s);
+        assert_eq!(r, vec![(3, 13), (14, 26)]);
+        assert!(repeats(b"ACGTTTTTTTGCA").is_empty());
+    }
 }

@@ -33,6 +33,7 @@ pub fn write(
     writeln!(cf, "gene\tslot\tallele\tsafe_call\tresolution\tmargin2\tmargin3\tmargin4\talt2\talt3\talt4\tnew_sites\tnew_detail").unwrap();
     writeln!(fh, "gene\tallele1\tallele2\tcall1\tcall2\tgap\treads\tcopies").unwrap();
     let mut js: Vec<serde_json::Value> = vec![];
+    let mut fasta = String::new();
     for &g in genes {
         // HLA-H and HLA-K sit in a segment that is deleted on some haplotypes (seen on 19 of 80
         // HPRC samples); copies = reads relative to the always-diploid neighbours F, G, V
@@ -166,6 +167,11 @@ pub fn write(
             let nd = if renamed { format!("known:{fin}+{nd}") } else { nd };
             let nc = if renamed { "0".to_string() } else { ns.map(|v| v.len().to_string()).unwrap_or_else(|| "-".to_string()) };
             writeln!(cf, "{g}\t{}\t{shown}\t{safe}\t{res_}\t{}\t{}\t{}\t{}\t{}\t{}\t{nc}\t{}", sl + 1, ms(m[0]), ms(m[1]), ms(m[2]), alt[0], alt[1], alt[2], if nd.is_empty() { "-" } else { nd.as_str() }).unwrap();
+            if !renamed {
+                if let (Some(v), Some(a)) = (ns, al.iter().find(|a| a.name == *fin)) {
+                    if let Some(rec) = novel_record(g, sl + 1, fin, &a.genomic, v) { fasta.push_str(&rec); }
+                }
+            }
             jal.push(serde_json::json!({
                 "allele": shown, "safe_call": safe, "resolution": res_,
                 "renamed_from": if renamed { serde_json::json!(fin) } else { serde_json::Value::Null },
@@ -185,4 +191,57 @@ pub fn write(
         "thresholds": {"2": T[0], "3": T[1], "4": T[2]}, "genes": js,
     });
     std::fs::write(format!("{prefix}.json"), serde_json::to_string_pretty(&rep).unwrap()).unwrap();
+    if !fasta.is_empty() {
+        std::fs::write(format!("{prefix}.novel.fa"), fasta).unwrap();
+    }
+}
+
+/// Sequence of a new allele: the called database allele with its residual substitutions, insertions
+/// and deletions applied. The header names the nearest allele and the applied changes, and says when
+/// the sequence is incomplete (blind stretches, unresolved repeat lengths) or when a change could
+/// belong to either allele.
+fn novel_record(g: &str, slot: usize, name: &str, genomic: &[u8], sites: &[crate::novel::Site]) -> Option<String> {
+    let mut seq = genomic.to_vec();
+    let mut applied = vec![];
+    let mut open = vec![];
+    let mut either = false;
+    let mut v: Vec<&crate::novel::Site> = sites.iter().collect();
+    v.sort_by_key(|s| std::cmp::Reverse(s.pos));
+    for s in v {
+        let w = s.what.trim_end_matches("(unsupported)");
+        let p = s.pos;
+        let ok = if let Some((r, a)) = w.split_once('>') {
+            r.len() == 1 && a.len() == 1 && p < seq.len() && seq[p] == r.as_bytes()[0] && { seq[p] = a.as_bytes()[0]; true }
+        } else if let Some(d) = w.strip_prefix("del") {
+            p + d.len() <= seq.len() && &seq[p..p + d.len()] == d.as_bytes() && { seq.drain(p..p + d.len()); true }
+        } else if let Some(i) = w.strip_prefix("ins") {
+            !i.is_empty() && i.bytes().all(|c| b"ACGT".contains(&c)) && p <= seq.len() && { seq.splice(p..p, i.bytes()); true }
+        } else {
+            false
+        };
+        if ok {
+            applied.push(format!("{}:{}", p + 1, w));
+            either |= s.either;
+        } else {
+            open.push(format!("{}:{}", p + 1, s.what));
+        }
+    }
+    if applied.is_empty() {
+        return None;
+    }
+    applied.reverse();
+    open.reverse();
+    let mut h = format!(">{g}_slot{slot}_new nearest={name} changes={}", applied.join(","));
+    if !open.is_empty() {
+        h.push_str(&format!(" incomplete={}", open.join(",")));
+    }
+    if either {
+        h.push_str(" phase=uncertain");
+    }
+    let mut out = h + "\n";
+    for c in seq.chunks(70) {
+        out.push_str(std::str::from_utf8(c).unwrap_or(""));
+        out.push('\n');
+    }
+    Some(out)
 }
