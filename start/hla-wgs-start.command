@@ -276,7 +276,12 @@ fi
 row 2 "$(tr_ "Fertig" "Done")" "$(secs "$START")" "$OK"
 printf '\n'
 cols() { if command -v column >/dev/null 2>&1; then column -t -s "$(printf '\t')"; else cat; fi; }
-cut -f1-5 "$TAB" | cols | awk -v m="$MUT" -v r="$RST" -v g="$OK" 'NR==1 { print "  " m $0 r; next } { line = "  " $0; if ($NF == "4") sub(/4$/, g "4" r, line); print line }'
+# genes estimated at 0 copies (PREFIX.tsv, column copies) are absent: the table lists them as such
+# instead of the nearest database allele that PREFIX.conf.tsv still carries for them
+ABSENT=""; [ -f "$OUT/$S.tsv" ] && [ "$LONG" = 0 ] && ABSENT="$(awk -F'\t' 'NR > 1 && $8 == "0" { printf "%s ", $1 }' "$OUT/$S.tsv")"
+cut -f1-5 "$TAB" | awk -F'\t' -v a=" $ABSENT" -v no="$(tr_ "nicht vorhanden" "absent")" 'NR == 1 { print; next }
+  index(a, " " $1 " ") { if (!($1 in seen)) print $1 "\t-\t" no "\t-\t0"; seen[$1] = 1; next } { print }' |
+  cols | awk -v m="$MUT" -v r="$RST" -v g="$OK" 'NR==1 { print "  " m $0 r; next } { line = "  " $0; if ($NF == "4") sub(/4$/, g "4" r, line); print line }'
 printf '\n  %s%s%s\n' "$MUT" "$(tr_ "safe_call und resolution: so viele Felder, wie die Reads tragen. Maßgeblich ist der sichere Ruf." "safe_call and resolution: as many fields as the reads support. Use the safe call.")" "$RST"
 printf '  %s%s%s\n' "$MUT" "$SHOWOUT" "$RST"
 title "hla-wgs · $S · $(tr_ "fertig" "done")"
