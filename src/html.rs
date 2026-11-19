@@ -29,8 +29,8 @@ pub fn date(secs: u64) -> (i64, u32, u32) {
 }
 
 const CSS: &str = "
-:root{--bg:#FAF9F5;--surface:#FFFFFF;--fg:#141413;--mut:#3F3E38;--soft-fg:#6E6C63;--line:#D8D5C7;--hair:rgba(216,213,199,.78);--acc:#D97757;--acc-t:#B34D30;--ok:#248A3D;--okdot:#34C759;--warn:#B34D30;--soft:#F2F0E8;--shadow:0 1px 2px rgba(20,20,19,.04),0 10px 28px rgba(20,20,19,.055);--r:14px;--ease:cubic-bezier(.22,.61,.36,1)}
-@media (prefers-color-scheme:dark){:root{--bg:#1C1C1E;--surface:#2C2C2E;--fg:#FFFFFF;--mut:rgba(235,235,245,.72);--soft-fg:rgba(235,235,245,.55);--line:#38383A;--hair:rgba(255,255,255,.1);--acc-t:#E38B69;--ok:#30D158;--okdot:#30D158;--warn:#E38B69;--soft:#242426;--shadow:0 1px 2px rgba(0,0,0,.28),0 12px 30px rgba(0,0,0,.3)}}
+:root{--bg:#FAF9F5;--surface:#FFFFFF;--fg:#141413;--mut:#3F3E38;--soft-fg:#6E6C63;--line:#D8D5C7;--hair:rgba(216,213,199,.78);--acc:#D97757;--acc-t:#B34D30;--ok:#248A3D;--okdot:#34C759;--warn:#B34D30;--soft:#F2F0E8;--f1:#C2410C;--f2:#9A7400;--f3:#4D7C0F;--f4:#0E7490;--shadow:0 1px 2px rgba(20,20,19,.04),0 10px 28px rgba(20,20,19,.055);--r:14px;--ease:cubic-bezier(.22,.61,.36,1)}
+@media (prefers-color-scheme:dark){:root{--bg:#1C1C1E;--surface:#2C2C2E;--fg:#FFFFFF;--mut:rgba(235,235,245,.72);--soft-fg:rgba(235,235,245,.55);--line:#38383A;--hair:rgba(255,255,255,.1);--acc-t:#E38B69;--ok:#30D158;--okdot:#30D158;--warn:#E38B69;--soft:#242426;--f1:#FB8A5C;--f2:#E3B341;--f3:#9BCB5A;--f4:#4FC3D9;--shadow:0 1px 2px rgba(0,0,0,.28),0 12px 30px rgba(0,0,0,.3)}}
 @font-face{font-family:'IBM Plex Mono';font-weight:400;font-style:normal;font-display:swap;src:url(data:font/woff2;base64,F400) format('woff2')}
 @font-face{font-family:'IBM Plex Mono';font-weight:500;font-style:normal;font-display:swap;src:url(data:font/woff2;base64,F500) format('woff2')}
 *{box-sizing:border-box}
@@ -83,6 +83,21 @@ summary b{font-weight:500;min-width:4.5em}
 .dt th{padding:9px 12px 7px}.dt td{padding:7px 12px}.dt td:last-child{min-width:16em}
 .reason{font-size:12px;color:var(--mut);border-left:2px solid var(--acc);padding:2px 0 2px 10px;margin:4px 0 14px}
 .ok{color:var(--ok)}
+.nm{white-space:nowrap;font-weight:500;letter-spacing:.01em}.nm .gn{color:var(--soft-fg);font-weight:400}
+.fd{display:inline-block;padding:0 1px;border-bottom:3px solid transparent;line-height:1.35;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.fd.k1{color:var(--f1);border-bottom-color:var(--f1)}.fd.k2{color:var(--f2);border-bottom-color:var(--f2)}.fd.k3{color:var(--f3);border-bottom-color:var(--f3)}.fd.k4{color:var(--f4);border-bottom-color:var(--f4)}
+.fd.off{color:var(--soft-fg);font-weight:400;border-bottom:2px dashed var(--line)}
+.c{color:var(--soft-fg);padding:0 1px}
+svg.fdia{-webkit-print-color-adjust:exact;print-color-adjust:exact;display:block;max-width:100%;height:auto;margin:6px 0 10px;overflow:visible}
+svg.fdia .fn{font:500 18px 'IBM Plex Mono',ui-monospace,monospace;fill:var(--fg)}svg.fdia .fg{fill:var(--soft-fg);font-weight:400}
+svg.fdia .fs{fill:var(--soft-fg)}svg.fdia .off{fill:var(--soft-fg);font-weight:400}
+svg.fdia .br,svg.fdia .ln{fill:none;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+svg.fdia .k1{stroke:var(--f1);fill:var(--f1)}svg.fdia .k2{stroke:var(--f2);fill:var(--f2)}svg.fdia .k3{stroke:var(--f3);fill:var(--f3)}svg.fdia .k4{stroke:var(--f4);fill:var(--f4)}
+svg.fdia tspan.fk1{fill:var(--f1)}svg.fdia tspan.fk2{fill:var(--f2)}svg.fdia tspan.fk3{fill:var(--f3)}svg.fdia tspan.fk4{fill:var(--f4)}svg.fdia tspan.off{fill:var(--soft-fg)}
+svg.fdia .br.off,svg.fdia .ln.off{stroke:var(--line);stroke-dasharray:3 3}svg.fdia circle.off{fill:var(--line);stroke:none}svg.fdia circle{stroke:none}
+svg.fdia .br,svg.fdia .ln{fill:none!important}
+svg.fdia .lb{font:400 12px 'IBM Plex Mono',ui-monospace,monospace;fill:var(--mut)}svg.fdia .lb.off{fill:var(--soft-fg)}
+.legend{background:var(--surface);border:1px solid var(--hair);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 20px 6px;margin:0 0 14px;overflow-x:auto}.legend .note{margin:2px 0 10px}.legend h3{font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--soft-fg);margin:0 0 6px}
 .alert{margin:22px 0 0;padding:12px 16px;border-radius:var(--r);background:color-mix(in srgb,var(--acc) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);font-size:12px;line-height:1.55}.alert.soft{background:var(--surface);border-color:var(--hair)}
 @media print{.bar,nav.tabs{display:none}section.tab-r,section.tab-d{display:block!important}section.tab-d{break-before:page}}
 body[data-tab=r] section.tab-d,body[data-tab=d] section.tab-r{display:none}
@@ -106,6 +121,88 @@ fn b64(d: &[u8]) -> String {
             o.push(if i <= c.len() { A[(n >> (18 - 6 * i) & 63) as usize] as char } else { '=' });
         }
     }
+    o
+}
+
+/// an allele name with each field marked: supported fields as colour chips by field number, the rest
+/// grey; the gene prefix plain
+fn name_html(full: &str, res: u64) -> String {
+    let (gene, rest) = full.split_once('*').unwrap_or(("", full));
+    let mut o = format!("<span class=\"nm\"><span class=\"gn\">{}*</span>", esc(gene));
+    for (i, f) in rest.split(':').enumerate() {
+        if i > 0 {
+            o.push_str(&format!("<span class=\"c{}\">:</span>", if (i as u64) < res { "" } else { " off" }));
+        }
+        let k = i + 1;
+        o.push_str(&format!("<span class=\"fd k{k}{}\" title=\"{k}\">{}</span>", if (k as u64) <= res { "" } else { " off" }, esc(f)));
+    }
+    o.push_str("</span>");
+    o
+}
+
+/// what each field of an allele name stands for, drawn on an example name
+fn legend(t: &dyn Fn(&'static str, &'static str) -> &'static str, example: &(String, u64)) -> String {
+    let labels: Vec<String> = (1..=4).map(|k| format!("{} {}", field_meaning(t, k), if k as u64 <= example.1 { "✓" } else { "?" })).collect();
+    format!("<div class=\"legend\"><h3>{}</h3>{}<p class=\"note\">{}</p></div>\n", t("So liest man einen Allelnamen", "How to read an allele name"), field_diagram(&example.0, example.1, &labels), t(
+        "Jedes Feld ist in seiner Farbe unterstrichen, wenn die Reads es sichern. Grau und gestrichelt: Feld des nächstliegenden Datenbank-Allels, das nicht gesichert ist.",
+        "Each field is underlined in its colour when the reads support it. Grey and dashed: a field of the nearest database allele that is not supported."))
+}
+
+fn field_meaning(t: &dyn Fn(&'static str, &'static str) -> &'static str, k: usize) -> &'static str {
+    match k {
+        1 => t("Feld 1 · Allelgruppe, etwa das Antigen", "Field 1 · allele group, about the antigen"),
+        2 => t("Feld 2 · Protein: andere Aminosäuren", "Field 2 · protein: other amino acids"),
+        3 => t("Feld 3 · stille Änderung in den Exons", "Field 3 · silent change in the exons"),
+        _ => t("Feld 4 · Änderung außerhalb der Exons", "Field 4 · change outside the exons"),
+    }
+}
+
+/// an allele name drawn with a bracket under each field and a line to its label, as in the
+/// nomenclature figure; `labels[k]` is the text for field k+1, fields beyond `res` are drawn grey
+fn field_diagram(full: &str, res: u64, labels: &[String]) -> String {
+    let (gene, rest) = full.split_once('*').unwrap_or(("", full));
+    let fields: Vec<&str> = rest.split(':').collect();
+    let nf = fields.len().min(4);
+    let cw = 10.8; // IBM Plex Mono at 18 px
+    let lw = 7.2; // at 12 px
+    let x0 = 4.0;
+    let mut spans = vec![];
+    let mut pos = gene.chars().count() + 1;
+    for (i, f) in fields.iter().enumerate().take(nf) {
+        if i > 0 {
+            pos += 1;
+        }
+        let n = f.chars().count();
+        spans.push((x0 + pos as f64 * cw, x0 + (pos + n) as f64 * cw));
+        pos += n;
+    }
+    let name_end = x0 + full.chars().count() as f64 * cw;
+    let lx = name_end + 34.0;
+    let row = 24.0;
+    let top = 50.0;
+    let maxl = labels.iter().take(nf).map(|l| l.chars().count()).max().unwrap_or(0) as f64;
+    let w = lx + maxl * lw + 8.0;
+    let h = top + (nf as f64 - 1.0) * row + 14.0;
+    let mut o = format!("<svg class=\"fdia\" viewBox=\"0 0 {w:.0} {h:.0}\" width=\"{w:.0}\" role=\"img\" aria-label=\"{}\">", esc(full));
+    o.push_str(&format!("<text x=\"{x0}\" y=\"20\" class=\"fn\"><tspan class=\"fg\">{}*</tspan>", esc(gene)));
+    for (i, f) in fields.iter().enumerate() {
+        if i > 0 {
+            o.push_str(&format!("<tspan class=\"fs{}\">:</tspan>", if (i as u64) < res { "" } else { " off" }));
+        }
+        o.push_str(&format!("<tspan class=\"fk{}{}\">{}</tspan>", (i + 1).min(4), if ((i + 1) as u64) <= res { "" } else { " off" }, esc(f)));
+    }
+    o.push_str("</text>");
+    for (i, &(a, b)) in spans.iter().enumerate() {
+        let k = i + 1;
+        let off = if (k as u64) <= res { "" } else { " off" };
+        let y = top + (nf - k) as f64 * row;
+        let cx = (a + b) / 2.0;
+        o.push_str(&format!(
+            "<path class=\"br k{k}{off}\" d=\"M{:.1} 27 v5 H{:.1} v-5\"/><path class=\"ln k{k}{off}\" d=\"M{cx:.1} 32 V{y:.1} H{:.1}\"/><circle class=\"dt k{k}{off}\" cx=\"{:.1}\" cy=\"{y:.1}\" r=\"2.6\"/><text class=\"lb{off}\" x=\"{lx:.1}\" y=\"{:.1}\">{}</text>",
+            a + 1.0, b - 1.0, lx - 8.0, lx - 8.0, y + 4.0, esc(&labels[i])
+        ));
+    }
+    o.push_str("</svg>");
     o
 }
 
@@ -193,8 +290,8 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
                 if res >= 4 {
                     n4 += 1;
                 }
-                let extra = if full != safe { format!("<span class=\"full\">{} {}</span>", t("am nächsten:", "nearest:"), esc(full)) } else { String::new() };
-                cells[i] = format!("<td><span class=\"call\">{}</span>{extra}</td>", esc(safe));
+                let _ = safe;
+                cells[i] = format!("<td>{}</td>", name_html(full, res));
                 dots.push_str(&format!("<div class=\"d\" title=\"{res} {}\">", t("Felder gesichert", "fields supported")));
                 for k in 1..=4 {
                     dots.push_str(if k <= res { "<i class=\"f on\"></i>" } else { "<i class=\"f\"></i>" });
@@ -273,6 +370,10 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         ));
     }
 
+    // the example for the figure: an allele of this sample with four fields of which not all are supported
+    // (shows both kinds), else the first with four fields
+    let all: Vec<(String, u64)> = genes.iter().filter(|g| g["copies"].as_u64().unwrap_or(2) > 0).flat_map(|g| g["alleles"].as_array().cloned().unwrap_or_default()).map(|a| (a["allele"].as_str().unwrap_or("").to_string(), a["resolution"].as_u64().unwrap_or(0))).filter(|(n, _)| n.split(':').count() == 4).collect();
+    let example = all.iter().find(|(_, r)| *r == 3).or(all.first()).cloned().unwrap_or_else(|| ("A*02:01:01:01".to_string(), 4));
     let mut h = String::with_capacity(32_000);
     h.push_str(&format!(
         "{}",
@@ -310,16 +411,17 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         t("pharmakogenetische Treffer", "pharmacogenetic findings")
     ));
     h.push_str(&format!(
-        "<h2>{}</h2>\n<div class=\"panel\"><table><thead><tr><th>{}</th><th>{} 1</th><th>{} 2</th><th>{}</th><th class=\"hide\">{}</th></tr></thead><tbody>\n{rows}</tbody></table></div>\n<p class=\"note\">{}</p>\n",
+        "<h2>{}</h2>\n{}<div class=\"panel\"><table><thead><tr><th>{}</th><th>{} 1</th><th>{} 2</th><th>{}</th><th class=\"hide\">{}</th></tr></thead><tbody>\n{rows}</tbody></table></div>\n<p class=\"note\">{}</p>\n",
         t("Ergebnis", "Result"),
+        legend(&t, &example),
         t("Gen", "Gene"),
         t("Allel", "Allele"),
         t("Allel", "Allele"),
         t("Felder", "Fields"),
         t("Hinweis", "Note"),
         t(
-            "Gezeigt ist der sichere Ruf: so viele Felder des Allelnamens, wie die Reads tragen. Die Punkte zählen diese Felder. Der nächstliegende volle Name steht darunter, wenn er weiter reicht.",
-            "Shown is the safe call: as many fields of the allele name as the reads support. The dots count these fields. The nearest full name is given below it where it goes further."
+            "Farbig sind die Felder, die die Reads sichern (der sichere Ruf); grau sind Felder des nächstliegenden Datenbank-Allels, die nicht gesichert sind. Die Punkte zählen die gesicherten Felder.",
+            "Coloured are the fields the reads support (the safe call); grey are fields of the nearest database allele that are not supported. The dots count the supported fields."
         )
     ));
     if !pgx.is_empty() {
@@ -363,7 +465,7 @@ fn gene_details(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static st
     let empty = vec![];
     let als = g["alleles"].as_array().unwrap_or(&empty);
     let copies = g["copies"].as_u64().unwrap_or(2);
-    let calls: Vec<String> = als.iter().take(copies.min(2) as usize).map(|a| esc(a["safe_call"].as_str().unwrap_or(""))).collect();
+    let calls: Vec<String> = als.iter().take(copies.min(2) as usize).map(|a| name_html(a["allele"].as_str().unwrap_or(""), a["resolution"].as_u64().unwrap_or(0))).collect();
     let summary = if copies == 0 { t("nicht vorhanden", "absent").to_string() } else if !g["called"].as_bool().unwrap_or(false) { t("kein Ergebnis", "no result").to_string() } else { calls.join(" · ") };
     let mut o = format!("<details><summary><b>{}</b> <span class=\"note\">{summary}</span></summary>\n", esc(name));
     o.push_str(&format!(
@@ -382,11 +484,25 @@ fn gene_details(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static st
     }
     for (i, a) in als.iter().take(copies.min(2) as usize).enumerate() {
         let full = a["allele"].as_str().unwrap_or("");
+        let res = a["resolution"].as_u64().unwrap_or(0);
+        let labels: Vec<String> = (1..=4usize).map(|k| {
+            let m = if k == 1 { None } else { a["margin"][k.to_string().as_str()].as_f64() };
+            let st = if (k as u64) <= res { t("✓ gesichert", "✓ supported") } else { t("? nicht gesichert", "? not supported") };
+            if (k as u64) == res + 1 {
+                // the first missing field carries the reason, which is not always the lead
+                return format!("{} · {st}: {}", field_meaning(t, k), field_reason(name, a, t, thr));
+            }
+            match m {
+                Some(m) if (k as u64) <= res => format!("{} · {st} ({} {m:.1}, {} {:.0})", field_meaning(t, k), t("Vorsprung", "lead"), t("Schwelle", "threshold"), thr(&k.to_string())),
+                _ => format!("{} · {st}", field_meaning(t, k)),
+            }
+        }).collect();
+        o.push_str(&field_diagram(full, res, &labels));
         o.push_str(&format!(
-            "<div class=\"kv\">{} {}: <b>{}</b> · {}: {} · {}: {} · G: {} · P: {}{}{}</div>\n",
+            "<div class=\"kv\">{} {}: {} · {}: {} · {}: {} · G: {} · P: {}{}{}</div>\n",
             t("Allel", "Allele"),
             i + 1,
-            esc(full),
+            name_html(full, a["resolution"].as_u64().unwrap_or(0)),
             t("sicherer Ruf", "safe call"),
             esc(a["safe_call"].as_str().unwrap_or("")),
             t("gesicherte Felder", "supported fields"),
