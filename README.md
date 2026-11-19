@@ -90,7 +90,7 @@ Linux run it with `bash`). It asks for the input; drag the BAM, CRAM or FASTQ fi
 which inserts its path, or type the path, then press Enter. If the reference is missing it sets it up
 once (download of hla.dat 3.66, `build-db`, optionally `build-mask` with a GRCh38 FASTA), then runs
 hla-wgs into `~/Downloads/hla-wgs-<sample>` (a new folder if one with results exists) and shows the
-result table. For PacBio HiFi reads start it with `--long` (or `HLA_WGS_LONG=1`). It looks for the `hla-wgs` program next to itself, in `../target/release` or in PATH.
+result table with an animated progress display, and opens the result page `PREFIX.html`. For PacBio HiFi reads start it with `--long` (or `HLA_WGS_LONG=1`). It looks for the `hla-wgs` program next to itself, in `../target/release` or in PATH.
 
 ## Build the reference once
 
