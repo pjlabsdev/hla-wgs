@@ -35,6 +35,51 @@ pub fn related(g: &str) -> &'static [&'static str] {
     }
 }
 
+/// everything that can be known before the first read is checked here, so that a wrong path
+/// or a read-only folder is reported at once and not after minutes of reading
+fn preflight(db: &str, panel: &str, input: &panel::Input, out: &str) {
+    let need = |p: &str, what: &str| match std::fs::metadata(p) {
+        Err(e) => util::die(&format!("{what} not found: {p} ({e})")),
+        Ok(m) if m.is_file() && m.len() == 0 => util::die(&format!("{what} is empty: {p}")),
+        Ok(m) if m.is_dir() => util::die(&format!("{what} is a folder, not a file: {p}")),
+        Ok(_) => {}
+    };
+    need(db, "database file");
+    need(panel, "database panel");
+    match input {
+        panel::Input::Fastq(r1, r2) => {
+            need(r1, "FASTQ R1");
+            need(r2, "FASTQ R2");
+        }
+        panel::Input::Aligned(p, reference) => {
+            need(p, "input file");
+            let l = p.to_ascii_lowercase();
+            let cands: Vec<String> = if l.ends_with(".cram") {
+                vec![format!("{p}.crai")]
+            } else {
+                vec![format!("{p}.bai"), format!("{p}.csi"), format!("{}.bai", &p[..p.len() - 4])]
+            };
+            if !cands.iter().any(|c| std::path::Path::new(c).is_file()) {
+                util::die(&format!("index not found for {p}: expected {} (create it with: samtools index)", cands.join(" or ")));
+            }
+            if let Some(r) = reference {
+                need(r, "reference FASTA");
+                need(&format!("{r}.fai"), "reference FASTA index");
+            }
+        }
+    }
+    let probe = format!("{out}.tsv");
+    let existed = std::path::Path::new(&probe).exists();
+    match std::fs::OpenOptions::new().append(true).create(true).open(&probe) {
+        Ok(_) => {
+            if !existed {
+                let _ = std::fs::remove_file(&probe);
+            }
+        }
+        Err(e) => util::die(&format!("cannot write results to {probe}: {e}")),
+    }
+}
+
 fn main() {
     let mut a: Vec<String> = std::env::args().collect();
     match a.get(1).map(|x| x.as_str()) {
@@ -43,6 +88,9 @@ fn main() {
         Some("long") => return long::run(&a[2..]),
         Some("--version") | Some("-V") => return println!("hla-wgs {}", env!("CARGO_PKG_VERSION")),
         _ => {}
+    }
+    if a.len() >= 4 && !std::path::Path::new(&a[1]).exists() {
+        util::die(&format!("database not found: {} (build it with: hla-wgs build-db hla.dat freq.json DBDIR)", a[1]));
     }
     // a database directory stands for its two files
     if a.get(1).map_or(false, |d| std::path::Path::new(d).is_dir()) {
@@ -68,6 +116,7 @@ fn main() {
     } else {
         (panel::Input::Fastq(a[3].clone(), a[4].clone()), a[5].clone(), 6)
     };
+    preflight(&a[1], &a[2], &input, &out);
     let threads: usize = a.get(ti).and_then(|x| x.parse().ok()).unwrap_or(4);
     rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().ok();
     let t0 = Instant::now();

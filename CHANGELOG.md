@@ -2,6 +2,7 @@
 
 ## Unreleased (1.1.0)
 
+- Input errors are reported at once and in plain words (`error: ...`, exit code 1) instead of after six retries or with a panic trace: database not found, input file missing or empty, BAM/CRAM index missing, not a BAM, FASTQ truncated or not a FASTQ, R1 and R2 of different length, output folder not writable (checked before reading). A BAM that ends early is reopened once and reported if it ends at the same record again. Retries remain for real I/O errors (disk dropping out).
 - HLA-E is reported to four fields like the other genes (was capped at three); its fourth field was exact in 274 of 275 alleles reported certain (80 HPRC, 30 check and 38 HGSVC3 samples).
 - `PREFIX.tsv`: `call1`/`call2` now hold the safe call (the fields the reads support) instead of repeating
   `allele1`/`allele2`; a gene estimated at 0 copies shows `-` in all allele columns, has no line in

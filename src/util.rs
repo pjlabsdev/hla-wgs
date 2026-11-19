@@ -10,6 +10,21 @@ pub fn open_reader(p: &str) -> Box<dyn BufRead> {
     }
 }
 
+/// end the run with a plain message (no panic trace) and exit code 1
+pub fn die(msg: &str) -> ! {
+    eprintln!("error: {msg}");
+    std::process::exit(1)
+}
+
+/// errors that a pause cannot cure: the content itself is wrong
+pub fn permanent(e: &std::io::Error) -> bool {
+    matches!(e.kind(), std::io::ErrorKind::InvalidData | std::io::ErrorKind::InvalidInput)
+}
+
+fn bad(msg: String) -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::InvalidData, msg)
+}
+
 pub struct Fq {
     pub name: String,
     pub seq: Vec<u8>,
@@ -50,11 +65,17 @@ pub fn read_fq_res(r: &mut dyn BufRead, n: usize) -> std::io::Result<Vec<Fq>> {
                 if i == 0 {
                     return Ok(out);
                 }
-                panic!("truncated fastq");
+                return Err(bad(format!("FASTQ ends in the middle of a record (record {}); the file is truncated", out.len() + 1)));
             }
             while x.last().map_or(false, |c| *c == b'\n' || *c == b'\r') {
                 x.pop();
             }
+            if i == 0 && x.first() != Some(&b'@') {
+                return Err(bad(format!("not a FASTQ file: record {} does not start with '@'", out.len() + 1)));
+            }
+        }
+        if l[2].first() != Some(&b'+') {
+            return Err(bad(format!("not a FASTQ record (record {}): the third line must start with '+'", out.len() + 1)));
         }
         let h = &l[0][1..];
         let e = h.iter().position(|&c| c == b' ' || c == b'\t').unwrap_or(h.len());
@@ -109,7 +130,9 @@ impl PairedFq {
         let [a, b] = self.rd.as_mut().unwrap();
         let b1 = read_fq_res(&mut **a, n)?;
         let b2 = read_fq_res(&mut **b, n)?;
-        assert_eq!(b1.len(), b2.len(), "mates out of sync");
+        if b1.len() != b2.len() {
+            return Err(bad(format!("R1 and R2 hold different numbers of reads (after {} pairs)", self.done + b1.len().min(b2.len()) as u64)));
+        }
         self.done += b1.len() as u64;
         if test_fault(self.done) {
             self.done -= b1.len() as u64;
@@ -126,10 +149,13 @@ impl PairedFq {
             match self.try_batch(n) {
                 Ok(x) => return x,
                 Err(e) => {
+                    if permanent(&e) || e.kind() == std::io::ErrorKind::UnexpectedEof {
+                        die(&format!("{} / {}: {e}", self.paths[0], self.paths[1]));
+                    }
                     self.rd = None;
                     attempt += 1;
                     if attempt > tries {
-                        panic!("{}: {e} (gave up after {tries} retries)", self.paths[0]);
+                        die(&format!("{}: {e} (gave up after {tries} retries)", self.paths[0]));
                     }
                     let wait = backoff(attempt);
                     eprintln!("[input] {}: I/O error after {} pairs: {e}; retry {attempt}/{tries} in {wait}s", self.paths[0], self.done);

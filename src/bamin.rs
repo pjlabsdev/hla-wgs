@@ -90,14 +90,26 @@ pub fn stream(path: &str, reference: Option<&str>, threads: usize, tx: SyncSende
     let mut p = Pairer { open: AHashMap::new(), b1: vec![], b2: vec![], tx, records: 0, pairs: 0 };
     let tries = crate::util::io_retries();
     let mut attempt = 0;
+    let mut last_eof: Option<u64> = None;
     loop {
         let skip = p.records;
         match pass(path, reference, threads, skip, &mut p) {
             Ok(()) => break,
             Err(e) => {
+                // nothing read yet and the content is at fault (no index, not a BAM, cut short):
+                // a pause does not help
+                let eof = e.kind() == std::io::ErrorKind::UnexpectedEof;
+                if crate::util::permanent(&e) || (eof && p.records == 0) {
+                    crate::util::die(&format!("{path}: {e}"));
+                }
+                // the same early end at the same record after a reopen: the file itself is cut short
+                if eof && last_eof == Some(p.records) {
+                    crate::util::die(&format!("{path}: file ends early after {} records ({e}); it is truncated or damaged", p.records));
+                }
+                last_eof = if eof { Some(p.records) } else { None };
                 attempt += 1;
                 if attempt > tries {
-                    panic!("{path}: {e} (gave up after {tries} retries)");
+                    crate::util::die(&format!("{path}: {e} (gave up after {tries} retries)"));
                 }
                 let wait = crate::util::backoff(attempt);
                 eprintln!("[input] {path}: I/O error after {} records: {e}; retry {attempt}/{tries} in {wait}s", p.records);
@@ -165,7 +177,7 @@ fn pass(path: &str, reference: Option<&str>, threads: usize, skip: u64, p: &mut 
                 let alt = path.strip_suffix(".bam").map(|b| format!("{b}.bai")).unwrap_or_default();
                 noodles::bam::bai::fs::read(&alt).map(noodles::bam::Index::Bai)
             })
-            .map_err(|e| err(format!("index .bam.bai/.bai/.csi needed: {e}")))?;
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("index .bam.bai/.bai/.csi needed: {e}")))?;
         let refs: Vec<(String, usize)> = header.reference_sequences().iter().map(|(n, m)| (n.to_string(), m.length().get())).collect();
         for reg in regions(&refs) {
             let region = reg.parse().unwrap();
