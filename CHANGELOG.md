@@ -2,6 +2,7 @@
 
 ## Unreleased (1.1.0)
 
+- `PREFIX.html`: the result as one page for reading and printing (safe call per allele, supported fields, notes, pharmacogenetic alleles, DOI and link to the research article); German with `HLA_WGS_LANG=de` or a German `LANG`.
 - Start file `start/hla-wgs-start.command`: double-click, drag the input file into the window or type its path; sets up the reference once if it is missing.
 - Long reads (experimental): `hla-wgs long DBDIR READS.fastq[.gz]|READS.bam PREFIX [threads]` types from
   PacBio HiFi reads. The gene sequence of each haplotype is built from the reads (consensus) and

@@ -8,6 +8,7 @@ mod prior;
 mod refine;
 mod stageb;
 mod names;
+mod html;
 mod long;
 mod mask;
 mod novel;

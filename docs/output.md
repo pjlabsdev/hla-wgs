@@ -124,3 +124,12 @@ For experiments; the defaults are the validated configuration.
 | `HLA_NOBIG` | count long insertions and deletions per base instead of as one event |
 | `HLA_UNPH` | also cut the fourth field when a sibling allele differs only at positions without phase information (fewer wrong, clearly fewer certain calls) |
 | `HLA_PHASE`, `HLA_BREAK` | experimental phase and break-point rules, off by default |
+
+## PREFIX.html
+
+One self-contained page with the result for reading and printing, built from the values of
+`PREFIX.json`: per gene the safe call of each allele, the number of supported fields, the nearest full
+name where it goes further, notes (one copy, gene absent, differences from the database allele,
+expression suffix), the pharmacogenetic alleles, and the citation with DOI and the link to the research
+article. It loads nothing from the network. The text is German when `HLA_WGS_LANG=de` is set or `LANG`
+starts with `de`, otherwise English.

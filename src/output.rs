@@ -207,6 +207,8 @@ pub fn write(
         }).collect::<Vec<_>>(),
     });
     std::fs::write(format!("{prefix}.json"), serde_json::to_string_pretty(&rep).unwrap()).unwrap();
+    let sample = std::path::Path::new(prefix).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    std::fs::write(format!("{prefix}.html"), crate::html::render(&rep, &sample)).unwrap();
     if !fasta.is_empty() {
         std::fs::write(format!("{prefix}.novel.fa"), fasta).unwrap();
     }
