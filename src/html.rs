@@ -489,8 +489,8 @@ fn gene_details(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static st
             let m = if k == 1 { None } else { a["margin"][k.to_string().as_str()].as_f64() };
             let st = if (k as u64) <= res { t("✓ gesichert", "✓ supported") } else { t("? nicht gesichert", "? not supported") };
             if (k as u64) == res + 1 {
-                // the first missing field carries the reason, which is not always the lead
-                return format!("{} · {st}: {}", field_meaning(t, k), field_reason(name, a, t, thr));
+                // the first missing field points to the reason, which is not always the lead
+                return format!("{} · {st} ({})", field_meaning(t, k), t("Grund unten", "reason below"));
             }
             match m {
                 Some(m) if (k as u64) <= res => format!("{} · {st} ({} {m:.1}, {} {:.0})", field_meaning(t, k), t("Vorsprung", "lead"), t("Schwelle", "threshold"), thr(&k.to_string())),
