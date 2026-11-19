@@ -83,6 +83,7 @@ summary b{font-weight:500;min-width:4.5em}
 .dt th{padding:9px 12px 7px}.dt td{padding:7px 12px}.dt td:last-child{min-width:16em}
 .reason{font-size:12px;color:var(--mut);border-left:2px solid var(--acc);padding:2px 0 2px 10px;margin:4px 0 14px}
 .ok{color:var(--ok)}
+.alert{margin:22px 0 0;padding:12px 16px;border-radius:var(--r);background:color-mix(in srgb,var(--acc) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);font-size:12px;line-height:1.55}.alert.soft{background:var(--surface);border-color:var(--hair)}
 @media print{.bar,nav.tabs{display:none}section.tab-r,section.tab-d{display:block!important}section.tab-d{break-before:page}}
 body[data-tab=r] section.tab-d,body[data-tab=d] section.tab-r{display:none}
 footer{margin-top:48px;border-top:1px solid var(--line);padding-top:18px;color:var(--soft-fg);font-size:12px}
@@ -283,6 +284,18 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         esc(sample),
         esc(version)
     ));
+    if rep["repeat_mask"].as_bool() == Some(false) {
+        h.push_str(&format!("<div class=\"alert\">{}</div>\n", t(
+            "Ohne Wiederholungsmaske gerechnet: Reads aus ähnlichen Stellen des Genoms können mitgezählt werden. Das Ergebnis ist weniger zuverlässig als in der Prüfung (zu viele Felder bei MICA/MICB, scheinbare Abweichungen bei DRB1/DRB4). Maske einrichten (hla-wgs build-mask) und neu starten.",
+            "Run without the repeat mask: reads from similar places in the genome can be counted. The result is less reliable than in the validation (too many fields for MICA/MICB, apparent differences in DRB1/DRB4). Set up the mask (hla-wgs build-mask) and run again."
+        )));
+    }
+    if !rep["groups_loaded"].as_bool().unwrap_or(true) {
+        h.push_str(&format!("<div class=\"alert soft\">{}</div>\n", t(
+            "G- und P-Gruppen fehlen: hla_nom_g.txt und hla_nom_p.txt liegen nicht in der Datenbank.",
+            "G and P groups are missing: hla_nom_g.txt and hla_nom_p.txt are not in the database."
+        )));
+    }
     h.push_str(&format!(
         "<nav class=\"tabs seg\"><button type=\"button\" data-tab=\"r\">{}</button><button type=\"button\" data-tab=\"d\">{}</button></nav>\n<section class=\"tab-r\">\n",
         t("Ergebnis", "Result"),

@@ -56,8 +56,12 @@ fn load_mask(panel: &str) -> AHashMap<String, Vec<(i64, i64)>> {
         }
     }
     eprintln!("[mask] {} alleles with repeat intervals from {}", m.len(), p);
+    MASK_LOADED.store(!m.is_empty(), std::sync::atomic::Ordering::Relaxed);
     m
 }
+
+/// whether a repeat mask was in use (reported in PREFIX.json and on the result page)
+pub static MASK_LOADED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
     let mut al = Aligner::builder()

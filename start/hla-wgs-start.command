@@ -9,6 +9,7 @@ case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in *UTF-8*) ;; *) export LC_CTYPE=en_US
 HLA_DAT_URL="https://github.com/ANHIG/IMGTHLA/raw/3660/hla.dat.zip"
 WMDA_URL="https://github.com/ANHIG/IMGTHLA/raw/3660/wmda"
 FREQ_URL="https://raw.githubusercontent.com/pjlabsdev/hla-wgs/main/data/freq_1000g_2field.json"
+MASK_URL="https://raw.githubusercontent.com/pjlabsdev/hla-wgs/main/data/panel_mask_3.66.bed"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 if [ "${LANG:-}" != "${LANG#de}" ] || [ "$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)" = "de" ]; then DE=1; else DE=0; fi
@@ -157,6 +158,8 @@ if [ ! -f "$DB/hladb.json.gz" ] || [ ! -f "$DB/panel.fa" ]; then
   fi
   step "$(tr_ "Datenbank bauen" "Building the database")" "$BIN" build-db "$DAT" "$FREQ" "$DB" || { result fail "$(tr_ "Datenbank" "Database")" "" "$(secs "$T0")"; cat "$WORKLOG"; finish 1; }
   result ok "$(tr_ "Datenbank" "Database")" "build-db" "$(secs "$T0")"
+  # the downloaded hla.dat is only needed for the build (about 390 MB); a dropped one is left alone
+  if [ "$DAT" = "$WORK/hla.dat" ]; then rm -f "$WORK/hla.dat" "$WORK/hla.dat.zip"; fi
 fi
 # G and P groups (WMDA files of the same release); without them the groups stay empty
 if [ ! -f "$DB/hla_nom_g.txt" ] || [ ! -f "$DB/hla_nom_p.txt" ]; then
@@ -168,7 +171,18 @@ if [ ! -f "$DB/hla_nom_g.txt" ] || [ ! -f "$DB/hla_nom_p.txt" ]; then
     result fail "$(tr_ "G- und P-Gruppen" "G and P groups")" "$(tr_ "weiter ohne" "continuing without")" "$(secs "$T0")"
   fi
 fi
+# repeat mask for the 3.66 panel (allele names and intervals only): shipped next to this file, in the
+# repository, or downloaded; building it from a GRCh38 FASTA remains possible
 if [ ! -f "$DB/panel.fa.mask.bed" ]; then
+  T0=$(now)
+  for c in "$HERE/panel_mask_3.66.bed" "$HERE/../data/panel_mask_3.66.bed"; do
+    if [ -s "$c" ]; then cp "$c" "$DB/panel.fa.mask.bed"; break; fi
+  done
+  [ -s "$DB/panel.fa.mask.bed" ] || curl -fsL -o "$DB/panel.fa.mask.bed" "$MASK_URL" || rm -f "$DB/panel.fa.mask.bed"
+  [ -s "$DB/panel.fa.mask.bed" ] && result ok "$(tr_ "Wiederholungsmaske" "Repeat mask")" "IMGT 3.66" "$(secs "$T0")"
+fi
+if [ ! -f "$DB/panel.fa.mask.bed" ]; then
+  printf '  %s%s%s\n' "$ERR" "$(tr_ "Ohne Wiederholungsmaske ist das Ergebnis weniger zuverlässig." "Without the repeat mask the result is less reliable.")" "$RST"
   askpath "Wiederholungsmaske (einmalig): Genom GRCh38 als FASTA hineinziehen, oder Enter zum Überspringen:" "Repeat mask (once): drop the GRCh38 genome FASTA, or press Enter to skip:" empty
   if [ -n "$REPLY_PATH" ]; then
     printf '\n'

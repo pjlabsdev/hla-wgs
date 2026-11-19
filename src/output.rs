@@ -210,6 +210,7 @@ pub fn write(
         "tool": "hla-wgs", "version": env!("CARGO_PKG_VERSION"), "schema": "genome.hla.v1",
         "thresholds": {"2": T[0], "3": T[1], "4": T[2]}, "genes": js,
         "groups_loaded": grp.loaded,
+        "repeat_mask": crate::panel::MASK_LOADED.load(std::sync::atomic::Ordering::Relaxed),
         "pharmacogenetic_alleles": crate::groups::PGX.iter().map(|(al, drugs)| {
             let hits: Vec<&(String, usize)> = called.iter().filter(|(n, _)| two(n) == *al).collect();
             serde_json::json!({
