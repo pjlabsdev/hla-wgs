@@ -114,6 +114,9 @@ for c in "$HERE/hla-wgs" "$HERE/bin/hla-wgs" "$HERE/../target/release/hla-wgs" "
   if [ -n "$c" ] && [ -x "$c" ]; then BIN="$c"; break; fi
 done
 WORKLOG="$(mktemp -t hla-wgs-start.XXXXXX)"
+# a ZIP unpacked after a browser download marks the program as quarantined, and macOS then stops it
+# at once; this file was started on purpose, so the mark is removed from the program only
+[ -n "$BIN" ] && command -v xattr >/dev/null 2>&1 && xattr -d com.apple.quarantine "$BIN" 2>/dev/null
 
 # ── header ───────────────────────────────────────────────────────────────────
 clear 2>/dev/null
@@ -191,14 +194,16 @@ if [ "${HLA_WGS_LONG:-0}" = 1 ] || [ "${1:-}" = "--long" ]; then LONG=1; fi
 if [ "$LONG" = 0 ]; then
   case "$lower" in
     *.cram) askpath "Referenz der CRAM (GRCh38-FASTA mit .fai) hineinziehen:" "Drop the reference of the CRAM (GRCh38 FASTA with .fai):"; EXTRA=("$REPLY_PATH") ;;
-    *.fq|*.fastq|*.fq.gz|*.fastq.gz) askpath "Zweite FASTQ-Datei (R2) hineinziehen:" "Drop the second FASTQ file (R2):"; IN2="$REPLY_PATH" ;;
+    *.fq|*.fastq|*.fq.gz|*.fastq.gz) askpath "Zweite FASTQ-Datei (R2) hineinziehen:" "Drop the second FASTQ file (R2):"; IN2="$REPLY_PATH"
+      printf '  %s%s%s\n' "$MUT" "$(tr_ "FASTQ: Das Programm liest alle Reads des Genoms, nicht nur die HLA-Region wie bei einer BAM. Das dauert deutlich länger. Weitere Programme braucht es nicht." "FASTQ: the program reads every read of the genome, not only the HLA region as with a BAM. This takes much longer. No other programs are needed.")" "$RST" ;;
   esac
 fi
 
 # sample name and an output folder that holds no earlier result
 S="$(basename "$IN")"
 for x in .fastq.gz .fq.gz .fastq .fq .bam .cram .BAM .CRAM; do S="${S%"$x"}"; done
-for x in _R1 _1 .R1 _r1; do S="${S%"$x"}"; done
+# FASTQ: drop the read-1 part of the name (PJ_R1, PJ_1, Illumina S1_L001_R1_001)
+case "$lower" in *.fq|*.fastq|*.fq.gz|*.fastq.gz) S="$(printf '%s' "$S" | sed -E 's/_S[0-9]+_L[0-9]{3}_R1_001$//; s/_L[0-9]{3}_R1_001$//; s/_R1_001$//; s/([._])[Rr]?1$//')" ;; esac
 [ -z "$S" ] && S=sample
 OUT="$HOME/Downloads/hla-wgs-$S"; n=2
 while [ -e "$OUT/$S.tsv" ] || [ -e "$OUT/$S.long.tsv" ]; do OUT="$HOME/Downloads/hla-wgs-$S-$n"; n=$((n + 1)); done
@@ -278,10 +283,18 @@ printf '\n'
 cols() { if command -v column >/dev/null 2>&1; then column -t -s "$(printf '\t')"; else cat; fi; }
 # genes estimated at 0 copies (PREFIX.tsv, column copies) are absent: the table lists them as such
 # instead of the nearest database allele that PREFIX.conf.tsv still carries for them
-ABSENT=""; [ -f "$OUT/$S.tsv" ] && [ "$LONG" = 0 ] && ABSENT="$(awk -F'\t' 'NR > 1 && $8 == "0" { printf "%s ", $1 }' "$OUT/$S.tsv")"
-cut -f1-5 "$TAB" | awk -F'\t' -v a=" $ABSENT" -v no="$(tr_ "nicht vorhanden" "absent")" 'NR == 1 { print; next }
-  index(a, " " $1 " ") { next } { print }
-  END { n = split(a, x, " "); for (k = 1; k <= n; k++) print x[k] "\t-\t" no "\t-\t0" }' |
+if [ -f "$OUT/$S.tsv" ] && [ "$LONG" = 0 ]; then
+  # in the gene order of PREFIX.tsv; an absent gene or one without a result keeps its place
+  awk -F'\t' -v no="$(tr_ "nicht vorhanden" "absent")" -v nr="$(tr_ "kein Ergebnis" "no result")" '
+    FNR == NR { if (FNR > 1) { ord[++n] = $1; cp[$1] = $8 } next }
+    FNR == 1 { print; next } { row[$1] = row[$1] $0 "\n" }
+    END { for (i = 1; i <= n; i++) { g = ord[i]
+      if (cp[g] == "0") print g "\t-\t" no "\t-\t0"
+      else if (g in row) printf "%s", row[g]
+      else print g "\t-\t" nr "\t-\t-" } }' "$OUT/$S.tsv" <(cut -f1-5 "$TAB")
+else
+  cut -f1-5 "$TAB"
+fi |
   cols | awk -v m="$MUT" -v r="$RST" -v g="$OK" 'NR==1 { print "  " m $0 r; next } { line = "  " $0; if ($NF == "4") sub(/4$/, g "4" r, line); print line }'
 printf '\n  %s%s%s\n' "$MUT" "$(tr_ "safe_call und resolution: so viele Felder, wie die Reads tragen. Maßgeblich ist der sichere Ruf." "safe_call and resolution: as many fields as the reads support. Use the safe call.")" "$RST"
 printf '  %s%s%s\n' "$MUT" "$SHOWOUT" "$RST"

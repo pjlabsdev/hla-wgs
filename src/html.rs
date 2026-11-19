@@ -56,6 +56,17 @@ th:nth-child(4),td:nth-child(4){width:70px}
 .pos{color:var(--warn);font-weight:500}
 .cls td{background:var(--soft);color:var(--mut);font-size:12px;letter-spacing:.06em;text-transform:uppercase;padding:5px 8px;border-bottom:1px solid var(--line)}
 a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+details{border-bottom:1px solid var(--line);padding:6px 0}
+summary{cursor:pointer;list-style:none}summary::-webkit-details-marker{display:none}
+summary:before{content:'+ ';color:var(--mut)}details[open] summary:before{content:'– '}
+.kv{color:var(--mut);font-size:12px;margin:8px 0}
+.dt{font-size:12px;margin:6px 0 10px}.dt td,.dt th{padding:4px 10px 4px 0}
+.ok{color:var(--ok)}
+body[data-lang=de] main.l-en,body[data-lang=en] main.l-de{display:none}
+nav.lang{max-width:980px;margin:0 auto;padding:16px 24px 0;text-align:right}
+nav.lang button{font:inherit;font-size:12px;background:none;border:1px solid var(--line);color:var(--mut);padding:3px 10px;cursor:pointer}
+body[data-lang=de] nav.lang button[data-set=de],body[data-lang=en] nav.lang button[data-set=en]{color:var(--fg);border-color:var(--fg)}
+@media print{nav.lang{display:none}}
 footer{margin-top:40px;border-top:1px solid var(--fg);padding-top:14px;color:var(--mut);font-size:12px}
 footer p{margin:6px 0}
 .cite{color:var(--fg)}
@@ -74,8 +85,20 @@ fn class_of(g: &str) -> u8 {
     }
 }
 
+/// the page holds the result in German and in English; a switch at the top shows one of them,
+/// the default follows HLA_WGS_LANG / LANG
 pub fn render(rep: &Value, sample: &str) -> String {
     let de = german();
+    let first = if de { "de" } else { "en" };
+    format!(
+        "<!DOCTYPE html>\n<html lang=\"{first}\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>hla-wgs · {}</title>\n<style>{CSS}</style></head><body data-lang=\"{first}\">\n<nav class=\"lang\"><button type=\"button\" data-set=\"de\">Deutsch</button><button type=\"button\" data-set=\"en\">English</button></nav>\n<main lang=\"de\" class=\"l-de\">\n{}</main>\n<main lang=\"en\" class=\"l-en\">\n{}</main>\n<script>\nfunction setL(l){{document.body.dataset.lang=l;document.documentElement.lang=l;try{{localStorage.setItem('hla-wgs-lang',l)}}catch(e){{}}}}\ntry{{const s=localStorage.getItem('hla-wgs-lang');if(s==='de'||s==='en')setL(s)}}catch(e){{}}\ndocument.querySelectorAll('nav.lang button').forEach(b=>b.addEventListener('click',()=>setL(b.dataset.set)));\naddEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));\n</script></body></html>\n",
+        esc(sample),
+        render_one(rep, sample, true),
+        render_one(rep, sample, false)
+    )
+}
+
+fn render_one(rep: &Value, sample: &str, de: bool) -> String {
     let t = |d: &'static str, e: &'static str| if de { d } else { e };
     let version = rep["version"].as_str().unwrap_or("");
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
@@ -85,6 +108,9 @@ pub fn render(rep: &Value, sample: &str) -> String {
     let genes = rep["genes"].as_array().unwrap_or(&empty);
 
     let (mut n_alleles, mut n4, mut n_new) = (0, 0, 0);
+    let mut details = String::new();
+    let thr = |k: &str| rep["thresholds"][k].as_f64().unwrap_or(0.0);
+    let f1 = |v: &Value| v.as_f64().map(|x| format!("{x:.1}")).unwrap_or_else(|| "–".to_string());
     let mut rows = String::new();
     let mut last = 9u8;
     let names = [
@@ -180,6 +206,7 @@ pub fn render(rep: &Value, sample: &str) -> String {
                 notes.push(t("beide Kopien auf den gesicherten Feldern gleich", "both copies alike on the supported fields").to_string());
             }
         }
+        details.push_str(&gene_details(g, &t, &thr, &f1));
         rows.push_str(&format!(
             "<tr><td class=\"g\">{}</td>{}{}<td>{dots}</td><td class=\"note hide\">{}</td></tr>\n",
             esc(name),
@@ -212,9 +239,8 @@ pub fn render(rep: &Value, sample: &str) -> String {
 
     let mut h = String::with_capacity(32_000);
     h.push_str(&format!(
-        "<!DOCTYPE html>\n<html lang=\"{}\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>hla-wgs · {}</title>\n<style>{CSS}</style></head><body><main>\n",
-        t("de", "en"),
-        esc(sample)
+        "{}",
+        ""
     ));
     h.push_str(&format!(
         "<h1>{}</h1>\n<div class=\"sub\">{} · hla-wgs {} · {day}</div>\n",
@@ -243,6 +269,14 @@ pub fn render(rep: &Value, sample: &str) -> String {
             "Shown is the safe call: as many fields of the allele name as the reads support. The dots count these fields. The nearest full name is given below it where it goes further."
         )
     ));
+    h.push_str(&format!(
+        "<h2>{}</h2>\n<p class=\"note\">{}</p>\n{details}",
+        t("Details je Gen", "Details per gene"),
+        t(
+            "Alle Werte aus .tsv und .conf.tsv. Vorsprung: wie viel besser (Log-Likelihood) das gewählte Allel die Reads erklärt als das beste Allel, das sich in diesem Feld unterscheidet; ab der Schwelle gilt das Feld als gesichert. Ein Klick öffnet ein Gen; beim Drucken sind alle offen.",
+            "All values of .tsv and .conf.tsv. Lead: how much better (log-likelihood) the chosen allele explains the reads than the best allele that differs in this field; at or above the threshold the field counts as supported. Click a gene to open it; all are open when printed."
+        )
+    ));
     if !pgx.is_empty() {
         h.push_str(&format!(
             "<h2>{}</h2>\n<table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th class=\"hide\">{}</th></tr></thead><tbody>\n{pgx}</tbody></table>\n",
@@ -254,7 +288,7 @@ pub fn render(rep: &Value, sample: &str) -> String {
         ));
     }
     h.push_str(&format!(
-        "<footer>\n<p class=\"cite\">{}: Jungwirth P. hla-wgs: HLA typing from whole-genome sequencing with a per-allele statement of what is certain. Zenodo. <a href=\"https://doi.org/{DOI}\">https://doi.org/{DOI}</a></p>\n<p>{}: <a href=\"{ARTICLE}\">{ARTICLE}</a> · {}: <a href=\"{SOURCE}\">{SOURCE}</a></p>\n<p>{}</p>\n<p>{}</p>\n</footer>\n</main></body></html>\n",
+        "<footer>\n<p class=\"cite\">{}: Jungwirth P. hla-wgs: HLA typing from whole-genome sequencing with a per-allele statement of what is certain. Zenodo. <a href=\"https://doi.org/{DOI}\">https://doi.org/{DOI}</a></p>\n<p>{}: <a href=\"{ARTICLE}\">{ARTICLE}</a> · {}: <a href=\"{SOURCE}\">{SOURCE}</a></p>\n<p>{}</p>\n<p>{}</p>\n</footer>\n",
         t("Zitieren", "Cite"),
         t("Forschungsbeitrag mit Methode und Prüfung", "Research article with method and validation"),
         t("Quelltext", "Source code"),
@@ -268,6 +302,105 @@ pub fn render(rep: &Value, sample: &str) -> String {
         )
     ));
     h
+}
+
+/// one collapsible block with every value the program reports for a gene
+fn gene_details(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static str, thr: &dyn Fn(&str) -> f64, f1: &dyn Fn(&Value) -> String) -> String {
+    let name = g["gene"].as_str().unwrap_or("");
+    let empty = vec![];
+    let als = g["alleles"].as_array().unwrap_or(&empty);
+    let copies = g["copies"].as_u64().unwrap_or(2);
+    let calls: Vec<String> = als.iter().take(copies.min(2) as usize).map(|a| esc(a["safe_call"].as_str().unwrap_or(""))).collect();
+    let summary = if copies == 0 { t("nicht vorhanden", "absent").to_string() } else if !g["called"].as_bool().unwrap_or(false) { t("kein Ergebnis", "no result").to_string() } else { calls.join(" · ") };
+    let mut o = format!("<details><summary><b>{}</b> <span class=\"note\">{summary}</span></summary>\n", esc(name));
+    o.push_str(&format!(
+        "<div class=\"kv\">{}: {} · {}: {} · {}: {}{}</div>\n",
+        t("Reads", "Reads"),
+        g["reads"].as_u64().map(|x| x.to_string()).unwrap_or_else(|| "–".into()),
+        t("Kopien", "Copies"),
+        copies,
+        t("Vorsprung des besten Allelpaars", "Lead of the best allele pair"),
+        f1(&g["gap"]),
+        g["copy_ratio"].as_f64().map(|r| format!(" · {}: {r:.2}", t("Kopienverhältnis (1 Kopie ≈ 1, 2 Kopien ≈ 2)", "copy ratio (1 copy ≈ 1, 2 copies ≈ 2)"))).unwrap_or_default()
+    ));
+    if copies == 0 {
+        o.push_str(&format!("<div class=\"kv\">{}</div></details>\n", t("Zu wenige Reads für eine Kopie: das Gen fehlt auf beiden Chromosomen.", "Too few reads for one copy: the gene is absent on both chromosomes.")));
+        return o;
+    }
+    for (i, a) in als.iter().take(copies.min(2) as usize).enumerate() {
+        let full = a["allele"].as_str().unwrap_or("");
+        o.push_str(&format!(
+            "<div class=\"kv\">{} {}: <b>{}</b> · {}: {} · {}: {} · G: {} · P: {}{}{}</div>\n",
+            t("Allel", "Allele"),
+            i + 1,
+            esc(full),
+            t("sicherer Ruf", "safe call"),
+            esc(a["safe_call"].as_str().unwrap_or("")),
+            t("gesicherte Felder", "supported fields"),
+            a["resolution"].as_u64().unwrap_or(0),
+            esc(a["g_group"].as_str().unwrap_or("–")),
+            esc(a["p_group"].as_str().unwrap_or("–")),
+            a["expression"].as_str().map(|x| format!(" · {}", esc(x))).unwrap_or_default(),
+            a["renamed_from"].as_str().map(|x| format!(" · {} {}", t("benannt aus", "named from"), esc(x))).unwrap_or_default()
+        ));
+        o.push_str(&format!("<table class=\"dt\"><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr>", t("Feld", "Field"), t("Vorsprung", "Lead"), t("Schwelle", "Threshold"), t("nächster Konkurrent", "nearest competitor")));
+        for k in ["2", "3", "4"] {
+            let m = &a["margin"][k];
+            let th = thr(k);
+            let pass = m.as_f64().map(|x| x >= th).unwrap_or(true);
+            o.push_str(&format!(
+                "<tr><td>{k}</td><td class=\"{}\">{}</td><td>{th:.0}</td><td>{}</td></tr>",
+                if pass { "ok" } else { "warn" },
+                if m.is_null() { t("kein Konkurrent", "no competitor").to_string() } else { f1(m) },
+                esc(a["alternative"][k].as_str().filter(|x| !x.is_empty()).unwrap_or("–"))
+            ));
+        }
+        o.push_str("</table>\n");
+        o.push_str(&format!("<div class=\"kv\">{}: {}</div>\n", t("Grund der Feldzahl", "Why this many fields"), field_reason(name, a, t, thr)));
+        let sites = a["new_sites"].as_array().cloned().unwrap_or_default();
+        if !sites.is_empty() {
+            o.push_str(&format!("<table class=\"dt\"><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr>", t("Position im Gen", "Position in the gene"), t("Abweichung", "Difference"), t("Reads dafür / Tiefe", "Reads for it / depth"), t("Hinweis", "Note")));
+            for x in &sites {
+                let ch = x["change"].as_str().unwrap_or("");
+                let mut nt = vec![];
+                if x["exon"].as_bool().unwrap_or(false) { nt.push(t("im Exon", "in an exon")); }
+                if x["either_allele"].as_bool().unwrap_or(false) { nt.push(t("keiner Kopie sicher zuzuordnen", "cannot be assigned to one copy")); }
+                if ch.starts_with("blind") { nt.push(t("Strecke ohne eindeutig zuordenbare Reads", "stretch without uniquely placed reads")); }
+                if ch.contains("unsupported") { nt.push(t("Datenbank-Base von keinem Read gestützt", "database base backed by no read")); }
+                let rd = if ch.starts_with("blind") { "–".to_string() } else { format!("{} / {}", x["reads"], x["depth"]) };
+                o.push_str(&format!("<tr><td>{}</td><td>{}</td><td>{rd}</td><td>{}</td></tr>", x["pos"], esc(ch), nt.join(", ")));
+            }
+            o.push_str("</table>\n");
+        }
+    }
+    o.push_str("</details>\n");
+    o
+}
+
+/// why the safe call stops at its number of fields
+fn field_reason(gene: &str, a: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static str, thr: &dyn Fn(&str) -> f64) -> String {
+    let r = a["resolution"].as_u64().unwrap_or(0);
+    let nf = a["allele"].as_str().and_then(|x| x.split('*').nth(1)).map(|x| x.split(':').count() as u64).unwrap_or(4);
+    if r >= 4 || r >= nf {
+        return t("alle Felder des Allelnamens gesichert", "all fields of the allele name are supported").to_string();
+    }
+    let next = (r + 1).max(2).to_string();
+    if let Some(m) = a["margin"][next.as_str()].as_f64() {
+        if m < thr(&next) {
+            return format!("{} {next}: {m:.1} < {:.0}", t("Vorsprung vor dem nächsten Konkurrenten unter der Schwelle im Feld", "lead over the nearest competitor below the threshold at field"), thr(&next));
+        }
+    }
+    if gene == "E" && r == 3 {
+        return t("HLA-E wird in dieser Version höchstens auf 3 Felder angegeben", "HLA-E is reported to at most 3 fields in this version").to_string();
+    }
+    let sites = a["new_sites"].as_array().cloned().unwrap_or_default();
+    if sites.iter().any(|x| x["exon"].as_bool().unwrap_or(false)) {
+        return t("abweichende Stelle im Exon: das Allel ist neu oder unbekannt, nur die Allelgruppe ist sicher", "differing site in an exon: the allele is new or unknown, only the allele group is certain").to_string();
+    }
+    if !sites.is_empty() {
+        return t("abweichende Stelle außerhalb der Exons: die ersten drei Felder gelten, das vierte nicht", "differing site outside the exons: the first three fields hold, the fourth does not").to_string();
+    }
+    t("Datenlage reicht nicht für mehr Felder", "the data do not support more fields").to_string()
 }
 
 #[cfg(test)]

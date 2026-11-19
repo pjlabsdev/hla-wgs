@@ -54,12 +54,14 @@ pub fn write(
             if rt < 0.4 {
                 let n = res.get(g).map(|t| t.0.nreads as usize).unwrap_or_else(|| depth.get(g).copied().unwrap_or(0));
                 writeln!(fh, "{g}\t-\t-\t-\t-\t0\t{n}\t0").unwrap();
-                js.push(serde_json::json!({"gene": g, "called": false, "copies": 0, "reads": n, "copy_ratio": rt}));
+                // absence is a result, written like a gene absent by the copy model
+                js.push(serde_json::json!({"gene": g, "called": true, "copies": 0, "reads": n, "alleles": [], "copy_ratio": rt}));
                 continue;
             }
         }
         let Some((r, refined, rm)) = res.get(g) else {
-            writeln!(fh, "{g}\t-\t-\t-\t-\t0\t{}\t0", depth.get(g).copied().unwrap_or(0)).unwrap();
+            // no result: the number of copies is unknown, not 0
+            writeln!(fh, "{g}\t-\t-\t-\t-\t-\t{}\t-", depth.get(g).copied().unwrap_or(0)).unwrap();
             js.push(serde_json::json!({"gene": g, "called": false, "reads": depth.get(g).copied().unwrap_or(0)}));
             continue;
         };

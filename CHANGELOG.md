@@ -5,7 +5,7 @@
 - `PREFIX.tsv`: `call1`/`call2` now hold the safe call (the fields the reads support) instead of repeating
   `allele1`/`allele2`; a gene estimated at 0 copies shows `-` in all allele columns, has no line in
   `PREFIX.conf.tsv` and no alleles in `PREFIX.json` (before, the nearest names were still printed).
-- `PREFIX.html`: the result as one page for reading and printing (safe call per allele, supported fields, notes, pharmacogenetic alleles, DOI and link to the research article); German with `HLA_WGS_LANG=de` or a German `LANG`.
+- `PREFIX.html`: the result as one page for reading and printing (safe call per allele, supported fields, notes, pharmacogenetic alleles, DOI and link to the research article); German and English in one page with a switch (opens in German with `HLA_WGS_LANG=de` or a German `LANG`); "Details per gene" shows everything from `PREFIX.tsv` and `PREFIX.conf.tsv` (leads per field with threshold and competitor, G/P groups, every differing site) and why each call stops at its number of fields.
 - Start file `start/hla-wgs-start.command`: double-click, drag the input file into the window or type its path; sets up the reference once if it is missing.
 - Long reads (experimental): `hla-wgs long DBDIR READS.fastq[.gz]|READS.bam PREFIX [threads]` types from
   PacBio HiFi reads. The gene sequence of each haplotype is built from the reads (consensus) and

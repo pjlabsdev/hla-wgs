@@ -16,7 +16,9 @@ One line per gene.
 | `copies` | 0, 1 or 2; estimated for DRB3, DRB4, DRB5, H and K, otherwise 2 |
 
 When `copies` is 0 the gene is absent on both chromosomes: all four allele columns are `-`, and
-`PREFIX.conf.tsv` has no line for it. When `copies` is 1 the second position is `-`.
+`PREFIX.conf.tsv` has no line for it; in `PREFIX.json` it has `"called": true`, `"copies": 0` and no
+alleles. When `copies` is 1 the second position is `-`. A gene without a result (too few reads) has
+`-` in every column except `reads`, and `"called": false` in `PREFIX.json`.
 
 ## PREFIX.conf.tsv
 
@@ -129,8 +131,15 @@ For experiments; the defaults are the validated configuration.
 ## PREFIX.html
 
 One self-contained page with the result for reading and printing, built from the values of
-`PREFIX.json`: per gene the safe call of each allele, the number of supported fields, the nearest full
-name where it goes further, notes (one copy, gene absent, differences from the database allele,
-expression suffix), the pharmacogenetic alleles, and the citation with DOI and the link to the research
-article. It loads nothing from the network. The text is German when `HLA_WGS_LANG=de` is set or `LANG`
-starts with `de`, otherwise English.
+`PREFIX.json`, so it holds everything that `PREFIX.tsv` and `PREFIX.conf.tsv` hold: per gene the
+safe call of each allele, the number of supported fields, the nearest full name where it goes
+further, notes (one copy, gene absent, differences from the database allele, expression suffix), the
+pharmacogenetic alleles, and the citation with DOI and the link to the research article. The section
+"Details per gene" opens per gene the reads, copies, lead of the best pair and copy ratio, and per
+allele the G and P groups, the lead at fields 2 to 4 against its threshold with the nearest competitor,
+the reason why the safe call stops where it does, and every differing site.
+
+The page holds German and English; the buttons at the top switch between them, the choice is kept in
+the browser, and printing uses the chosen language with all details opened. It opens in German when
+`HLA_WGS_LANG=de` is set or `LANG` starts with `de`, otherwise in English. It loads nothing from the
+network.
