@@ -9,13 +9,14 @@ One line per gene.
 | column | meaning |
 |---|---|
 | `gene` | gene name without the `HLA-` prefix |
-| `allele1`, `allele2` | best database alleles; `-` when the copy is absent |
-| `call1`, `call2` | the same without the gene prefix |
-| `gap` | log-likelihood margin of the best pair over the next pair |
+| `allele1`, `allele2` | best database alleles (full name); `-` for a copy that is absent |
+| `call1`, `call2` | the safe call of each allele without the gene prefix: only the fields the reads support (as `safe_call` in `PREFIX.conf.tsv`) |
+| `gap` | log-likelihood lead of the best allele pair over the next pair; high means clear. It is not a gap in coverage (stretches without reads are listed as `blindNbp` in `PREFIX.conf.tsv`) |
 | `reads` | read pairs assigned to the gene |
 | `copies` | 0, 1 or 2; estimated for DRB3, DRB4, DRB5, H and K, otherwise 2 |
 
-When `copies` is 0 the allele columns still show the best-scoring names; ignore them.
+When `copies` is 0 the gene is absent on both chromosomes: all four allele columns are `-`, and
+`PREFIX.conf.tsv` has no line for it. When `copies` is 1 the second position is `-`.
 
 ## PREFIX.conf.tsv
 
@@ -97,9 +98,7 @@ One line per gene sequence found in the long reads.
 | `equal_alternatives` | other alleles at the same distance |
 | `note` | `minor`: a third sequence of a gene or one with few reads; not written to the FASTA |
 
-One line for a gene means that both copies are identical or that there is one copy. A gene with
-`copies` 0 in `PREFIX.tsv` keeps its two lines with the best-scoring names; it is absent and these
-lines are to be ignored (the result page and the start file show it as absent). Besides the typed
+One line for a gene means that both copies are identical or that there is one copy. A gene with `copies` 0 has no line. Besides the typed
 genes the table lists what else lies on the reads (for example HLA-J, L, DPA2, DPB2, DQA2).
 `PREFIX.long.fa` holds each sequence over the extent of its nearest allele.
 

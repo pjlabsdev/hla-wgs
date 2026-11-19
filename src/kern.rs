@@ -132,7 +132,12 @@ fn anchors(idx: &Index, nt: usize, fw: &[u8], rc: &[u8]) -> Vec<Vec<(u8, i64)>> 
         cnt.sort_by(|x, y| x.1.cmp(&y.1).then(y.0.cmp(&x.0)).then(x.2.cmp(&y.2)));
         let mut sel = vec![];
         for st in 0..2u8 {
-            sel.extend(cnt.iter().filter(|c| c.1 == st).take(2).map(|c| (c.1, c.2 * 8)));
+            sel.extend(
+                cnt.iter()
+                    .filter(|c| c.1 == st)
+                    .take(2)
+                    .map(|c| (c.1, c.2 * 8)),
+            );
         }
         out[t as usize] = sel;
     }
@@ -224,7 +229,11 @@ fn mate_cost(
         // text window; positions outside the target are wildcards (free overhang)
         let mut win = Vec::with_capacity((e - s) as usize);
         for p in s..e {
-            win.push(if p < 0 || p >= l { 4 } else { t.seq[p as usize] });
+            win.push(if p < 0 || p >= l {
+                4
+            } else {
+                t.seq[p as usize]
+            });
         }
         let key = (st, win);
         let c = match cache.get(&key) {
@@ -245,10 +254,14 @@ fn mate_cost(
     }
 }
 
-
 /// raw matrix (row-major, reads x seqs), exactly as hlakern wrote it
 pub fn raw(reads: &[[&[u8]; 2]], seqs: &[&[u8]]) -> Vec<u16> {
-    let targets: Vec<Target> = seqs.iter().map(|s| Target { seq: s.iter().map(|&c| code(c)).collect() }).collect();
+    let targets: Vec<Target> = seqs
+        .iter()
+        .map(|s| Target {
+            seq: s.iter().map(|&c| code(c)).collect(),
+        })
+        .collect();
     let idx = Index::new(&targets);
     let nt = targets.len();
     let rows: Vec<Vec<u16>> = reads
@@ -278,8 +291,16 @@ pub const UNMAPPED_EXTRA: f64 = 3.0;
 
 /// edit_matrix_rs of the prototype: rows of reads with at least one aligned cell; a cell with
 /// an unaligned mate costs row-min + 3 per unaligned mate. Returns (matrix rows, used read ids).
-pub fn edit_matrix(reads: &crate::panel::Reads, qnames: &[usize], seqs: &[&[u8]]) -> Option<(Vec<Vec<f64>>, Vec<usize>)> {
-    let qs: Vec<usize> = qnames.iter().copied().filter(|&q| reads.get(q).is_some()).collect();
+pub fn edit_matrix(
+    reads: &crate::panel::Reads,
+    qnames: &[usize],
+    seqs: &[&[u8]],
+) -> Option<(Vec<Vec<f64>>, Vec<usize>)> {
+    let qs: Vec<usize> = qnames
+        .iter()
+        .copied()
+        .filter(|&q| reads.get(q).is_some())
+        .collect();
     if qs.is_empty() || seqs.is_empty() {
         return None;
     }
@@ -287,7 +308,10 @@ pub fn edit_matrix(reads: &crate::panel::Reads, qnames: &[usize], seqs: &[&[u8]]
         .iter()
         .map(|&q| {
             let r = &reads.seq[q];
-            [r[0].as_deref().unwrap_or(&[]), r[1].as_deref().unwrap_or(&[])]
+            [
+                r[0].as_deref().unwrap_or(&[]),
+                r[1].as_deref().unwrap_or(&[]),
+            ]
         })
         .collect();
     let raw = raw(&mates, seqs);
@@ -300,8 +324,22 @@ pub fn edit_matrix(reads: &crate::panel::Reads, qnames: &[usize], seqs: &[&[u8]]
             continue;
         }
         let mn = row.iter().filter(|&&v| v < 999).min().copied().unwrap() as f64;
-        out.push(row.iter().map(|&v| if v >= 999 { mn + UNMAPPED_EXTRA * (v / 999) as f64 } else { v as f64 }).collect());
+        out.push(
+            row.iter()
+                .map(|&v| {
+                    if v >= 999 {
+                        mn + UNMAPPED_EXTRA * (v / 999) as f64
+                    } else {
+                        v as f64
+                    }
+                })
+                .collect(),
+        );
         used.push(q);
     }
-    if out.is_empty() { None } else { Some((out, used)) }
+    if out.is_empty() {
+        None
+    } else {
+        Some((out, used))
+    }
 }

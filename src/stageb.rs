@@ -1,11 +1,11 @@
 //! Stage B: every gene read against every candidate (Rust kernel), genotype = best allele pair
 //! under a read mixture model with priors. Also candidate padding (shared flanks) and decoys.
-use crate::align::{aligner, best_mlen, map, Preset};
+use crate::align::{Preset, aligner, best_mlen, map};
 use crate::db::{Allele, Db};
 use crate::kern;
 use crate::names::{diff_level, fields, is_null_like, num_key, two};
 use crate::panel::Reads;
-use crate::prior::{Priors, PRIOR_IMPUTED, PRIOR_NULL};
+use crate::prior::{PRIOR_IMPUTED, PRIOR_NULL, Priors};
 use crate::stagea::np_sum;
 use ahash::AHashMap;
 use rayon::prelude::*;
@@ -58,7 +58,14 @@ pub struct StageB {
 
 impl<'a> Ctx<'a> {
     pub fn new(db: &'a Db, reads: &'a Reads) -> Self {
-        Ctx { db, reads, pri: Priors::new(db), pad: Mutex::new(AHashMap::new()), donor: Mutex::new(AHashMap::new()), decoy: Mutex::new(AHashMap::new()) }
+        Ctx {
+            db,
+            reads,
+            pri: Priors::new(db),
+            pad: Mutex::new(AHashMap::new()),
+            donor: Mutex::new(AHashMap::new()),
+            decoy: Mutex::new(AHashMap::new()),
+        }
     }
 
     pub fn al(&self, g: &str) -> &'a [Allele] {
@@ -91,7 +98,11 @@ impl<'a> Ctx<'a> {
         let s_ = self.orig_seq(g, i);
         let mut out = al[i].genomic.clone();
         if donor != i {
-            let d: Vec<u8> = if depth < 6 && std::env::var("HLA_PAD1").is_err() { self.padded(g, donor, pool, depth + 1) } else { al[donor].genomic.clone() };
+            let d: Vec<u8> = if depth < 6 && std::env::var("HLA_PAD1").is_err() {
+                self.padded(g, donor, pool, depth + 1)
+            } else {
+                al[donor].genomic.clone()
+            };
             if d.len() > s_.len() + 20 {
                 let a = aligner(&d, Preset::Asm10);
                 let hs = map(&a, s_);
@@ -120,7 +131,11 @@ impl<'a> Ctx<'a> {
         let al = self.al(g);
         let s_ = self.orig_seq(g, i);
         let mut best = (i64::MAX, i);
-        let longer: Vec<usize> = pool.iter().copied().filter(|&j| !al[j].extended && al[j].genomic.len() > s_.len() + 20).collect();
+        let longer: Vec<usize> = pool
+            .iter()
+            .copied()
+            .filter(|&j| !al[j].extended && al[j].genomic.len() > s_.len() + 20)
+            .collect();
         let mut a = None;
         for j in longer {
             let ck = (g.to_string(), al[i].name.clone(), al[j].name.clone());
@@ -152,7 +167,10 @@ impl<'a> Ctx<'a> {
         }
         cand.iter()
             .map(|&i| {
-                let pool = grp.get(&two(&al[i].name)).map(|v| &v[..v.len().min(60)]).unwrap_or(&[]);
+                let pool = grp
+                    .get(&two(&al[i].name))
+                    .map(|v| &v[..v.len().min(60)])
+                    .unwrap_or(&[]);
                 self.padded(g, i, pool, 0)
             })
             .collect()
@@ -187,8 +205,11 @@ impl<'a> Ctx<'a> {
     }
 
     pub fn allele_prior(&self, g: &str, a: &Allele) -> f64 {
-        (if is_null_like(&a.name) { -PRIOR_NULL } else { 0.0 })
-            + (if a.imputed { -PRIOR_IMPUTED } else { 0.0 })
+        (if is_null_like(&a.name) {
+            -PRIOR_NULL
+        } else {
+            0.0
+        }) + (if a.imputed { -PRIOR_IMPUTED } else { 0.0 })
             + (if a.extended { -0.3 } else { 0.0 })
             + self.pri.freq_prior(g, &a.name)
             + self.pri.sub_prior(g, &a.name)
@@ -196,8 +217,17 @@ impl<'a> Ctx<'a> {
     }
 
     /// reads kept for scoring: best cell <= 10 edits and not explained better by a decoy
-    pub fn keep_rows(&self, g: &str, qnames: &[usize], e: &[Vec<f64>], used: &[usize]) -> Vec<bool> {
-        let mut keep: Vec<bool> = e.iter().map(|r| r.iter().cloned().fold(f64::INFINITY, f64::min) <= 10.0).collect();
+    pub fn keep_rows(
+        &self,
+        g: &str,
+        qnames: &[usize],
+        e: &[Vec<f64>],
+        used: &[usize],
+    ) -> Vec<bool> {
+        let mut keep: Vec<bool> = e
+            .iter()
+            .map(|r| r.iter().cloned().fold(f64::INFINITY, f64::min) <= 10.0)
+            .collect();
         if !decoys(g).is_empty() || self.db.genome_decoy.contains_key(g) {
             let dm = self.decoy_min(g, qnames);
             for (k, (r, q)) in e.iter().zip(used).enumerate() {
@@ -222,13 +252,36 @@ impl<'a> Ctx<'a> {
             if f.len() == 3 && f[0] == g {
                 let pos = |n: &str| cand.iter().position(|&i| al[i].name == n);
                 if let (Some(x), Some(y)) = (pos(f[1]), pos(f[2])) {
-                    eprintln!("HLACMPLEN\t{}\t{}\t{}\t{}", seqs[x].len(), seqs[y].len(), al[cand[x]].genomic.len(), al[cand[y]].genomic.len());
+                    eprintln!(
+                        "HLACMPLEN\t{}\t{}\t{}\t{}",
+                        seqs[x].len(),
+                        seqs[y].len(),
+                        al[cand[x]].genomic.len(),
+                        al[cand[y]].genomic.len()
+                    );
                     let n = seqs[x].len().min(seqs[y].len());
-                    eprintln!("HLACMPEND\t{}\t{}", String::from_utf8_lossy(&seqs[x][seqs[x].len() - 80..]), String::from_utf8_lossy(&seqs[y][seqs[y].len() - 80..]));
-                    eprintln!("HLACMPSTART\t{}\t{}\t{}", String::from_utf8_lossy(&seqs[x][..60]), String::from_utf8_lossy(&seqs[y][..60]), n);
+                    eprintln!(
+                        "HLACMPEND\t{}\t{}",
+                        String::from_utf8_lossy(&seqs[x][seqs[x].len() - 80..]),
+                        String::from_utf8_lossy(&seqs[y][seqs[y].len() - 80..])
+                    );
+                    eprintln!(
+                        "HLACMPSTART\t{}\t{}\t{}",
+                        String::from_utf8_lossy(&seqs[x][..60]),
+                        String::from_utf8_lossy(&seqs[y][..60]),
+                        n
+                    );
                     for ((row, q), k) in e.iter().zip(used.iter()).zip(keep.iter()) {
                         if row[x] != row[y] {
-                            eprintln!("HLACMP\t{}\t{}\t{}\t{}\t{}\t{}", g, self.reads.names[*q], row[x], row[y], k, cand.len());
+                            eprintln!(
+                                "HLACMP\t{}\t{}\t{}\t{}\t{}\t{}",
+                                g,
+                                self.reads.names[*q],
+                                row[x],
+                                row[y],
+                                k,
+                                cand.len()
+                            );
                         }
                     }
                 } else {
@@ -236,7 +289,12 @@ impl<'a> Ctx<'a> {
                 }
             }
         }
-        let e: Vec<&Vec<f64>> = e.iter().zip(keep.iter()).filter(|x| *x.1).map(|x| x.0).collect();
+        let e: Vec<&Vec<f64>> = e
+            .iter()
+            .zip(keep.iter())
+            .filter(|x| *x.1)
+            .map(|x| x.0)
+            .collect();
         let nc = cand.len();
         let nr = e.len();
         // P column-major for the pair loop
@@ -248,7 +306,8 @@ impl<'a> Ctx<'a> {
         }
         let bg = (-LAM * BG_EDITS).exp();
         let prior: Vec<f64> = cand.iter().map(|&i| self.allele_prior(g, &al[i])).collect();
-        let pairs: Vec<(usize, usize)> = (0..nc).flat_map(|i| (i..nc).map(move |j| (i, j))).collect();
+        let pairs: Vec<(usize, usize)> =
+            (0..nc).flat_map(|i| (i..nc).map(move |j| (i, j))).collect();
         let lls: Vec<f64> = pairs
             .par_iter()
             .map_init(
@@ -269,7 +328,11 @@ impl<'a> Ctx<'a> {
         let mut ranked: Vec<usize> = (0..pairs.len()).collect();
         ranked.sort_by(|&a, &b| lls[b].partial_cmp(&lls[a]).unwrap());
         let ll0 = lls[ranked[0]];
-        let mut ties: Vec<(usize, usize)> = ranked.iter().filter(|&&k| lls[k] >= ll0 - TIE).map(|&k| pairs[k]).collect();
+        let mut ties: Vec<(usize, usize)> = ranked
+            .iter()
+            .filter(|&&k| lls[k] >= ll0 - TIE)
+            .map(|&k| pairs[k])
+            .collect();
         let simple = |i: usize| {
             let a = &al[cand[i]];
             let f = fields(&a.name);
@@ -277,12 +340,25 @@ impl<'a> Ctx<'a> {
         };
         ties.sort_by(|x, y| (simple(x.0), simple(x.1)).cmp(&(simple(y.0), simple(y.1))));
         let best = ties[0];
-        let second = ranked.iter().map(|&k| lls[k]).find(|&v| v < ll0 - TIE).unwrap_or(ll0 - 99.0);
-        let near: Vec<(usize, usize)> = ranked.iter().take(200).filter(|&&k| lls[k] >= ll0 - NEAR).map(|&k| pairs[k]).collect();
+        let second = ranked
+            .iter()
+            .map(|&k| lls[k])
+            .find(|&v| v < ll0 - TIE)
+            .unwrap_or(ll0 - 99.0);
+        let near: Vec<(usize, usize)> = ranked
+            .iter()
+            .take(200)
+            .filter(|&&k| lls[k] >= ll0 - NEAR)
+            .map(|&k| pairs[k])
+            .collect();
         let sc = |a: usize, b: usize| scores[&(a.min(b), a.max(b))];
         let mut bmargin: [([f64; 3], [String; 3]); 2] = Default::default();
         for sl in 0..2 {
-            let (x, y) = if sl == 0 { (best.0, best.1) } else { (best.1, best.0) };
+            let (x, y) = if sl == 0 {
+                (best.0, best.1)
+            } else {
+                (best.1, best.0)
+            };
             let mut m = [999.0f64; 3];
             let mut alt: [String; 3] = Default::default();
             for k in 0..nc {
@@ -320,6 +396,16 @@ impl<'a> Ctx<'a> {
             }
             alts.extend(seen);
         }
-        Some(StageB { pair: best, ties, near, alts, bmargin, ll: ll0, gap: ll0 - second, nreads: nr, cand: cand.to_vec() })
+        Some(StageB {
+            pair: best,
+            ties,
+            near,
+            alts,
+            bmargin,
+            ll: ll0,
+            gap: ll0 - second,
+            nreads: nr,
+            cand: cand.to_vec(),
+        })
     }
 }

@@ -17,7 +17,10 @@ pub struct Fq {
 
 /// how often an I/O error on the input is retried (env HLA_IO_RETRIES, default 6)
 pub fn io_retries() -> u32 {
-    std::env::var("HLA_IO_RETRIES").ok().and_then(|v| v.parse().ok()).unwrap_or(6)
+    std::env::var("HLA_IO_RETRIES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(6)
 }
 
 /// Test hook: env HLA_TEST_IO_FAULT=N makes the first read pass fail once after N records
@@ -25,7 +28,10 @@ pub fn io_retries() -> u32 {
 pub fn test_fault(n: u64) -> bool {
     use std::sync::atomic::{AtomicBool, Ordering};
     static FIRED: AtomicBool = AtomicBool::new(false);
-    match std::env::var("HLA_TEST_IO_FAULT").ok().and_then(|v| v.parse::<u64>().ok()) {
+    match std::env::var("HLA_TEST_IO_FAULT")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+    {
         Some(at) if n >= at && !FIRED.swap(true, Ordering::SeqCst) => true,
         _ => false,
     }
@@ -57,12 +63,18 @@ pub fn read_fq_res(r: &mut dyn BufRead, n: usize) -> std::io::Result<Vec<Fq>> {
             }
         }
         let h = &l[0][1..];
-        let e = h.iter().position(|&c| c == b' ' || c == b'\t').unwrap_or(h.len());
+        let e = h
+            .iter()
+            .position(|&c| c == b' ' || c == b'\t')
+            .unwrap_or(h.len());
         let mut nm = &h[..e];
         if nm.len() > 2 && nm[nm.len() - 2] == b'/' {
             nm = &nm[..nm.len() - 2];
         }
-        out.push(Fq { name: String::from_utf8_lossy(nm).into_owned(), seq: l[1].clone() });
+        out.push(Fq {
+            name: String::from_utf8_lossy(nm).into_owned(),
+            seq: l[1].clone(),
+        });
     }
     Ok(out)
 }
@@ -88,7 +100,11 @@ pub struct PairedFq {
 
 impl PairedFq {
     pub fn new(r1: &str, r2: &str) -> Self {
-        PairedFq { paths: [r1.to_string(), r2.to_string()], rd: None, done: 0 }
+        PairedFq {
+            paths: [r1.to_string(), r2.to_string()],
+            rd: None,
+            done: 0,
+        }
     }
 
     fn try_batch(&mut self, n: usize) -> std::io::Result<(Vec<Fq>, Vec<Fq>)> {
@@ -100,7 +116,9 @@ impl PairedFq {
                 let k = left.min(50_000) as usize;
                 let (x, y) = (read_fq_res(&mut *a, k)?, read_fq_res(&mut *b, k)?);
                 if x.len() != k || y.len() != k {
-                    return Err(std::io::Error::other("input shorter than before the I/O error"));
+                    return Err(std::io::Error::other(
+                        "input shorter than before the I/O error",
+                    ));
                 }
                 left -= k as u64;
             }
@@ -113,7 +131,9 @@ impl PairedFq {
         self.done += b1.len() as u64;
         if test_fault(self.done) {
             self.done -= b1.len() as u64;
-            return Err(std::io::Error::other("injected test fault (HLA_TEST_IO_FAULT)"));
+            return Err(std::io::Error::other(
+                "injected test fault (HLA_TEST_IO_FAULT)",
+            ));
         }
         Ok((b1, b2))
     }
@@ -132,7 +152,10 @@ impl PairedFq {
                         panic!("{}: {e} (gave up after {tries} retries)", self.paths[0]);
                     }
                     let wait = backoff(attempt);
-                    eprintln!("[input] {}: I/O error after {} pairs: {e}; retry {attempt}/{tries} in {wait}s", self.paths[0], self.done);
+                    eprintln!(
+                        "[input] {}: I/O error after {} pairs: {e}; retry {attempt}/{tries} in {wait}s",
+                        self.paths[0], self.done
+                    );
                     std::thread::sleep(std::time::Duration::from_secs(wait));
                 }
             }

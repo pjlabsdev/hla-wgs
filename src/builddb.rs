@@ -2,7 +2,7 @@
 //! IPD-IMGT/HLA hla.dat on the user's machine (the IMGT data are CC BY-ND and are not shipped).
 //! Port of the prototype steps refbuild.py, extend.py, build_donor.py, panel.py, export_db.py;
 //! the result must equal the prototype package for the same hla.dat.
-use crate::align::{aligner, best_mlen, map, Preset};
+use crate::align::{Preset, aligner, best_mlen, map};
 use rayon::prelude::*;
 use std::collections::BTreeMap;
 use std::io::{BufRead, Write};
@@ -44,7 +44,8 @@ fn parse(dat: &str) -> Vec<Al> {
     let rd = std::io::BufReader::with_capacity(1 << 20, f);
     let mut out: Vec<Al> = vec![];
     let mut cur: Option<(Option<String>, bool, Vec<Feat>, String)> = None;
-    let mut flush = |cur: &mut Option<(Option<String>, bool, Vec<Feat>, String)>, out: &mut Vec<Al>| {
+    let mut flush = |cur: &mut Option<(Option<String>, bool, Vec<Feat>, String)>,
+                     out: &mut Vec<Al>| {
         if let Some((Some(name), partial, feat, seq)) = cur.take() {
             let gene = name.split('*').next().unwrap().to_string();
             let mut exons: Vec<(u32, String)> = vec![];
@@ -56,7 +57,18 @@ fn parse(dat: &str) -> Vec<Al> {
                     None => exons.push((k, s)),
                 }
             }
-            out.push(Al { name, gene, partial, feat, seq, exons, genomic: String::new(), imputed: false, imputed_from: None, extended: false });
+            out.push(Al {
+                name,
+                gene,
+                partial,
+                feat,
+                seq,
+                exons,
+                genomic: String::new(),
+                imputed: false,
+                imputed_from: None,
+                extended: false,
+            });
         }
     };
     for line in rd.lines() {
@@ -71,7 +83,10 @@ fn parse(dat: &str) -> Vec<Al> {
                 // DE   (?:HLA-)?([^ ,]+)
                 if let Some(rest) = line.strip_prefix("DE   ") {
                     let rest = rest.strip_prefix("HLA-").unwrap_or(rest);
-                    let n: String = rest.chars().take_while(|&ch| ch != ' ' && ch != ',').collect();
+                    let n: String = rest
+                        .chars()
+                        .take_while(|&ch| ch != ' ' && ch != ',')
+                        .collect();
                     if !n.is_empty() {
                         c.0 = Some(n);
                         if line.contains("(partial)") {
@@ -88,12 +103,21 @@ fn parse(dat: &str) -> Vec<Al> {
                     if let Some(r) = rest.strip_prefix(kind) {
                         if r.starts_with(|ch: char| ch.is_whitespace()) {
                             let r = r.trim_start();
-                            let a: String = r.chars().take_while(|ch| ch.is_ascii_digit()).collect();
+                            let a: String =
+                                r.chars().take_while(|ch| ch.is_ascii_digit()).collect();
                             let r2 = &r[a.len()..];
                             if !a.is_empty() && r2.starts_with("..") {
-                                let b: String = r2[2..].chars().take_while(|ch| ch.is_ascii_digit()).collect();
+                                let b: String = r2[2..]
+                                    .chars()
+                                    .take_while(|ch| ch.is_ascii_digit())
+                                    .collect();
                                 if !b.is_empty() {
-                                    c.2.push(Feat { kind: kind.to_string(), num: None, st: a.parse::<usize>().unwrap() - 1, en: b.parse().unwrap() });
+                                    c.2.push(Feat {
+                                        kind: kind.to_string(),
+                                        num: None,
+                                        st: a.parse::<usize>().unwrap() - 1,
+                                        en: b.parse().unwrap(),
+                                    });
                                 }
                             }
                         }
@@ -140,7 +164,10 @@ fn refbuild(alleles: Vec<Al>) -> Vec<(String, Vec<Al>)> {
         }
     }
     for (_, al) in bygene.iter_mut() {
-        let is_full: Vec<bool> = al.iter().map(|a| a.feat.iter().any(|f| f.kind == "intron")).collect();
+        let is_full: Vec<bool> = al
+            .iter()
+            .map(|a| a.feat.iter().any(|f| f.kind == "intron"))
+            .collect();
         let full: Vec<usize> = (0..al.len()).filter(|&i| is_full[i]).collect();
         if full.is_empty() {
             for a in al.iter_mut() {
@@ -158,14 +185,24 @@ fn refbuild(alleles: Vec<Al>) -> Vec<(String, Vec<Al>)> {
                 }
                 let mut keys: Vec<u32> = a.exons.iter().map(|e| e.0).collect();
                 keys.sort();
-                let q: Vec<u8> = keys.iter().flat_map(|k| a.exon(*k).unwrap().bytes()).collect();
-                let cand: Vec<usize> = full.iter().copied().filter(|&f| keys.iter().all(|k| snapshot[f].exon(*k).is_some())).collect();
+                let q: Vec<u8> = keys
+                    .iter()
+                    .flat_map(|k| a.exon(*k).unwrap().bytes())
+                    .collect();
+                let cand: Vec<usize> = full
+                    .iter()
+                    .copied()
+                    .filter(|&f| keys.iter().all(|k| snapshot[f].exon(*k).is_some()))
+                    .collect();
                 if cand.is_empty() {
                     return (a.seq.clone(), false, None);
                 }
                 let mut best: Option<(usize, usize)> = None;
                 for &f in &cand {
-                    let fl: usize = keys.iter().map(|k| snapshot[f].exon(*k).unwrap().len()).sum();
+                    let fl: usize = keys
+                        .iter()
+                        .map(|k| snapshot[f].exon(*k).unwrap().len())
+                        .sum();
                     if fl != q.len() {
                         continue;
                     }
@@ -211,7 +248,10 @@ fn refbuild(alleles: Vec<Al>) -> Vec<(String, Vec<Al>)> {
     bygene
 }
 
-const TARGET: [&str; 23] = ["A", "B", "C", "E", "F", "G", "H", "J", "K", "L", "DRA", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DQA2", "DQB2", "DPA2", "DPB2"];
+const TARGET: [&str; 23] = [
+    "A", "B", "C", "E", "F", "G", "H", "J", "K", "L", "DRA", "DRB1", "DRB3", "DRB4", "DRB5",
+    "DQA1", "DQB1", "DPA1", "DPB1", "DQA2", "DQB2", "DPA2", "DPB2",
+];
 
 /// numpy.percentile(x, q) with linear interpolation
 fn percentile(v: &[usize], q: f64) -> f64 {
@@ -231,7 +271,9 @@ fn extend(genes: &mut [(String, Vec<Al>)]) {
         }
         let lens: Vec<usize> = al.iter().map(|a| a.genomic.len()).collect();
         let cut = 0.97 * percentile(&lens, 90.0);
-        let full: Vec<usize> = (0..al.len()).filter(|&i| al[i].genomic.len() as f64 >= cut && !al[i].imputed).collect();
+        let full: Vec<usize> = (0..al.len())
+            .filter(|&i| al[i].genomic.len() as f64 >= cut && !al[i].imputed)
+            .collect();
         if full.is_empty() {
             continue;
         }
@@ -266,8 +308,16 @@ fn extend(genes: &mut [(String, Vec<Al>)]) {
                 if !h.fwd {
                     return None;
                 }
-                let pre = if h.q_st == 0 { &b[..h.r_st as usize] } else { "" };
-                let post = if h.q_en as usize == a.genomic.len() { &b[h.r_en as usize..] } else { "" };
+                let pre = if h.q_st == 0 {
+                    &b[..h.r_st as usize]
+                } else {
+                    ""
+                };
+                let post = if h.q_en as usize == a.genomic.len() {
+                    &b[h.r_en as usize..]
+                } else {
+                    ""
+                };
                 if pre.is_empty() && post.is_empty() {
                     return None;
                 }
@@ -286,11 +336,16 @@ fn extend(genes: &mut [(String, Vec<Al>)]) {
     }
 }
 
-const DONOR_GENES: [&str; 11] = ["A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1"];
+const DONOR_GENES: [&str; 11] = [
+    "A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1",
+];
 
 /// build_donor.py: edit distance of every allele to each longer non-extended sibling of its
 /// 2-field group (flank donors), precomputed once per release
-fn donors(ext: &[(String, Vec<Al>)], orig: &BTreeMap<(String, String), String>) -> Vec<(String, String, String, Option<i64>)> {
+fn donors(
+    ext: &[(String, Vec<Al>)],
+    orig: &BTreeMap<(String, String), String>,
+) -> Vec<(String, String, String, Option<i64>)> {
     let mut out = vec![];
     for (g, al) in ext.iter() {
         if !DONOR_GENES.contains(&g.as_str()) {
@@ -298,7 +353,9 @@ fn donors(ext: &[(String, Vec<Al>)], orig: &BTreeMap<(String, String), String>) 
         }
         let og = |a: &Al| -> String {
             if a.extended {
-                orig.get(&(g.clone(), a.name.clone())).cloned().unwrap_or_else(|| a.genomic.clone())
+                orig.get(&(g.clone(), a.name.clone()))
+                    .cloned()
+                    .unwrap_or_else(|| a.genomic.clone())
             } else {
                 a.genomic.clone()
             }
@@ -308,7 +365,11 @@ fn donors(ext: &[(String, Vec<Al>)], orig: &BTreeMap<(String, String), String>) 
             bygrp.entry(b.two()).or_default().push(b.genomic.len());
         }
         let jobs: Vec<usize> = (0..al.len())
-            .filter(|&i| bygrp.get(&al[i].two()).map_or(false, |l| *l.iter().max().unwrap() > og(&al[i]).len() + 20))
+            .filter(|&i| {
+                bygrp
+                    .get(&al[i].two())
+                    .map_or(false, |l| *l.iter().max().unwrap() > og(&al[i]).len() + 20)
+            })
             .collect();
         let res: Vec<Vec<(String, String, String, Option<i64>)>> = jobs
             .par_iter()
@@ -317,14 +378,20 @@ fn donors(ext: &[(String, Vec<Al>)], orig: &BTreeMap<(String, String), String>) 
                 let s_ = og(a);
                 let grp = a.two();
                 let longer: Vec<usize> = (0..al.len())
-                    .filter(|&j| !al[j].imputed && al[j].two() == grp && !al[j].extended && al[j].genomic.len() > s_.len() + 20)
+                    .filter(|&j| {
+                        !al[j].imputed
+                            && al[j].two() == grp
+                            && !al[j].extended
+                            && al[j].genomic.len() > s_.len() + 20
+                    })
                     .collect();
                 let mut o = vec![];
                 if !longer.is_empty() {
                     let am = aligner(s_.as_bytes(), Preset::Asm10);
                     for j in longer {
                         let hs = map(&am, al[j].genomic.as_bytes());
-                        let nm = best_mlen(&hs).map(|h| h.nm + (s_.len() as i64 - (h.r_en - h.r_st)));
+                        let nm =
+                            best_mlen(&hs).map(|h| h.nm + (s_.len() as i64 - (h.r_en - h.r_st)));
                         o.push((g.clone(), a.name.clone(), al[j].name.clone(), nm));
                     }
                 }
@@ -341,12 +408,22 @@ fn panel(genes: &[(String, Vec<Al>)], out: &str) {
     let mut f = std::io::BufWriter::new(std::fs::File::create(out).unwrap());
     for (_, al) in genes {
         let mut idx: Vec<usize> = (0..al.len()).collect();
-        idx.sort_by(|&x, &y| (al[x].imputed, al[x].name.as_bytes()).cmp(&(al[y].imputed, al[y].name.as_bytes())));
+        idx.sort_by(|&x, &y| {
+            (al[x].imputed, al[x].name.as_bytes()).cmp(&(al[y].imputed, al[y].name.as_bytes()))
+        });
         let mut seen = std::collections::HashSet::new();
         let mut k = 0;
         for i in idx {
             let a = &al[i];
-            let two = a.name.split('*').nth(1).unwrap().split(':').take(2).collect::<Vec<_>>().join(":");
+            let two = a
+                .name
+                .split('*')
+                .nth(1)
+                .unwrap()
+                .split(':')
+                .take(2)
+                .collect::<Vec<_>>()
+                .join(":");
             if !seen.insert(two) {
                 continue;
             }
@@ -368,22 +445,38 @@ pub fn run(args: &[String]) {
     std::fs::create_dir_all(outdir).unwrap();
     let t = std::time::Instant::now();
     let alleles = parse(dat);
-    eprintln!("[{:.0}s] {} alleles", t.elapsed().as_secs_f64(), alleles.len());
+    eprintln!(
+        "[{:.0}s] {} alleles",
+        t.elapsed().as_secs_f64(),
+        alleles.len()
+    );
     let base = refbuild(alleles);
-    eprintln!("[{:.0}s] genomic sequences built", t.elapsed().as_secs_f64());
+    eprintln!(
+        "[{:.0}s] genomic sequences built",
+        t.elapsed().as_secs_f64()
+    );
     panel(&base, &format!("{outdir}/panel.fa"));
     let orig: BTreeMap<(String, String), String> = base
         .iter()
-        .flat_map(|(g, al)| al.iter().filter(|a| !a.imputed).map(move |a| ((g.clone(), a.name.clone()), a.genomic.clone())))
+        .flat_map(|(g, al)| {
+            al.iter()
+                .filter(|a| !a.imputed)
+                .map(move |a| ((g.clone(), a.name.clone()), a.genomic.clone()))
+        })
         .collect();
     let mut ext = base.clone();
     extend(&mut ext);
     eprintln!("[{:.0}s] flanks extended", t.elapsed().as_secs_f64());
     let donor = donors(&ext, &orig);
-    eprintln!("[{:.0}s] donor distances {}", t.elapsed().as_secs_f64(), donor.len());
+    eprintln!(
+        "[{:.0}s] donor distances {}",
+        t.elapsed().as_secs_f64(),
+        donor.len()
+    );
     // keep the frequency table as written (exact float text), not re-serialised
     let fr_txt = std::fs::read_to_string(freq).unwrap_or_else(|e| panic!("{freq}: {e}"));
-    let fr: Box<serde_json::value::RawValue> = serde_json::value::RawValue::from_string(fr_txt.trim().to_string()).expect("freq json");
+    let fr: Box<serde_json::value::RawValue> =
+        serde_json::value::RawValue::from_string(fr_txt.trim().to_string()).expect("freq json");
     let genes: Vec<serde_json::Value> = ext
         .iter()
         .map(|(g, al)| {
@@ -400,7 +493,10 @@ pub fn run(args: &[String]) {
             serde_json::json!({"gene": g, "alleles": rows})
         })
         .collect();
-    let donor_j: Vec<serde_json::Value> = donor.iter().map(|(g, a, b, v)| serde_json::json!([g, a, b, v])).collect();
+    let donor_j: Vec<serde_json::Value> = donor
+        .iter()
+        .map(|(g, a, b, v)| serde_json::json!([g, a, b, v]))
+        .collect();
     let f = std::fs::File::create(format!("{outdir}/hladb.json.gz")).unwrap();
     let mut gz = flate2::write::GzEncoder::new(f, flate2::Compression::default());
     gz.write_all(b"{\"genes\":").unwrap();
@@ -411,5 +507,8 @@ pub fn run(args: &[String]) {
     serde_json::to_writer(&mut gz, &donor_j).unwrap();
     gz.write_all(b"}").unwrap();
     gz.finish().unwrap();
-    eprintln!("[{:.0}s] wrote {outdir}/hladb.json.gz and {outdir}/panel.fa", t.elapsed().as_secs_f64());
+    eprintln!(
+        "[{:.0}s] wrote {outdir}/hladb.json.gz and {outdir}/panel.fa",
+        t.elapsed().as_secs_f64()
+    );
 }

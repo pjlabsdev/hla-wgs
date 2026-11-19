@@ -64,9 +64,14 @@ pub struct Db {
 fn load_genome_decoys(dbpath: &str) -> AHashMap<String, Vec<Vec<u8>>> {
     let mut out: AHashMap<String, Vec<Vec<u8>>> = AHashMap::new();
     let p = std::env::var("HLA_DECOYS").unwrap_or_else(|_| {
-        std::path::Path::new(dbpath).with_file_name("repeat_decoys.fa").to_string_lossy().into_owned()
+        std::path::Path::new(dbpath)
+            .with_file_name("repeat_decoys.fa")
+            .to_string_lossy()
+            .into_owned()
     });
-    let Ok(txt) = std::fs::read_to_string(&p) else { return out };
+    let Ok(txt) = std::fs::read_to_string(&p) else {
+        return out;
+    };
     let mut cur: Option<String> = None;
     for line in txt.lines() {
         if let Some(h) = line.strip_prefix('>') {
@@ -74,7 +79,11 @@ fn load_genome_decoys(dbpath: &str) -> AHashMap<String, Vec<Vec<u8>>> {
             out.entry(g.clone()).or_default().push(vec![]);
             cur = Some(g);
         } else if let Some(g) = &cur {
-            out.get_mut(g).unwrap().last_mut().unwrap().extend(line.trim().bytes().map(|b| b.to_ascii_uppercase()));
+            out.get_mut(g)
+                .unwrap()
+                .last_mut()
+                .unwrap()
+                .extend(line.trim().bytes().map(|b| b.to_ascii_uppercase()));
         }
     }
     out
@@ -85,7 +94,9 @@ impl Db {
         let f = std::fs::File::open(path).unwrap_or_else(|e| panic!("{path}: {e}"));
         let mut s = String::new();
         if path.ends_with(".gz") {
-            flate2::read::GzDecoder::new(f).read_to_string(&mut s).unwrap();
+            flate2::read::GzDecoder::new(f)
+                .read_to_string(&mut s)
+                .unwrap();
         } else {
             std::io::BufReader::new(f).read_to_string(&mut s).unwrap();
         }
@@ -100,7 +111,11 @@ impl Db {
                 .map(|a| Allele {
                     name: a.name,
                     genomic: a.genomic.into_bytes(),
-                    exons: a.exons.into_iter().map(|(k, v)| (k, v.into_bytes())).collect(),
+                    exons: a
+                        .exons
+                        .into_iter()
+                        .map(|(k, v)| (k, v.into_bytes()))
+                        .collect(),
                     imputed: a.imputed,
                     partial: a.partial,
                     extended: a.extended,
@@ -113,9 +128,24 @@ impl Db {
         let mut freq = AHashMap::new();
         for (g, v) in j.freq {
             let m = v.as_object().expect("freq");
-            freq.insert(g, m.iter().map(|(k, x)| (k.clone(), x.as_f64().unwrap())).collect());
+            freq.insert(
+                g,
+                m.iter()
+                    .map(|(k, x)| (k.clone(), x.as_f64().unwrap()))
+                    .collect(),
+            );
         }
-        let donor_nm = j.donor_nm.into_iter().map(|(g, a, b, v)| ((g, a, b), v)).collect();
-        Db { genes, ref_, freq, donor_nm, genome_decoy: load_genome_decoys(path) }
+        let donor_nm = j
+            .donor_nm
+            .into_iter()
+            .map(|(g, a, b, v)| ((g, a, b), v))
+            .collect();
+        Db {
+            genes,
+            ref_,
+            freq,
+            donor_nm,
+            genome_decoy: load_genome_decoys(path),
+        }
     }
 }

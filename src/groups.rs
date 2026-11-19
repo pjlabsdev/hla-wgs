@@ -28,7 +28,11 @@ fn parse(text: &str) -> AHashMap<String, String> {
                 continue;
             }
             // an allele alone in its group is its own group
-            let grp = if name.is_empty() { String::new() } else { format!("{gene}{name}") };
+            let grp = if name.is_empty() {
+                String::new()
+            } else {
+                format!("{gene}{name}")
+            };
             m.insert(format!("{gene}{a}"), grp);
         }
     }
@@ -41,7 +45,11 @@ impl Groups {
         let rd = |n: &str| std::fs::read_to_string(dir.join(n)).ok().map(|t| parse(&t));
         let (g, p) = (rd("hla_nom_g.txt"), rd("hla_nom_p.txt"));
         let loaded = g.is_some() || p.is_some();
-        Groups { g: g.unwrap_or_default(), p: p.unwrap_or_default(), loaded }
+        Groups {
+            g: g.unwrap_or_default(),
+            p: p.unwrap_or_default(),
+            loaded,
+        }
     }
     fn get(m: &AHashMap<String, String>, allele: &str) -> Option<String> {
         m.get(allele).filter(|x| !x.is_empty()).cloned()
@@ -70,7 +78,10 @@ pub fn expression(allele: &str) -> Option<&'static str> {
 /// two-field alleles with a CPIC guideline: (allele, drugs)
 pub const PGX: [(&str, &str); 4] = [
     ("B*57:01", "abacavir"),
-    ("B*15:02", "carbamazepine, oxcarbazepine, phenytoin, fosphenytoin"),
+    (
+        "B*15:02",
+        "carbamazepine, oxcarbazepine, phenytoin, fosphenytoin",
+    ),
     ("A*31:01", "carbamazepine"),
     ("B*58:01", "allopurinol"),
 ];

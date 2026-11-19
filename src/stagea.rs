@@ -106,7 +106,11 @@ pub fn run(gene: &str, al: &[Allele], idx: &Index, reads: &Reads, qnames: &[usiz
         let mut cur: Option<Vec<u64>> = None;
         for s in r.iter().flatten() {
             for strand in [s.clone(), revcomp(s)] {
-                let ks: Vec<u64> = kmers(&strand).into_iter().flatten().filter(|k| idx.map.contains_key(k)).collect();
+                let ks: Vec<u64> = kmers(&strand)
+                    .into_iter()
+                    .flatten()
+                    .filter(|k| idx.map.contains_key(k))
+                    .collect();
                 if ks.len() < 5 {
                     continue;
                 }
@@ -141,13 +145,24 @@ pub fn run(gene: &str, al: &[Allele], idx: &Index, reads: &Reads, qnames: &[usiz
         }
     }
     if eq_keys.is_empty() {
-        return StageA { cand: vec![], log: String::new() };
+        return StageA {
+            cand: vec![],
+            log: String::new(),
+        };
     }
-    let lens: Vec<f64> = al.iter().map(|a| a.exons.iter().map(|e| e.1.len()).sum::<usize>().max(1) as f64).collect();
+    let lens: Vec<f64> = al
+        .iter()
+        .map(|a| a.exons.iter().map(|e| e.1.len()).sum::<usize>().max(1) as f64)
+        .collect();
     let classes: Vec<(Vec<usize>, f64)> = eq_keys
         .iter()
         .zip(eq_cnt.iter())
-        .map(|(k, &c)| ((0..n).filter(|&i| k[i / 64] >> (i % 64) & 1 == 1).collect(), c as f64))
+        .map(|(k, &c)| {
+            (
+                (0..n).filter(|&i| k[i / 64] >> (i % 64) & 1 == 1).collect(),
+                c as f64,
+            )
+        })
         .collect();
     let mut theta = vec![1.0 / n as f64; n];
     for _ in 0..200 {
@@ -198,11 +213,18 @@ pub fn run(gene: &str, al: &[Allele], idx: &Index, reads: &Reads, qnames: &[usiz
     let log = format!(
         "{} groups [{}] classes {} reads_in_eq {}",
         gene,
-        top.iter().map(|&g| format!("('{}', {:.3})", gnames[g], gval[g] / tot)).collect::<Vec<_>>().join(", "),
+        top.iter()
+            .map(|&g| format!("('{}', {:.3})", gnames[g], gval[g] / tot))
+            .collect::<Vec<_>>()
+            .join(", "),
         eq_keys.len(),
         eq_cnt.iter().sum::<usize>()
     );
-    let groups: Vec<&String> = top.iter().filter(|&&g| gval[g] >= 0.01 * tot).map(|&g| &gnames[g]).collect();
+    let groups: Vec<&String> = top
+        .iter()
+        .filter(|&&g| gval[g] >= 0.01 * tot)
+        .map(|&g| &gnames[g])
+        .collect();
     let mut cand: Vec<usize> = vec![];
     for g in groups {
         let mut reps: Vec<(&[(u32, Vec<u8>)], usize, bool)> = vec![];

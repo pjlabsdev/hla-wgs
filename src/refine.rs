@@ -1,10 +1,10 @@
 //! Pass 3 (exon-transplant refinement) and the phase check of the prototype
-use crate::align::{aligner, map, Preset};
+use crate::align::{Preset, aligner, map};
 use crate::db::Allele;
 use crate::kern;
 use crate::names::{diff_level, is_null_like, num_key, two};
-use crate::stageb::{Ctx, StageB, BG_EDITS, LAM, TIE};
 use crate::stagea::np_sum;
+use crate::stageb::{BG_EDITS, Ctx, LAM, StageB, TIE};
 use ahash::{AHashMap, AHashSet};
 
 const MAXCLS: usize = 400;
@@ -39,7 +39,10 @@ fn find_from(h: &[u8], n: &[u8], from: usize) -> Option<usize> {
     if from > h.len() || h.len() - from < n.len() {
         return None;
     }
-    h[from..].windows(n.len()).position(|w| w == n).map(|p| p + from)
+    h[from..]
+        .windows(n.len())
+        .position(|w| w == n)
+        .map(|p| p + from)
 }
 
 /// exon number -> (start, end) on the allele's genomic sequence
@@ -74,11 +77,17 @@ pub fn transplant(al: &[Allele], backbone: usize, exons: &[(u32, Vec<u8>)]) -> V
 }
 
 fn rep_of(al: &[Allele], mem: &[usize]) -> usize {
-    let full: Vec<usize> = mem.iter().copied().filter(|&x| !al[x].imputed && !al[x].partial).collect();
+    let full: Vec<usize> = mem
+        .iter()
+        .copied()
+        .filter(|&x| !al[x].imputed && !al[x].partial)
+        .collect();
     let full = if full.is_empty() { mem.to_vec() } else { full };
     let mut best = full[0];
     for &x in &full[1..] {
-        if (is_null_like(&al[x].name), num_key(&al[x].name)) < (is_null_like(&al[best].name), num_key(&al[best].name)) {
+        if (is_null_like(&al[x].name), num_key(&al[x].name))
+            < (is_null_like(&al[best].name), num_key(&al[best].name))
+        {
             best = x;
         }
     }
@@ -94,7 +103,14 @@ struct Jn {
     new: Option<(Vec<u8>, f64, String)>,
 }
 
-pub fn exon_refine(ctx: &Ctx, g: &str, qnames: &[usize], r: &StageB, rmarg: &mut RMarg, log: &dyn Fn(String)) -> Option<Vec<String>> {
+pub fn exon_refine(
+    ctx: &Ctx,
+    g: &str,
+    qnames: &[usize],
+    r: &StageB,
+    rmarg: &mut RMarg,
+    log: &dyn Fn(String),
+) -> Option<Vec<String>> {
     let al = ctx.al(g);
     let cand = &r.cand;
     let win = [cand[r.pair.0], cand[r.pair.1]];
@@ -115,10 +131,26 @@ pub fn exon_refine(ctx: &Ctx, g: &str, qnames: &[usize], r: &StageB, rmarg: &mut
     }
     let fr: &[(String, f64)] = ctx.db.freq.get(g).map(|v| v.as_slice()).unwrap_or(&[]);
     for &w in &win {
-        let fam = al[w].name.split('*').nth(1).unwrap().split(':').next().unwrap().to_string();
-        let mut common: Vec<&(String, f64)> = fr.iter().filter(|(k, _)| k.split(':').next().unwrap() == fam).collect();
+        let fam = al[w]
+            .name
+            .split('*')
+            .nth(1)
+            .unwrap()
+            .split(':')
+            .next()
+            .unwrap()
+            .to_string();
+        let mut common: Vec<&(String, f64)> = fr
+            .iter()
+            .filter(|(k, _)| k.split(':').next().unwrap() == fam)
+            .collect();
         common.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-        let add: Vec<String> = common.iter().take(3).map(|(k, _)| format!("{g}*{k}")).filter(|x| !near2.contains(x)).collect();
+        let add: Vec<String> = common
+            .iter()
+            .take(3)
+            .map(|(k, _)| format!("{g}*{k}"))
+            .filter(|x| !near2.contains(x))
+            .collect();
         near2.extend(add);
     }
     let near2set: AHashSet<&String> = near2.iter().collect();
@@ -172,8 +204,18 @@ pub fn exon_refine(ctx: &Ctx, g: &str, qnames: &[usize], r: &StageB, rmarg: &mut
         let own = two(&al[w].name);
         let fam = own.split(':').next().unwrap().to_string();
         let mut order = vec![own.clone()];
-        order.extend(near2.iter().filter(|x| **x != own && x.split(':').next().unwrap() == fam).cloned());
-        order.extend(near2.iter().filter(|x| x.split(':').next().unwrap() != fam).cloned());
+        order.extend(
+            near2
+                .iter()
+                .filter(|x| **x != own && x.split(':').next().unwrap() == fam)
+                .cloned(),
+        );
+        order.extend(
+            near2
+                .iter()
+                .filter(|x| x.split(':').next().unwrap() != fam)
+                .cloned(),
+        );
         let mut out: Vec<(Exons, Vec<usize>)> = vec![];
         let mut pos: AHashMap<Exons, usize> = AHashMap::new();
         for (k, m) in exon_neighbours(w) {
@@ -222,7 +264,10 @@ pub fn exon_refine(ctx: &Ctx, g: &str, qnames: &[usize], r: &StageB, rmarg: &mut
                 continue;
             }
             for sq in rd.iter().flatten() {
-                if map(&a, sq).iter().any(|h| iv.iter().any(|&(_, s, e)| h.r_st < e as i64 && h.r_en > s as i64)) {
+                if map(&a, sq).iter().any(|h| {
+                    iv.iter()
+                        .any(|&(_, s, e)| h.r_st < e as i64 && h.r_en > s as i64)
+                }) {
                     ex_q.insert(q);
                     break;
                 }
@@ -230,8 +275,17 @@ pub fn exon_refine(ctx: &Ctx, g: &str, qnames: &[usize], r: &StageB, rmarg: &mut
         }
     }
     let qall: Vec<usize> = qnames.to_vec();
-    let mut qn: Vec<usize> = qnames.iter().copied().filter(|q| ex_q.contains(q)).collect();
-    log(format!("{} exon-refine reads {} classes {}", g, qn.len(), nclasses));
+    let mut qn: Vec<usize> = qnames
+        .iter()
+        .copied()
+        .filter(|q| ex_q.contains(q))
+        .collect();
+    log(format!(
+        "{} exon-refine reads {} classes {}",
+        g,
+        qn.len(),
+        nclasses
+    ));
     if qn.is_empty() {
         return None;
     }
@@ -241,12 +295,31 @@ pub fn exon_refine(ctx: &Ctx, g: &str, qnames: &[usize], r: &StageB, rmarg: &mut
         qn = qn.into_iter().step_by(step).collect();
     }
     let mut names = vec![al[win[0]].name.clone(), al[win[1]].name.clone()];
-    let slots: Vec<usize> = if win[0] == win[1] { vec![0] } else { vec![0, 1] };
-    let mut jn: Vec<Jn> = vec![Jn { orig: None, new: None }, Jn { orig: None, new: None }];
+    let slots: Vec<usize> = if win[0] == win[1] {
+        vec![0]
+    } else {
+        vec![0, 1]
+    };
+    let mut jn: Vec<Jn> = vec![
+        Jn {
+            orig: None,
+            new: None,
+        },
+        Jn {
+            orig: None,
+            new: None,
+        },
+    ];
     let bg = (-LAM * BG_EDITS).exp();
-    let keep = |e: &[Vec<f64>], used: &[usize]| -> Vec<bool> { ctx.keep_rows(g, &qall_for_decoy(qnames), e, used) };
+    let keep = |e: &[Vec<f64>], used: &[usize]| -> Vec<bool> {
+        ctx.keep_rows(g, &qall_for_decoy(qnames), e, used)
+    };
     for &sl in &slots {
-        let other: Option<&[u8]> = if slots.len() == 2 { Some(&al[win[1 - sl]].genomic) } else { None };
+        let other: Option<&[u8]> = if slots.len() == 2 {
+            Some(&al[win[1 - sl]].genomic)
+        } else {
+            None
+        };
         let mut seqs: Vec<Vec<u8>> = vec![];
         let mut seqpos: AHashMap<Vec<u8>, usize> = AHashMap::new();
         let mut owners: Vec<Vec<usize>> = vec![];
@@ -270,8 +343,16 @@ pub fn exon_refine(ctx: &Ctx, g: &str, qnames: &[usize], r: &StageB, rmarg: &mut
         all.extend(seqs.iter().map(|s| s.as_slice()));
         let (e, used) = kern::edit_matrix(ctx.reads, &qn, &all)?;
         let kp = keep(&e, &used);
-        let e: Vec<&Vec<f64>> = e.iter().zip(kp.iter()).filter(|x| *x.1).map(|x| x.0).collect();
-        let p: Vec<Vec<f64>> = e.iter().map(|r| r.iter().map(|v| (-LAM * v.min(12.0)).exp()).collect()).collect();
+        let e: Vec<&Vec<f64>> = e
+            .iter()
+            .zip(kp.iter())
+            .filter(|x| *x.1)
+            .map(|x| x.0)
+            .collect();
+        let p: Vec<Vec<f64>> = e
+            .iter()
+            .map(|r| r.iter().map(|v| (-LAM * v.min(12.0)).exp()).collect())
+            .collect();
         let off = if other.is_some() { 1 } else { 0 };
         let mut best: Option<(f64, usize)> = None;
         let mut allk: Vec<(f64, usize)> = vec![];
@@ -314,35 +395,77 @@ pub fn exon_refine(ctx: &Ctx, g: &str, qnames: &[usize], r: &StageB, rmarg: &mut
         if slots.len() == 1 {
             names[1] = names[0].clone();
         }
-        log(format!("{} exon-refine slot {} -> {} classes {}", g, sl, names[sl], seqs.len()));
+        log(format!(
+            "{} exon-refine slot {} -> {} classes {}",
+            g,
+            sl,
+            names[sl],
+            seqs.len()
+        ));
     }
     // both slots changed: score the four combinations jointly
-    if slots.len() == 2 && slots.iter().all(|&sl| jn[sl].orig.is_some() && jn[sl].new.as_ref().unwrap().0 != jn[sl].orig.as_ref().unwrap().0) {
-        let (o0, n0, o1, n1) = (jn[0].orig.as_ref().unwrap(), jn[0].new.as_ref().unwrap(), jn[1].orig.as_ref().unwrap(), jn[1].new.as_ref().unwrap());
+    if slots.len() == 2
+        && slots.iter().all(|&sl| {
+            jn[sl].orig.is_some()
+                && jn[sl].new.as_ref().unwrap().0 != jn[sl].orig.as_ref().unwrap().0
+        })
+    {
+        let (o0, n0, o1, n1) = (
+            jn[0].orig.as_ref().unwrap(),
+            jn[0].new.as_ref().unwrap(),
+            jn[1].orig.as_ref().unwrap(),
+            jn[1].new.as_ref().unwrap(),
+        );
         let sq: Vec<&[u8]> = vec![&o0.0, &n0.0, &o1.0, &n1.0];
         if let Some((e, used)) = kern::edit_matrix(ctx.reads, &qn, &sq) {
             let kp = keep(&e, &used);
-            let p: Vec<Vec<f64>> = e.iter().zip(kp.iter()).filter(|x| *x.1).map(|x| x.0.iter().map(|v| (-LAM * v.min(12.0)).exp()).collect()).collect();
+            let p: Vec<Vec<f64>> = e
+                .iter()
+                .zip(kp.iter())
+                .filter(|x| *x.1)
+                .map(|x| x.0.iter().map(|v| (-LAM * v.min(12.0)).exp()).collect())
+                .collect();
             let mut comb: Vec<(f64, &str, &str)> = vec![];
             for a in ["orig", "new"] {
                 for b in ["orig", "new"] {
                     let ca = if a == "orig" { 0 } else { 1 };
                     let cb = if b == "orig" { 2 } else { 3 };
-                    let (pa, pb) = (if a == "orig" { o0.1 } else { n0.1 }, if b == "orig" { o1.1 } else { n1.1 });
-                    let ll = np_sum(p.iter().map(|r| (0.5 * r[ca] + 0.5 * r[cb] + bg).ln())) + pa + pb;
+                    let (pa, pb) = (
+                        if a == "orig" { o0.1 } else { n0.1 },
+                        if b == "orig" { o1.1 } else { n1.1 },
+                    );
+                    let ll =
+                        np_sum(p.iter().map(|r| (0.5 * r[ca] + 0.5 * r[cb] + bg).ln())) + pa + pb;
                     comb.push((ll, a, b));
                 }
             }
             // Python: comb.sort(reverse=True) on (ll, a, b)
-            comb.sort_by(|x, y| y.0.partial_cmp(&x.0).unwrap().then(y.1.cmp(x.1)).then(y.2.cmp(x.2)));
+            comb.sort_by(|x, y| {
+                y.0.partial_cmp(&x.0)
+                    .unwrap()
+                    .then(y.1.cmp(x.1))
+                    .then(y.2.cmp(x.2))
+            });
             let nm = |sl: usize, c: &str| -> String {
                 let j = if sl == 0 { (o0, n0) } else { (o1, n1) };
-                if c == "orig" { j.0 .2.clone() } else { j.1 .2.clone() }
+                if c == "orig" {
+                    j.0.2.clone()
+                } else {
+                    j.1.2.clone()
+                }
             };
             log(format!(
                 "{} exon-refine joint [{}]",
                 g,
-                comb.iter().map(|(ll, a, b)| format!("({:.1}, '{}', '{}')", ll - comb[0].0, nm(0, a), nm(1, b))).collect::<Vec<_>>().join(", ")
+                comb.iter()
+                    .map(|(ll, a, b)| format!(
+                        "({:.1}, '{}', '{}')",
+                        ll - comb[0].0,
+                        nm(0, a),
+                        nm(1, b)
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
             names = vec![nm(0, comb[0].1), nm(1, comb[0].2)];
             let jm = comb[0].0 - comb[1].0;
@@ -375,7 +498,15 @@ fn qall_for_decoy(q: &[usize]) -> Vec<usize> {
     q.to_vec()
 }
 
-pub fn phase_check(ctx: &Ctx, g: &str, qnames: &[usize], win: [usize; 2], names: Vec<String>, rmarg: &mut RMarg, log: &dyn Fn(String)) -> Vec<String> {
+pub fn phase_check(
+    ctx: &Ctx,
+    g: &str,
+    qnames: &[usize],
+    win: [usize; 2],
+    names: Vec<String>,
+    rmarg: &mut RMarg,
+    log: &dyn Fn(String),
+) -> Vec<String> {
     let al = ctx.al(g);
     if names[0] == names[1] {
         return names;
@@ -394,13 +525,25 @@ pub fn phase_check(ctx: &Ctx, g: &str, qnames: &[usize], win: [usize; 2], names:
             }
         }
     }
-    let byname: AHashMap<&str, usize> = al.iter().enumerate().map(|(i, a)| (a.name.as_str(), i)).collect();
+    let byname: AHashMap<&str, usize> = al
+        .iter()
+        .enumerate()
+        .map(|(i, a)| (a.name.as_str(), i))
+        .collect();
     let (fa, fb) = (byname[names[0].as_str()], byname[names[1].as_str()]);
     let (ea, eb) = (&al[fa].exons, &al[fb].exons);
     let get = |e: &Exons, k: u32| e.iter().find(|x| x.0 == k).map(|x| x.1.clone());
-    let mut kk: Vec<u32> = ea.iter().map(|e| e.0).filter(|k| eb.iter().any(|x| x.0 == *k)).collect();
+    let mut kk: Vec<u32> = ea
+        .iter()
+        .map(|e| e.0)
+        .filter(|k| eb.iter().any(|x| x.0 == *k))
+        .collect();
     kk.sort();
-    if kk.is_empty() || kk.iter().any(|&k| get(ea, k).unwrap().len() != get(eb, k).unwrap().len()) {
+    if kk.is_empty()
+        || kk
+            .iter()
+            .any(|&k| get(ea, k).unwrap().len() != get(eb, k).unwrap().len())
+    {
         return names;
     }
     let mut d: Vec<(u32, usize)> = vec![];
@@ -420,7 +563,9 @@ pub fn phase_check(ctx: &Ctx, g: &str, qnames: &[usize], win: [usize; 2], names:
         let mut out: Vec<usize> = vec![];
         for (ci, (e, _)) in cls.iter().enumerate() {
             let has = |k: u32| e.iter().any(|x| x.0 == k);
-            if dk.iter().all(|&k| has(k)) && kk.iter().all(|&k| !has(k) || get(e, k).unwrap() == c[&k]) {
+            if dk.iter().all(|&k| has(k))
+                && kk.iter().all(|&k| !has(k) || get(e, k).unwrap() == c[&k])
+            {
                 out.push(ci);
             }
         }
@@ -442,7 +587,9 @@ pub fn phase_check(ctx: &Ctx, g: &str, qnames: &[usize], win: [usize; 2], names:
             }
         }
         if let (Some(fc), Some(fd)) = (find(&c), find(&dd)) {
-            let to = |m: &AHashMap<u32, Vec<u8>>| -> Exons { kk.iter().map(|&k| (k, m[&k].clone())).collect() };
+            let to = |m: &AHashMap<u32, Vec<u8>>| -> Exons {
+                kk.iter().map(|&k| (k, m[&k].clone())).collect()
+            };
             alts.push((fc, fd, to(&c), to(&dd)));
         }
     }
@@ -451,32 +598,79 @@ pub fn phase_check(ctx: &Ctx, g: &str, qnames: &[usize], win: [usize; 2], names:
     }
     let base_a: Exons = kk.iter().map(|&k| (k, get(ea, k).unwrap())).collect();
     let base_b: Exons = kk.iter().map(|&k| (k, get(eb, k).unwrap())).collect();
-    let mut sq: Vec<Vec<u8>> = vec![transplant(al, win[0], &base_a), transplant(al, win[1], &base_b)];
+    let mut sq: Vec<Vec<u8>> = vec![
+        transplant(al, win[0], &base_a),
+        transplant(al, win[1], &base_b),
+    ];
     for (_, _, c, dd) in &alts {
         sq.push(transplant(al, win[0], c));
         sq.push(transplant(al, win[1], dd));
     }
     let sr: Vec<&[u8]> = sq.iter().map(|s| s.as_slice()).collect();
-    let Some((e, _)) = kern::edit_matrix(ctx.reads, qnames, &sr) else { return names };
+    let Some((e, _)) = kern::edit_matrix(ctx.reads, qnames, &sr) else {
+        return names;
+    };
     let bg = (-LAM * BG_EDITS).exp();
-    let p: Vec<Vec<f64>> = e.iter().filter(|r| min_row(r) <= 10.0).map(|r| r.iter().map(|v| (-LAM * v.min(12.0)).exp()).collect()).collect();
-    let ll: Vec<f64> = (0..sq.len() / 2).map(|t| np_sum(p.iter().map(|r| (0.5 * r[2 * t] + 0.5 * r[2 * t + 1] + bg).ln()))).collect();
-    let cur = (ll[0], prior(fa) + prior(fb), names[0].clone(), names[1].clone());
+    let p: Vec<Vec<f64>> = e
+        .iter()
+        .filter(|r| min_row(r) <= 10.0)
+        .map(|r| r.iter().map(|v| (-LAM * v.min(12.0)).exp()).collect())
+        .collect();
+    let ll: Vec<f64> = (0..sq.len() / 2)
+        .map(|t| {
+            np_sum(
+                p.iter()
+                    .map(|r| (0.5 * r[2 * t] + 0.5 * r[2 * t + 1] + bg).ln()),
+            )
+        })
+        .collect();
+    let cur = (
+        ll[0],
+        prior(fa) + prior(fb),
+        names[0].clone(),
+        names[1].clone(),
+    );
     let mut amb: Option<(f64, f64, String, String)> = None;
     for (t, (kc, kd, _, _)) in alts.iter().enumerate() {
         let (rc, rd) = (rep_of(al, &cls[*kc].1), rep_of(al, &cls[*kd].1));
-        let cand = (ll[t + 1], prior(rc) + prior(rd), al[rc].name.clone(), al[rd].name.clone());
-        log(format!("{} phase alternative {} {} reads {:.1} prior {:.1}", g, cand.2, cand.3, cand.0 - cur.0, cand.1 - cur.1));
+        let cand = (
+            ll[t + 1],
+            prior(rc) + prior(rd),
+            al[rc].name.clone(),
+            al[rd].name.clone(),
+        );
+        log(format!(
+            "{} phase alternative {} {} reads {:.1} prior {:.1}",
+            g,
+            cand.2,
+            cand.3,
+            cand.0 - cur.0,
+            cand.1 - cur.1
+        ));
         if cand.0 - cur.0 > -PH_T && amb.as_ref().map_or(true, |a| cand.0 + cand.1 > a.0 + a.1) {
             amb = Some(cand);
         }
     }
     let Some(amb) = amb else { return names };
-    let (best, other) = if amb.0 - cur.0 > PH_T || amb.0 + amb.1 > cur.0 + cur.1 { (amb.clone(), cur.clone()) } else { (cur.clone(), amb.clone()) };
-    let dm = if (amb.0 - cur.0).abs() > PH_T { (amb.0 - cur.0).abs() } else { 0.0 };
+    let (best, other) = if amb.0 - cur.0 > PH_T || amb.0 + amb.1 > cur.0 + cur.1 {
+        (amb.clone(), cur.clone())
+    } else {
+        (cur.clone(), amb.clone())
+    };
+    let dm = if (amb.0 - cur.0).abs() > PH_T {
+        (amb.0 - cur.0).abs()
+    } else {
+        0.0
+    };
     for sl in 0..2 {
-        let e = rmarg.entry(sl).or_insert(([999.0, 999.0], Default::default()));
-        let (on, bn) = if sl == 0 { (&other.2, &best.2) } else { (&other.3, &best.3) };
+        let e = rmarg
+            .entry(sl)
+            .or_insert(([999.0, 999.0], Default::default()));
+        let (on, bn) = if sl == 0 {
+            (&other.2, &best.2)
+        } else {
+            (&other.3, &best.3)
+        };
         let lv = diff_level(on, bn);
         for (ni, n) in [2u32, 3].iter().enumerate() {
             if lv <= *n && dm < e.0[ni] {
@@ -485,6 +679,9 @@ pub fn phase_check(ctx: &Ctx, g: &str, qnames: &[usize], win: [usize; 2], names:
             }
         }
     }
-    log(format!("{} phase-ambiguous: {} {} vs {} {}", g, best.2, best.3, other.2, other.3));
+    log(format!(
+        "{} phase-ambiguous: {} {} vs {} {}",
+        g, best.2, best.3, other.2, other.3
+    ));
     vec![best.2, best.3]
 }

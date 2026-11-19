@@ -18,13 +18,28 @@ pub struct Priors<'a> {
 }
 
 fn two_nogene(name: &str) -> String {
-    name.split('*').nth(1).unwrap_or("").split(':').take(2).collect::<Vec<_>>().join(":")
+    name.split('*')
+        .nth(1)
+        .unwrap_or("")
+        .split(':')
+        .take(2)
+        .collect::<Vec<_>>()
+        .join(":")
 }
 
 impl<'a> Priors<'a> {
     pub fn new(db: &'a Db) -> Self {
-        let freq = db.freq.iter().map(|(g, v)| (g.clone(), v.iter().cloned().collect())).collect();
-        Priors { db, freq, n2: Mutex::new(AHashMap::new()), n3: Mutex::new(AHashMap::new()) }
+        let freq = db
+            .freq
+            .iter()
+            .map(|(g, v)| (g.clone(), v.iter().cloned().collect()))
+            .collect();
+        Priors {
+            db,
+            freq,
+            n2: Mutex::new(AHashMap::new()),
+            n3: Mutex::new(AHashMap::new()),
+        }
     }
 
     pub fn freq_prior(&self, gene: &str, name: &str) -> f64 {
@@ -85,6 +100,7 @@ impl<'a> Priors<'a> {
 
     /// prior used in exon refinement and phase check
     pub fn name_prior(&self, gene: &str, name: &str) -> f64 {
-        self.freq_prior(gene, name) + self.sub_prior(gene, name) - if is_null_like(name) { PRIOR_NULL } else { 0.0 }
+        self.freq_prior(gene, name) + self.sub_prior(gene, name)
+            - if is_null_like(name) { PRIOR_NULL } else { 0.0 }
     }
 }

@@ -7,11 +7,17 @@ pub const ARTICLE: &str = "https://pjlabs.dev/forschung/hla-wgs";
 pub const SOURCE: &str = "https://github.com/pjlabsdev/hla-wgs";
 
 fn esc(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 fn german() -> bool {
-    let v = std::env::var("HLA_WGS_LANG").or_else(|_| std::env::var("LC_ALL")).or_else(|_| std::env::var("LANG")).unwrap_or_default();
+    let v = std::env::var("HLA_WGS_LANG")
+        .or_else(|_| std::env::var("LC_ALL"))
+        .or_else(|_| std::env::var("LANG"))
+        .unwrap_or_default();
     v.to_ascii_lowercase().starts_with("de")
 }
 
@@ -78,9 +84,16 @@ pub fn render(rep: &Value, sample: &str) -> String {
     let de = german();
     let t = |d: &'static str, e: &'static str| if de { d } else { e };
     let version = rep["version"].as_str().unwrap_or("");
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
     let (y, m, d) = date(now);
-    let day = if de { format!("{d:02}.{m:02}.{y}") } else { format!("{y}-{m:02}-{d:02}") };
+    let day = if de {
+        format!("{d:02}.{m:02}.{y}")
+    } else {
+        format!("{y}-{m:02}-{d:02}")
+    };
     let empty = vec![];
     let genes = rep["genes"].as_array().unwrap_or(&empty);
 
@@ -100,20 +113,66 @@ pub fn render(rep: &Value, sample: &str) -> String {
         let name = g["gene"].as_str().unwrap_or("");
         let c = class_of(name);
         if c != last {
-            rows.push_str(&format!("<tr class=\"cls\"><td colspan=\"5\">{}</td></tr>\n", names[c as usize]));
+            rows.push_str(&format!(
+                "<tr class=\"cls\"><td colspan=\"5\">{}</td></tr>\n",
+                names[c as usize]
+            ));
             last = c;
         }
         let copies = g["copies"].as_u64().unwrap_or(2);
         let als = g["alleles"].as_array().unwrap_or(&empty);
         let called = g["called"].as_bool().unwrap_or(false);
-        let mut cells = [String::from("<td class=\"note\">–</td>"), String::from("<td class=\"note\">–</td>")];
+        let mut cells = [
+            String::from("<td class=\"note\">–</td>"),
+            String::from("<td class=\"note\">–</td>"),
+        ];
         let mut dots = String::new();
         let mut notes: Vec<String> = vec![];
-        if !called {
+        if copies == 0 && g.get("copies").is_some() {
+            notes.push(
+                t(
+                    "Gen auf keinem Chromosom vorhanden",
+                    "gene present on neither chromosome",
+                )
+                .to_string(),
+            );
+        } else if !called {
             notes.push(t("kein Ergebnis", "no result").to_string());
-        } else if copies == 0 {
-            notes.push(t("Gen auf keinem Chromosom vorhanden", "gene present on neither chromosome").to_string());
         } else {
+            // sites: a site flagged "either" could belong to either copy; it is one finding for the
+            // gene, not one per allele. Blind stretches are reported once, with their length.
+            let sites_of = |a: &Value| -> Vec<(i64, String, bool)> {
+                a["new_sites"]
+                    .as_array()
+                    .map(|v| {
+                        v.iter()
+                            .map(|x| {
+                                (
+                                    x["pos"].as_i64().unwrap_or(-1),
+                                    x["change"].as_str().unwrap_or("").to_string(),
+                                    x["either_allele"].as_bool().unwrap_or(false),
+                                )
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            };
+            let used: Vec<&Value> = als.iter().take(copies.min(2) as usize).collect();
+            let either: std::collections::BTreeSet<i64> = used
+                .iter()
+                .flat_map(|a| sites_of(a))
+                .filter(|x| x.2)
+                .map(|x| x.0)
+                .collect();
+            let blind = used
+                .iter()
+                .flat_map(|a| sites_of(a))
+                .filter_map(|x| {
+                    x.1.strip_prefix("blind")
+                        .and_then(|b| b.trim_end_matches("bp").parse::<u64>().ok())
+                })
+                .max();
+            let mut gene_new = false;
             for (i, a) in als.iter().take(copies.min(2) as usize).enumerate() {
                 let safe = a["safe_call"].as_str().unwrap_or("");
                 let full = a["allele"].as_str().unwrap_or("");
@@ -122,34 +181,90 @@ pub fn render(rep: &Value, sample: &str) -> String {
                 if res >= 4 {
                     n4 += 1;
                 }
-                let extra = if full != safe { format!("<span class=\"full\">{} {}</span>", t("am nächsten:", "nearest:"), esc(full)) } else { String::new() };
+                let extra = if full != safe {
+                    format!(
+                        "<span class=\"full\">{} {}</span>",
+                        t("am nächsten:", "nearest:"),
+                        esc(full)
+                    )
+                } else {
+                    String::new()
+                };
                 cells[i] = format!("<td><span class=\"call\">{}</span>{extra}</td>", esc(safe));
-                dots.push_str(&format!("<div class=\"d\" title=\"{res} {}\">", t("Felder gesichert", "fields supported")));
+                dots.push_str(&format!(
+                    "<div class=\"d\" title=\"{res} {}\">",
+                    t("Felder gesichert", "fields supported")
+                ));
                 for k in 1..=4 {
-                    dots.push_str(if k <= res { "<i class=\"f on\"></i>" } else { "<i class=\"f\"></i>" });
+                    dots.push_str(if k <= res {
+                        "<i class=\"f on\"></i>"
+                    } else {
+                        "<i class=\"f\"></i>"
+                    });
                 }
                 dots.push_str("</div>");
                 if let Some(x) = a["expression"].as_str() {
                     notes.push(format!("{}: {}", esc(full), esc(x)));
                 }
-                let sites = a["new_sites"].as_array().map(|v| v.iter().filter(|s| !s["change"].as_str().unwrap_or("").starts_with("blind")).count()).unwrap_or(0);
+                let sites = sites_of(a)
+                    .iter()
+                    .filter(|x| !x.1.starts_with("blind") && !either.contains(&x.0))
+                    .count();
                 if sites > 0 {
-                    n_new += 1;
+                    gene_new = true;
                     notes.push(format!(
                         "<span class=\"warn\">{} {}: {sites} {}</span>",
                         t("Allel", "allele"),
                         i + 1,
-                        t("Abweichung(en) vom Datenbank-Allel, mögliches neues Allel", "difference(s) from the database allele, possibly a new allele")
+                        t(
+                            "Abweichung(en) vom Datenbank-Allel, mögliches neues Allel",
+                            "difference(s) from the database allele, possibly a new allele"
+                        )
                     ));
                 }
                 if let Some(x) = a["renamed_from"].as_str() {
-                    notes.push(format!("{} {}", t("mit Varianten benannt, Ausgang", "named with its variants, from"), esc(x)));
+                    notes.push(format!(
+                        "{} {}",
+                        t(
+                            "mit Varianten benannt, Ausgang",
+                            "named with its variants, from"
+                        ),
+                        esc(x)
+                    ));
                 }
+            }
+            if !either.is_empty() {
+                gene_new = true;
+                notes.push(format!(
+                    "<span class=\"warn\">{} {}</span>",
+                    either.len(),
+                    t(
+                        "abweichende Stelle(n), keiner der beiden Kopien sicher zuzuordnen",
+                        "differing site(s) that cannot be assigned to either copy"
+                    )
+                ));
+            }
+            if gene_new {
+                n_new += 1;
+            }
+            if let Some(b) = blind {
+                notes.push(format!(
+                    "{b} {}",
+                    t("bp ohne eindeutig zuordenbare Reads (ähnliche Gene, Wiederholungen): dort ist das Allel nicht prüfbar", "bp without uniquely placed reads (similar genes, repeats): the allele cannot be checked there")
+                ));
             }
             if copies == 1 {
                 notes.push(t("eine Kopie", "one copy").to_string());
-            } else if als.len() >= 2 && als[0]["safe_call"] == als[1]["safe_call"] {
+            } else if als.len() >= 2 && als[0]["allele"] == als[1]["allele"] {
                 notes.push(t("beide Kopien gleich", "both copies alike").to_string());
+            } else if als.len() >= 2 && als[0]["safe_call"] == als[1]["safe_call"] {
+                notes.push(
+                    t(
+                        "beide Kopien auf den gesicherten Feldern gleich",
+                        "both copies alike on the supported fields",
+                    )
+                    .to_string(),
+                );
             }
         }
         rows.push_str(&format!(
@@ -168,10 +283,24 @@ pub fn render(rep: &Value, sample: &str) -> String {
         let certain = p["certain"].as_bool().unwrap_or(false);
         let state = match (n, certain) {
             (0, true) => t("nicht nachgewiesen", "not found").to_string(),
-            (0, false) => format!("<span class=\"warn\">{}</span>", t("nicht sicher beurteilbar", "cannot be judged with certainty")),
+            (0, false) => format!(
+                "<span class=\"warn\">{}</span>",
+                t(
+                    "nicht sicher beurteilbar",
+                    "cannot be judged with certainty"
+                )
+            ),
             (n, c) => {
                 carriers += 1;
-                format!("<span class=\"pos\">{} ({n}×){}</span>", t("Träger", "carrier"), if c { "" } else { t(", unsicher", ", uncertain") })
+                format!(
+                    "<span class=\"pos\">{} ({n}×){}</span>",
+                    t("Träger", "carrier"),
+                    if c {
+                        ""
+                    } else {
+                        t(", unsicher", ", uncertain")
+                    }
+                )
             }
         };
         pgx.push_str(&format!(
@@ -191,7 +320,10 @@ pub fn render(rep: &Value, sample: &str) -> String {
     h.push_str(&format!(
         "<h1>{}</h1>\n<div class=\"sub\">{} · hla-wgs {} · {day}</div>\n",
         esc(sample),
-        t("HLA-Typisierung aus dem Genom", "HLA typing from the genome"),
+        t(
+            "HLA-Typisierung aus dem Genom",
+            "HLA typing from the genome"
+        ),
         esc(version)
     ));
     h.push_str(&format!(
@@ -199,7 +331,7 @@ pub fn render(rep: &Value, sample: &str) -> String {
         genes.len(),
         t("Gene ausgewertet", "genes typed"),
         t("Allele auf vier Felder gesichert", "alleles supported to four fields"),
-        t("Allele mit Abweichungen", "alleles with differences"),
+        t("Gene mit Abweichungen von der Datenbank", "genes with differences from the database"),
         t("pharmakogenetische Treffer", "pharmacogenetic findings")
     ));
     h.push_str(&format!(
