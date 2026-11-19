@@ -2,6 +2,7 @@
 
 ## Unreleased (1.1.0)
 
+- Start file `start/hla-wgs-start.command`: double-click, drag the input file into the window or type its path; sets up the reference once if it is missing.
 - Long reads (experimental): `hla-wgs long DBDIR READS.fastq[.gz]|READS.bam PREFIX [threads]` types from
   PacBio HiFi reads. The gene sequence of each haplotype is built from the reads (consensus) and
   compared with every full-length allele; `PREFIX.long.tsv` gives the nearest allele and the number of
