@@ -130,8 +130,9 @@ hla-wgs long hladb mhc_reads.fastq.gz out/sample 4
 ```
 
 For PacBio HiFi reads. A read of 10 to 25 kb usually holds a whole gene, so the sequence of each
-haplotype is built from the reads and compared with every full-length allele. This also settles what
-short reads cannot: the long repeats and the Alu cluster in DRB1, DRB3 and DRB4. Output:
+haplotype is built from the reads and compared with every full-length allele. This also reaches what
+short reads cannot: the Alu cluster and the long repeats in DRB1, DRB3 and DRB4, although the exact
+length of the longest repeats stays the weak point (marked as unsure sites). Output:
 `PREFIX.long.tsv` and `PREFIX.long.fa`, see [`docs/output.md`](docs/output.md). Tested on PacBio HiFi
 (26 samples); see `validation/results/long26/`.
 
