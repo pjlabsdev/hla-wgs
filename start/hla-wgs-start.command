@@ -130,14 +130,8 @@ if [ -z "$BIN" ]; then
   finish 1
 fi
 
-# ── reference: HLA_WGS_DB, else an existing one, else ~/hla-wgs-ref/hladb ─────
-DB="${HLA_WGS_DB:-}"
-if [ -z "$DB" ]; then
-  for c in "$HOME/Downloads/hla-wgs-ref/hladb" "$HOME/hla-wgs-ref/hladb"; do
-    if [ -f "$c/hladb.json.gz" ]; then DB="$c"; break; fi
-  done
-fi
-[ -z "$DB" ] && DB="$HOME/hla-wgs-ref/hladb"
+# ── reference: HLA_WGS_DB, else ref/hladb in the folder of this file (built there on the first start) ──
+DB="${HLA_WGS_DB:-$HERE/ref/hladb}"
 
 if [ ! -f "$DB/hladb.json.gz" ] || [ ! -f "$DB/panel.fa" ]; then
   WORK="$(dirname "$DB")"; mkdir -p "$DB"
