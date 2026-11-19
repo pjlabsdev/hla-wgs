@@ -1,0 +1,24 @@
+{
+  "title": "hla-wgs: HLA typing from whole-genome sequencing with a per-allele statement of what is certain",
+  "upload_type": "software",
+  "description": "<p>Single Rust program that types 18 HLA genes (A, B, C, DRB1, DRB3, DRB4, DRB5, DQA1, DQB1, DPA1, DPB1, DRA, E, F, G, H, K, V) from short-read whole-genome sequencing (FASTQ, BAM or CRAM). For every allele it reports the best four-field name, the resolution up to which the call is certain, copy number for DRB3/4/5, H and K, and positions at which the reads differ from the named allele (candidate new alleles). The reference database is built locally from the IPD-IMGT/HLA release with <code>hla-wgs build-db</code>; no IPD-IMGT/HLA sequences are distributed. Validated against haplotype-resolved HPRC assemblies, GIAB trios and 1000 Genomes laboratory typing. Research use only.</p>",
+  "creators": [
+    {
+      "name": "Jungwirth, Peter",
+      "affiliation": "PJ Labs"
+    }
+  ],
+  "license": "mit",
+  "keywords": [
+    "HLA",
+    "MHC",
+    "HLA typing",
+    "whole-genome sequencing",
+    "IPD-IMGT/HLA",
+    "four-field resolution",
+    "novel alleles",
+    "Rust"
+  ],
+  "access_right": "open",
+  "version": "1.0.0"
+}

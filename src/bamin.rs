@@ -1,0 +1,152 @@
+//! Direct BAM/CRAM input: read the MHC window, the MHC ALT and HLA-* contigs and all unplaced
+//! unmapped reads through the index, drop secondary/supplementary records, pair mates by name
+//! and hand complete pairs (sequencing orientation) to stage 0. Same read set as
+//! `samtools view -M -L regions` + `samtools view '*'` | `view -F 0x900` | collate | fastq.
+use crate::util::Fq;
+use ahash::AHashMap;
+use noodles::sam::alignment::record::Flags;
+use std::sync::mpsc::SyncSender;
+
+const MHC_ALTS: [&str; 16] = [
+    "chr6_GL000250v2_alt", "chr6_GL000251v2_alt", "chr6_GL000252v2_alt", "chr6_GL000253v2_alt",
+    "chr6_GL000254v2_alt", "chr6_GL000255v2_alt", "chr6_GL000256v2_alt", "chr6_GL383533v1_alt",
+    "chr6_KB021644v2_alt", "chr6_KI270758v1_alt", "chr6_KI270797v1_alt", "chr6_KI270798v1_alt",
+    "chr6_KI270799v1_alt", "chr6_KI270800v1_alt", "chr6_KI270801v1_alt", "chr6_KI270802v1_alt",
+];
+const GRCH38_CHR6: usize = 170_805_979;
+const GRCH37_CHR6: usize = 171_115_067;
+
+/// regions to query, as "name:start-end" strings (1-based, inclusive)
+fn regions(refs: &[(String, usize)]) -> Vec<String> {
+    let mut out = vec![];
+    for (name, len) in refs {
+        let n = name.as_str();
+        if n == "chr6" || n == "6" {
+            let (s, e) = match *len {
+                GRCH38_CHR6 => (28_510_120, 33_480_577),
+                GRCH37_CHR6 => (28_477_797, 33_448_354),
+                _ => {
+                    eprintln!("warning: unknown chr6 length {len}; using GRCh38 MHC coordinates");
+                    (28_510_120, 33_480_577)
+                }
+            };
+            out.push(format!("{n}:{s}-{e}"));
+        } else if n.starts_with("HLA-") || MHC_ALTS.contains(&n) || MHC_ALTS.iter().any(|a| a.strip_prefix("chr") == Some(n)) {
+            out.push(format!("{n}:1-{len}"));
+        }
+    }
+    out.dedup();
+    out
+}
+
+fn revcomp_into(s: &[u8]) -> Vec<u8> {
+    crate::util::revcomp(s)
+}
+
+struct Pairer {
+    open: AHashMap<Vec<u8>, [Option<Vec<u8>>; 2]>,
+    b1: Vec<Fq>,
+    b2: Vec<Fq>,
+    tx: SyncSender<(Vec<Fq>, Vec<Fq>)>,
+    pub records: u64,
+    pub pairs: u64,
+}
+
+impl Pairer {
+    fn add(&mut self, name: &[u8], flags: Flags, seq: Vec<u8>) {
+        self.records += 1;
+        if flags.intersects(Flags::SECONDARY.union(Flags::SUPPLEMENTARY)) || !flags.is_segmented() {
+            return;
+        }
+        let mate = if flags.is_first_segment() { 0 } else if flags.is_last_segment() { 1 } else { return };
+        let seq = if flags.is_reverse_complemented() { revcomp_into(&seq) } else { seq };
+        let e = self.open.entry(name.to_vec()).or_insert([None, None]);
+        e[mate] = Some(seq);
+        if e[0].is_some() && e[1].is_some() {
+            let [a, b] = self.open.remove(name).unwrap();
+            let nm = String::from_utf8_lossy(name).into_owned();
+            self.b1.push(Fq { name: nm.clone(), seq: a.unwrap() });
+            self.b2.push(Fq { name: nm, seq: b.unwrap() });
+            self.pairs += 1;
+            if self.b1.len() >= 50_000 {
+                self.flush();
+            }
+        }
+    }
+    fn flush(&mut self) {
+        if !self.b1.is_empty() {
+            let b1 = std::mem::take(&mut self.b1);
+            let b2 = std::mem::take(&mut self.b2);
+            self.tx.send((b1, b2)).unwrap();
+        }
+    }
+}
+
+/// stream all pairs of an indexed BAM or CRAM into `tx`; returns (records seen, pairs, singletons)
+pub fn stream(path: &str, reference: Option<&str>, threads: usize, tx: SyncSender<(Vec<Fq>, Vec<Fq>)>) -> (u64, u64, usize) {
+    let mut p = Pairer { open: AHashMap::new(), b1: vec![], b2: vec![], tx, records: 0, pairs: 0 };
+    let lower = path.to_ascii_lowercase();
+    if lower.ends_with(".cram") {
+        use noodles::{cram, fasta};
+        let repo = reference
+            .map(|src| fasta::io::indexed_reader::Builder::default().build_from_path(src).expect("reference fasta (.fai needed)"))
+            .map(fasta::repository::adapters::IndexedReader::new)
+            .map(fasta::Repository::new)
+            .unwrap_or_default();
+        let mut rd = cram::io::reader::Builder::default()
+            .set_reference_sequence_repository(repo)
+            .build_from_path(path)
+            .unwrap_or_else(|e| panic!("{path}: {e}"));
+        let header = rd.read_header().expect("CRAM header");
+        let index = cram::fs::read_associated_index(path).expect("CRAM index (.crai) next to the file");
+        let refs: Vec<(String, usize)> = header.reference_sequences().iter().map(|(n, m)| (n.to_string(), m.length().get())).collect();
+        for reg in regions(&refs) {
+            let region = reg.parse().unwrap();
+            for r in rd.query(&header, &index, &region).expect("CRAM query").records() {
+                let r = r.expect("CRAM record");
+                let nm = r.name().map(|n| n.to_vec()).unwrap_or_default();
+                p.add(&nm, r.flags(), r.sequence().as_ref().to_vec());
+            }
+        }
+        for r in rd.query_unmapped(&header, &index).expect("CRAM unmapped") {
+            let r = r.expect("CRAM record");
+            let nm = r.name().map(|n| n.to_vec()).unwrap_or_default();
+            p.add(&nm, r.flags(), r.sequence().as_ref().to_vec());
+        }
+    } else {
+        use noodles::{bam, bgzf};
+        // multithreaded BGZF decompression over a large read buffer: the unmapped tail of a WGS
+        // BAM is several GB, and USB disks like large sequential reads
+        let workers = std::num::NonZero::new(threads.clamp(1, 8)).unwrap();
+        let f = std::fs::File::open(path).unwrap_or_else(|e| panic!("{path}: {e}"));
+        let mut rd = bam::io::Reader::from(bgzf::io::MultithreadedReader::with_worker_count(
+            workers,
+            std::io::BufReader::with_capacity(8 << 20, f),
+        ));
+        let header = rd.read_header().expect("BAM header");
+        let index = bam::fs::read_associated_index(path)
+            .or_else(|_| {
+                let alt = path.strip_suffix(".bam").map(|b| format!("{b}.bai")).unwrap_or_default();
+                noodles::bam::bai::fs::read(&alt).map(noodles::bam::Index::Bai)
+            })
+            .unwrap_or_else(|e| panic!("{path}: index .bam.bai/.bai/.csi needed: {e}"));
+        let refs: Vec<(String, usize)> = header.reference_sequences().iter().map(|(n, m)| (n.to_string(), m.length().get())).collect();
+        for reg in regions(&refs) {
+            let region = reg.parse().unwrap();
+            for r in rd.query(&header, &index, &region).expect("BAM query").records() {
+                let r = r.expect("BAM record");
+                let nm = r.name().map(|n| n.to_vec()).unwrap_or_default();
+                let seq: Vec<u8> = r.sequence().iter().collect();
+                p.add(&nm, r.flags(), seq);
+            }
+        }
+        for r in rd.query_unmapped(&index).expect("BAM unmapped") {
+            let r = r.expect("BAM record");
+            let nm = r.name().map(|n| n.to_vec()).unwrap_or_default();
+            let seq: Vec<u8> = r.sequence().iter().collect();
+            p.add(&nm, r.flags(), seq);
+        }
+    }
+    p.flush();
+    (p.records, p.pairs, p.open.len())
+}

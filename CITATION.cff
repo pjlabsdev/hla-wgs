@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use hla-wgs, please cite it as below."
+title: "hla-wgs: HLA typing from whole-genome sequencing with a per-allele statement of what is certain"
+type: software
+authors:
+  - family-names: Jungwirth
+    given-names: Peter
+    affiliation: PJ Labs
+repository-code: "https://github.com/pjlabsdev/hla-wgs"
+license: MIT
+version: 1.0.0
+date-released: 2026-11-19
+keywords: [HLA, MHC, whole-genome sequencing, HLA typing, IPD-IMGT/HLA, Rust]

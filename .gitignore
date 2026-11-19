@@ -1,0 +1,10 @@
+target/
+*.fq.gz
+*.bam
+*.cram
+hladb.json.gz
+panel.fa
+panel.fa.mask.bed
+hla.dat
+__pycache__/
+*.pyc
