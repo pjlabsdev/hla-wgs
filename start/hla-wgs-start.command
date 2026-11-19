@@ -91,8 +91,8 @@ case "$lower" in
   *.fq|*.fastq|*.fq.gz|*.fastq.gz) ;;
   *) say "Unbekanntes Format. Erlaubt sind BAM, CRAM oder FASTQ." "Unknown format. Allowed are BAM, CRAM or FASTQ."; finish 1 ;;
 esac
-ask "Lange Reads (PacBio HiFi)? j/N" "Long reads (PacBio HiFi)? y/N"; read -r yn
-case "$yn" in [jJyY]*) LONG=1 ;; esac
+# long reads (PacBio HiFi) only on request: HLA_WGS_LONG=1 or the argument --long
+if [ "${HLA_WGS_LONG:-0}" = 1 ] || [ "${1:-}" = "--long" ]; then LONG=1; fi
 if [ "$LONG" = 0 ]; then
   case "$lower" in
     *.cram) askpath "Referenz der CRAM (GRCh38-FASTA mit .fai) hineinziehen:" "Drop the reference of the CRAM (GRCh38 FASTA with .fai):"; EXTRA=("$REPLY_PATH") ;;
