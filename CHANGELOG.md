@@ -2,6 +2,7 @@
 
 ## Unreleased (1.1.0)
 
+- HLA-E is reported to four fields like the other genes (was capped at three); its fourth field was exact in 274 of 275 alleles reported certain (80 HPRC, 30 check and 38 HGSVC3 samples).
 - `PREFIX.tsv`: `call1`/`call2` now hold the safe call (the fields the reads support) instead of repeating
   `allele1`/`allele2`; a gene estimated at 0 copies shows `-` in all allele columns, has no line in
   `PREFIX.conf.tsv` and no alleles in `PREFIX.json` (before, the nearest names were still printed).

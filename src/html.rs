@@ -127,7 +127,7 @@ pub fn render(rep: &Value, sample: &str) -> String {
     let de = german();
     let first = if de { "de" } else { "en" };
     format!(
-        "<!DOCTYPE html>\n<html lang=\"{first}\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>hla-wgs · {}</title>\n<style>{css}</style></head><body data-lang=\"{first}\" data-tab=\"r\">\n<header class=\"bar\"><div class=\"bar-in\"><div class=\"brand\">PJ Labs <i>·</i> hla-wgs</div><nav class=\"lang seg\"><button type=\"button\" data-set=\"de\">Deutsch</button><button type=\"button\" data-set=\"en\">English</button></nav></div></header>\n<main lang=\"de\" class=\"l-de\">\n{}</main>\n<main lang=\"en\" class=\"l-en\">\n{}</main>\n<script>\nfunction setL(l){{document.body.dataset.lang=l;document.documentElement.lang=l;try{{localStorage.setItem('hla-wgs-lang',l)}}catch(e){{}}}}\ntry{{const s=localStorage.getItem('hla-wgs-lang');if(s==='de'||s==='en')setL(s)}}catch(e){{}}\ndocument.querySelectorAll('nav.lang button').forEach(b=>b.addEventListener('click',()=>setL(b.dataset.set)));\ndocument.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{{document.body.dataset.tab=b.dataset.tab;scrollTo(0,0)}}));\naddEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));\n</script></body></html>\n",
+        "<!DOCTYPE html>\n<html lang=\"{first}\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>hla-wgs · {}</title>\n<style>{css}</style></head><body data-lang=\"{first}\" data-tab=\"r\">\n<header class=\"bar\"><div class=\"bar-in\"><div class=\"brand\">PJ Labs <i>·</i> hla-wgs</div><nav class=\"lang seg\"><button type=\"button\" data-set=\"de\">Deutsch</button><button type=\"button\" data-set=\"en\">English</button></nav></div></header>\n<main lang=\"de\" class=\"l-de\">\n{}</main>\n<main lang=\"en\" class=\"l-en\">\n{}</main>\n<script>\nfunction aria(){{document.querySelectorAll('nav.lang button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.set===document.body.dataset.lang));document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tab===document.body.dataset.tab))}}\nfunction setL(l){{document.body.dataset.lang=l;document.documentElement.lang=l;aria();try{{localStorage.setItem('hla-wgs-lang',l)}}catch(e){{}}}}\ntry{{const s=localStorage.getItem('hla-wgs-lang');if(s==='de'||s==='en')setL(s)}}catch(e){{}}\ndocument.querySelectorAll('nav.lang button').forEach(b=>b.addEventListener('click',()=>setL(b.dataset.set)));\ndocument.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{{document.body.dataset.tab=b.dataset.tab;aria();scrollTo(0,0)}}));\naria();\naddEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));\n</script></body></html>\n",
         esc(sample),
         render_one(rep, sample, true),
         render_one(rep, sample, false)
@@ -431,7 +431,7 @@ fn gene_details(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static st
 }
 
 /// why the safe call stops at its number of fields
-fn field_reason(gene: &str, a: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static str, thr: &dyn Fn(&str) -> f64) -> String {
+fn field_reason(_gene: &str, a: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static str, thr: &dyn Fn(&str) -> f64) -> String {
     let r = a["resolution"].as_u64().unwrap_or(0);
     let nf = a["allele"].as_str().and_then(|x| x.split('*').nth(1)).map(|x| x.split(':').count() as u64).unwrap_or(4);
     if r >= 4 || r >= nf {
@@ -442,9 +442,6 @@ fn field_reason(gene: &str, a: &Value, t: &dyn Fn(&'static str, &'static str) ->
         if m < thr(&next) {
             return format!("{} {next}: {m:.1} < {:.0}", t("Vorsprung vor dem nächsten Konkurrenten unter der Schwelle im Feld", "lead over the nearest competitor below the threshold at field"), thr(&next));
         }
-    }
-    if gene == "E" && r == 3 {
-        return t("HLA-E wird in dieser Version höchstens auf 3 Felder angegeben", "HLA-E is reported to at most 3 fields in this version").to_string();
     }
     let sites = a["new_sites"].as_array().cloned().unwrap_or_default();
     if sites.iter().any(|x| x["exon"].as_bool().unwrap_or(false)) {

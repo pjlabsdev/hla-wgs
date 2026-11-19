@@ -10,11 +10,10 @@ const T: [f64; 3] = [6.0, 6.0, 4.0];
 /// Highest resolution that validation against assembly truth supports per gene.
 /// HLA-E: 4th-field differences sit in UTR repeats / span ends and were miscalled with
 /// large margins on HPRC assemblies, so E is never reported safe beyond 3 fields.
-fn max_res(g: &str) -> usize {
-    match g {
-        "E" => 3,
-        _ => 4,
-    }
+// every gene may reach four fields; HLA-E was capped at three until 1.1 (its fourth field is now exact
+// in 274 of 275 alleles reported certain: 80 HPRC, 30 check and 38 HGSVC3 samples)
+fn max_res(_g: &str) -> usize {
+    4
 }
 
 pub fn write(
