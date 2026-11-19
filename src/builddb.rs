@@ -40,8 +40,13 @@ impl Al {
 }
 
 fn parse(dat: &str) -> Vec<Al> {
-    let f = std::fs::File::open(dat).unwrap_or_else(|e| panic!("{dat}: {e}"));
-    let rd = std::io::BufReader::with_capacity(1 << 20, f);
+    let f = std::fs::File::open(dat).unwrap_or_else(|e| crate::util::die(&format!("{dat}: {e}")));
+    let mut rd = std::io::BufReader::with_capacity(1 << 20, f);
+    // an EMBL flat file starts with "ID   HLA....."; anything else is the wrong file
+    let head = std::io::BufRead::fill_buf(&mut rd).unwrap_or_else(|e| crate::util::die(&format!("{dat}: {e}")));
+    if !head.starts_with(b"ID   HLA") {
+        crate::util::die(&format!("not an IPD-IMGT/HLA hla.dat file: {dat} (its first line must start with \"ID   HLA\"; unpack hla.dat.zip first)"));
+    }
     let mut out: Vec<Al> = vec![];
     let mut cur: Option<(Option<String>, bool, Vec<Feat>, String)> = None;
     let mut flush = |cur: &mut Option<(Option<String>, bool, Vec<Feat>, String)>, out: &mut Vec<Al>| {
@@ -60,7 +65,7 @@ fn parse(dat: &str) -> Vec<Al> {
         }
     };
     for line in rd.lines() {
-        let line = line.unwrap();
+        let line = line.unwrap_or_else(|e| crate::util::die(&format!("{dat}: {e}")));
         let tag = line.get(..2).unwrap_or("");
         if tag == "ID" {
             flush(&mut cur, &mut out);

@@ -2,6 +2,8 @@
 
 ## Unreleased (1.1.0)
 
+- `build-db` reports a file that is not an hla.dat instead of aborting with a trace.
+
 - New sites: read pairs that a related gene explains better (HLA-Y, -J, -K beside HLA-A; DQA2 beside DQA1) are left out when sites are collected, as they already were when alleles are scored. On the 80 development samples this removed 7 false sites and no true one; four more alleles (three HLA-A, one DQA1) are reported certain at four fields, all exact (1719 of 1740, before 1715 of 1736).
 - Input errors are reported at once and in plain words (`error: ...`, exit code 1) instead of after six retries or with a panic trace: database not found, input file missing or empty, BAM/CRAM index missing, not a BAM, FASTQ truncated or not a FASTQ, R1 and R2 of different length, output folder not writable (checked before reading). A BAM that ends early is reopened once and reported if it ends at the same record again. Retries remain for real I/O errors (disk dropping out).
 - HLA-E is reported to four fields like the other genes (was capped at three); its fourth field was exact in 274 of 275 alleles reported certain (80 HPRC, 30 check and 38 HGSVC3 samples).
