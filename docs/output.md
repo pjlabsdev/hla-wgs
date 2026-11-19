@@ -82,6 +82,25 @@ unsupported positions that could not be applied); `phase=uncertain` says that at
 was seen only in reads that fit both alleles. The sequence is a proposal from short reads, not a
 confirmed allele.
 
+## PREFIX.long.tsv and PREFIX.long.fa (`hla-wgs long`)
+
+One line per gene sequence found in the long reads.
+
+| column | meaning |
+|---|---|
+| `gene`, `slot` | gene and running number, most reads first |
+| `allele` | nearest full-length database allele |
+| `differences` | edits between this allele (over its whole length) and the sequence built from the reads; 0 means the four-field name is exact |
+| `exact` | `yes`, `yes, with unsure sites` or `no` |
+| `reads`, `spanning` | reads in the group, and how many of them cover the whole gene |
+| `unsure_sites` | positions at which 30 % or more of the reads disagree with the sequence, nearly always long single-base runs |
+| `equal_alternatives` | other alleles at the same distance |
+| `note` | `minor`: a third sequence of a gene or one with few reads; not written to the FASTA |
+
+One line for a gene means that both copies are identical or that there is one copy. Besides the typed
+genes the table lists what else lies on the reads (for example HLA-J, L, DPA2, DPB2, DQA2).
+`PREFIX.long.fa` holds each sequence over the extent of its nearest allele.
+
 ## Groups and pharmacogenetic alleles (JSON)
 
 With `hla_nom_g.txt` and `hla_nom_p.txt` (folder `wmda` of the IPD-IMGT/HLA release) in the database

@@ -8,6 +8,7 @@ mod prior;
 mod refine;
 mod stageb;
 mod names;
+mod long;
 mod mask;
 mod novel;
 mod panel;
@@ -38,6 +39,7 @@ fn main() {
     match a.get(1).map(|x| x.as_str()) {
         Some("build-db") => return builddb::run(&a[2..]),
         Some("build-mask") => return mask::run(&a[2..]),
+        Some("long") => return long::run(&a[2..]),
         Some("--version") | Some("-V") => return println!("hla-wgs {}", env!("CARGO_PKG_VERSION")),
         _ => {}
     }
@@ -54,6 +56,7 @@ fn main() {
     if a.len() < if aligned { 5 } else { 6 } {
         eprintln!("usage: hla-wgs DBDIR R1.fq.gz R2.fq.gz OUTPREFIX [threads]");
         eprintln!("       hla-wgs DBDIR INPUT.bam|INPUT.cram OUTPREFIX [threads] [REF.fa (CRAM)]");
+        eprintln!("       hla-wgs long DBDIR READS.fastq[.gz]|READS.bam OUTPREFIX [threads]   (PacBio HiFi)");
         eprintln!("       hla-wgs build-db hla.dat freq.json DBDIR");
         eprintln!("       hla-wgs build-mask DBDIR GENOME.fa [EXCLUDE.bed]");
         eprintln!("       (DBDIR may also be given as its two files: hladb.json.gz panel.fa)");

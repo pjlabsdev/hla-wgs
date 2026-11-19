@@ -122,6 +122,19 @@ From BAM/CRAM the program reads the MHC region (GRCh38 chr6:28,510,120-33,480,57
 6:28,477,797-33,448,354), all ALT and HLA contigs, and the unmapped reads. The last argument is the
 number of threads.
 
+### Long reads (experimental, 1.1)
+
+```bash
+hla-wgs long hladb sample.hifi.bam out/sample 4      # indexed BAM: the MHC region is read
+hla-wgs long hladb mhc_reads.fastq.gz out/sample 4
+```
+
+For PacBio HiFi reads. A read of 10 to 25 kb usually holds a whole gene, so the sequence of each
+haplotype is built from the reads and compared with every full-length allele. This also settles what
+short reads cannot: the long repeats and the Alu cluster in DRB1, DRB3 and DRB4. Output:
+`PREFIX.long.tsv` and `PREFIX.long.fa`, see [`docs/output.md`](docs/output.md). Tested on four samples
+only; see `validation/results/long4/`.
+
 ## Output
 
 `PREFIX.tsv` (one line per gene), `PREFIX.conf.tsv` (one line per allele with certainty) and

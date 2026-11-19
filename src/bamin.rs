@@ -17,7 +17,7 @@ const GRCH38_CHR6: usize = 170_805_979;
 const GRCH37_CHR6: usize = 171_115_067;
 
 /// regions to query, as "name:start-end" strings (1-based, inclusive)
-fn regions(refs: &[(String, usize)]) -> Vec<String> {
+pub fn regions(refs: &[(String, usize)]) -> Vec<String> {
     let mut out = vec![];
     for (name, len) in refs {
         let n = name.as_str();
