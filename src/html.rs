@@ -60,7 +60,7 @@ details{border-bottom:1px solid var(--line);padding:6px 0}
 summary{cursor:pointer;list-style:none}summary::-webkit-details-marker{display:none}
 summary:before{content:'+ ';color:var(--mut)}details[open] summary:before{content:'– '}
 .kv{color:var(--mut);font-size:12px;margin:8px 0}
-.dt{font-size:12px;margin:6px 0 10px}.dt td,.dt th{padding:4px 10px 4px 0}
+.dt{font-size:12px;margin:6px 0 10px}.dt td,.dt th{padding:4px 10px 4px 0}.dt td:last-child{min-width:16em}
 .ok{color:var(--ok)}
 body[data-lang=de] main.l-en,body[data-lang=en] main.l-de{display:none}
 nav.lang{max-width:980px;margin:0 auto;padding:16px 24px 0;text-align:right}
@@ -396,6 +396,9 @@ fn field_reason(gene: &str, a: &Value, t: &dyn Fn(&'static str, &'static str) ->
     let sites = a["new_sites"].as_array().cloned().unwrap_or_default();
     if sites.iter().any(|x| x["exon"].as_bool().unwrap_or(false)) {
         return t("abweichende Stelle im Exon: das Allel ist neu oder unbekannt, nur die Allelgruppe ist sicher", "differing site in an exon: the allele is new or unknown, only the allele group is certain").to_string();
+    }
+    if !sites.is_empty() && sites.iter().all(|x| x["change"].as_str().unwrap_or("").starts_with("blind")) {
+        return t("Strecke ohne eindeutig zuordenbare Reads (ähnliche Gene, Wiederholungen): dort lässt sich das vierte Feld nicht prüfen", "stretch without uniquely placed reads (similar genes, repeats): the fourth field cannot be checked there").to_string();
     }
     if !sites.is_empty() {
         return t("abweichende Stelle außerhalb der Exons: die ersten drei Felder gelten, das vierte nicht", "differing site outside the exons: the first three fields hold, the fourth does not").to_string();
