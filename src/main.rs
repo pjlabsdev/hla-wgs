@@ -20,7 +20,7 @@ use names::{three, two};
 use std::time::Instant;
 use rayon::prelude::*;
 
-pub const FOCUS: [&str; 18] = ["A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DRA", "E", "F", "G", "H", "K", "V"];
+pub const FOCUS: [&str; 26] = ["A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DRA", "E", "F", "G", "H", "K", "V", "DMA", "DMB", "DOA", "DOB", "MICA", "MICB", "TAP1", "TAP2"];
 
 pub fn related(g: &str) -> &'static [&'static str] {
     match g {
