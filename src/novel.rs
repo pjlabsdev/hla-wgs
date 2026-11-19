@@ -171,6 +171,10 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
     let mut replen: Vec<Vec<AHashMap<i64, (u32, u32)>>> = (0..na).map(|k| vec![AHashMap::new(); reps[k].len()]).collect();
     // not for HLA-V: no gain there on the development samples (one true site lost, one false removed)
     let dmin: AHashMap<usize, f64> = if std::env::var("HLA_NOPARA").is_err() && g != "V" && (!crate::stageb::decoys(g).is_empty() || ctx.db.genome_decoy.contains_key(g)) { ctx.decoy_min(g, qnames) } else { AHashMap::new() };
+    // pairs that fit both alleles equally: per allele the stretches they cover and the differences they
+    // show there; they tie neighbouring new sites to each other (see `phase_shared`)
+    let mut links: Vec<[(Vec<(usize, usize)>, Vec<(usize, String)>); 2]> = vec![];
+    let mut firm: [AHashMap<(usize, String), u32>; 2] = [AHashMap::new(), AHashMap::new()];
     for &q in qnames {
         let Some(r) = ctx.reads.get(q) else { continue };
         let mut per: Vec<Option<(i64, Vec<Aln>)>> = vec![];
@@ -225,6 +229,15 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
                     for p in a.st..a.en.min(seqs[k].len()) { dlink[k][p] += 1; }
                 }
             }
+        }
+        if na == 2 && winners.len() == 2 {
+            let side = |k: usize| {
+                let v = &per[k].as_ref().unwrap().1;
+                let cov: Vec<(usize, usize)> = v.iter().map(|a| (a.st + 2, a.en.saturating_sub(2))).collect();
+                let df: Vec<(usize, String)> = v.iter().flat_map(|a| a.diffs.iter().filter(|(p, _)| *p >= a.st + 2 && *p + 2 <= a.en).cloned()).collect();
+                (cov, df)
+            };
+            links.push([side(0), side(1)]);
         }
         for &k in &winners {
             for a in &per[k].as_ref().unwrap().1 {
@@ -416,6 +429,14 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
         }
         v.sort_by_key(|s| s.pos);
         out[k] = v;
+        if na == 2 {
+            for ((p, w), (cs, _)) in &alt[k] {
+                if *cs > 0 { firm[k].insert((*p, w.clone()), *cs); }
+            }
+        }
+    }
+    if na == 2 && std::env::var("HLA_NOPHASE").is_err() {
+        phase_shared(&mut out, &links, &firm);
     }
     if hom {
         // one allele called twice: a site carried by about half the reads belongs to one copy only
@@ -423,6 +444,94 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
         out[0].retain(|s| s.alt as f64 >= if (s.what.starts_with("del") || s.what.starts_with("ins")) && s.what.len() >= 8 { 0.5 } else { 0.75 } * s.depth as f64);
     }
     out
+}
+
+/// A new variant in a stretch where the two called alleles are identical is seen only in pairs that
+/// fit both alleles ("either"). Such a site is listed for both alleles. This pass assigns it to one:
+/// (a) a site that pairs specific to one allele carry, and that about half of the shared pairs
+/// carry, belongs to that allele alone; (b) a site that shared pairs show together with an
+/// assigned site (same pairs carry both, hardly any carry only one) belongs to the same allele.
+/// The assigned allele keeps the site as its own, the other allele loses it.
+fn phase_shared(out: &mut [Vec<Site>; 2], links: &[[(Vec<(usize, usize)>, Vec<(usize, String)>); 2]], firm: &[AHashMap<(usize, String), u32>; 2]) {
+    let plain = |s: &Site| !s.what.contains('(') && !s.what.contains(':') && !s.what.starts_with("rep") && !s.what.starts_with("blind") && s.what != "break";
+    // position on allele 1 of a difference seen on allele 0, from pairs that show the same differences on both
+    let mut map: AHashMap<(usize, String), AHashMap<usize, u32>> = AHashMap::new();
+    for l in links {
+        let (d0, d1) = (&l[0].1, &l[1].1);
+        if d0.len() == d1.len() && d0.iter().zip(d1.iter()).all(|(a, b)| a.1 == b.1) {
+            for (a, b) in d0.iter().zip(d1.iter()) {
+                *map.entry(a.clone()).or_default().entry(b.0).or_insert(0) += 1;
+            }
+        }
+    }
+    // common sites: (index in out[0], index in out[1])
+    let mut common: Vec<(usize, usize)> = vec![];
+    for (i, s) in out[0].iter().enumerate() {
+        if !plain(s) { continue; }
+        let Some(m) = map.get(&(s.pos, s.what.clone())) else { continue };
+        let Some((&p1, _)) = m.iter().max_by_key(|(p, n)| (**n, std::cmp::Reverse(**p))) else { continue };
+        if let Some(j) = out[1].iter().position(|t| t.pos == p1 && t.what == s.what) {
+            common.push((i, j));
+        }
+    }
+    if common.is_empty() { return; }
+    let het = |s: &Site| (s.alt as f64) <= 0.75 * s.depth as f64 && (s.alt as f64) >= 0.2 * s.depth as f64;
+    // owner of each common site
+    let mut owner: Vec<Option<usize>> = common.iter().map(|&(i, j)| {
+        let (a, b) = (&out[0][i], &out[1][j]);
+        let f0 = firm[0].get(&(a.pos, a.what.clone())).copied().unwrap_or(0);
+        let f1 = firm[1].get(&(b.pos, b.what.clone())).copied().unwrap_or(0);
+        if !(het(a) && het(b)) { None } else if f0 >= 3 && f1 == 0 { Some(0) } else if f1 >= 3 && f0 == 0 { Some(1) } else { None }
+    }).collect();
+    // what a shared pair shows at a site, on allele 0: Some(true) the variant, Some(false) the allele's base
+    let state = |l: &[(Vec<(usize, usize)>, Vec<(usize, String)>); 2], s: &Site| -> Option<bool> {
+        if !l[0].0.iter().any(|&(a, b)| s.pos >= a && s.pos < b) { return None; }
+        Some(l[0].1.iter().any(|(p, w)| *p == s.pos && *w == s.what))
+    };
+    loop {
+        let mut changed = false;
+        for x in 0..common.len() {
+            if owner[x].is_some() { continue; }
+            let sx = &out[0][common[x].0];
+            if !het(sx) || !het(&out[1][common[x].1]) { continue; }
+            // pairs specific to an allele that carry the site speak against giving it to the other one
+            let fx = [firm[0].contains_key(&(sx.pos, sx.what.clone())), firm[1].contains_key(&(out[1][common[x].1].pos, sx.what.clone()))];
+            if fx[0] && fx[1] { continue; }
+            // votes per allele from all assigned sites this one shares pairs with
+            let mut cis = [0u32; 2];
+            let mut trans = [0u32; 2];
+            for y in 0..common.len() {
+                let Some(o) = owner[y] else { continue };
+                let sy = &out[0][common[y].0];
+                for l in links {
+                    match (state(l, sx), state(l, sy)) {
+                        (Some(true), Some(true)) => cis[o] += 1,
+                        (Some(a), Some(b)) if a != b => trans[o] += 1,
+                        _ => {}
+                    }
+                }
+            }
+            for o in 0..2 {
+                if cis[o] >= 3 && cis[1 - o] == 0 && trans[o] * 10 <= cis[o] && !fx[1 - o] {
+                    owner[x] = Some(o);
+                    changed = true;
+                }
+            }
+        }
+        if !changed { break; }
+    }
+    let mut drop: [Vec<usize>; 2] = [vec![], vec![]];
+    for (x, &(i, j)) in common.iter().enumerate() {
+        match owner[x] {
+            Some(0) => { out[0][i].either = false; drop[1].push(j); }
+            Some(1) => { out[1][j].either = false; drop[0].push(i); }
+            _ => {}
+        }
+    }
+    for k in 0..2 {
+        drop[k].sort();
+        for &i in drop[k].iter().rev() { out[k].remove(i); }
+    }
 }
 
 /// The database allele that equals the called allele with its residual variants applied, if there
