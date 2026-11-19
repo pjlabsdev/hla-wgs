@@ -5,8 +5,9 @@
 - Long reads (experimental): `hla-wgs long DBDIR READS.fastq[.gz]|READS.bam PREFIX [threads]` types from
   PacBio HiFi reads. The gene sequence of each haplotype is built from the reads (consensus) and
   compared with every full-length allele; `PREFIX.long.tsv` gives the nearest allele and the number of
-  differences, `PREFIX.long.fa` the sequences. On four HPRC samples (40x HiFi, MHC region) 214 of 232
-  sequences were identical to the assembled haplotype, about one minute per sample on 4 cores. The
+  differences, `PREFIX.long.fa` the sequences. On 26 HPRC samples (40x HiFi, MHC region) 689 of 726
+  sequences of the 18 genes were identical to the assembled haplotype, and all 546 reported as exact
+  were; about one minute per sample on 4 cores. The
   assemblies were made from the same reads, so this is not an independent truth.
 - New alleles as sequence: `PREFIX.novel.fa` holds, for every allele with new sites, the nearest
   database allele with the substitutions, insertions and deletions applied. The header names the
