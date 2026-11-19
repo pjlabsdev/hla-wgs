@@ -7,6 +7,7 @@ set -u
 case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in *UTF-8*) ;; *) export LC_CTYPE=en_US.UTF-8 ;; esac
 
 HLA_DAT_URL="https://github.com/ANHIG/IMGTHLA/raw/3660/hla.dat.zip"
+WMDA_URL="https://github.com/ANHIG/IMGTHLA/raw/3660/wmda"
 FREQ_URL="https://raw.githubusercontent.com/pjlabsdev/hla-wgs/main/data/freq_1000g_2field.json"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
@@ -156,6 +157,16 @@ if [ ! -f "$DB/hladb.json.gz" ] || [ ! -f "$DB/panel.fa" ]; then
   fi
   step "$(tr_ "Datenbank bauen" "Building the database")" "$BIN" build-db "$DAT" "$FREQ" "$DB" || { result fail "$(tr_ "Datenbank" "Database")" "" "$(secs "$T0")"; cat "$WORKLOG"; finish 1; }
   result ok "$(tr_ "Datenbank" "Database")" "build-db" "$(secs "$T0")"
+fi
+# G and P groups (WMDA files of the same release); without them the groups stay empty
+if [ ! -f "$DB/hla_nom_g.txt" ] || [ ! -f "$DB/hla_nom_p.txt" ]; then
+  T0=$(now)
+  if curl -fsL -o "$DB/hla_nom_g.txt" "$WMDA_URL/hla_nom_g.txt" && curl -fsL -o "$DB/hla_nom_p.txt" "$WMDA_URL/hla_nom_p.txt"; then
+    result ok "$(tr_ "G- und P-Gruppen" "G and P groups")" "hla_nom_g/p" "$(secs "$T0")"
+  else
+    rm -f "$DB/hla_nom_g.txt" "$DB/hla_nom_p.txt"
+    result fail "$(tr_ "G- und P-Gruppen" "G and P groups")" "$(tr_ "weiter ohne" "continuing without")" "$(secs "$T0")"
+  fi
 fi
 if [ ! -f "$DB/panel.fa.mask.bed" ]; then
   askpath "Wiederholungsmaske (einmalig): Genom GRCh38 als FASTA hineinziehen, oder Enter zum Überspringen:" "Repeat mask (once): drop the GRCh38 genome FASTA, or press Enter to skip:" empty

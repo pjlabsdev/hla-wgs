@@ -29,50 +29,84 @@ pub fn date(secs: u64) -> (i64, u32, u32) {
 }
 
 const CSS: &str = "
-:root{--fg:#111;--mut:#6b6b6b;--line:#e3e3e3;--bg:#fff;--acc:#0b57d0;--ok:#1a7f37;--warn:#9a6700;--soft:#f6f6f6}
-@media (prefers-color-scheme:dark){:root{--fg:#eaeaea;--mut:#9a9a9a;--line:#2c2c2c;--bg:#111;--acc:#8ab4f8;--ok:#56d364;--warn:#e3b341;--soft:#1a1a1a}}
+:root{--bg:#FAF9F5;--surface:#FFFFFF;--fg:#141413;--mut:#3F3E38;--soft-fg:#6E6C63;--line:#D8D5C7;--hair:rgba(216,213,199,.78);--acc:#D97757;--acc-t:#B34D30;--ok:#248A3D;--okdot:#34C759;--warn:#B34D30;--soft:#F2F0E8;--shadow:0 1px 2px rgba(20,20,19,.04),0 10px 28px rgba(20,20,19,.055);--r:14px;--ease:cubic-bezier(.22,.61,.36,1)}
+@media (prefers-color-scheme:dark){:root{--bg:#1C1C1E;--surface:#2C2C2E;--fg:#FFFFFF;--mut:rgba(235,235,245,.72);--soft-fg:rgba(235,235,245,.55);--line:#38383A;--hair:rgba(255,255,255,.1);--acc-t:#E38B69;--ok:#30D158;--okdot:#30D158;--warn:#E38B69;--soft:#242426;--shadow:0 1px 2px rgba(0,0,0,.28),0 12px 30px rgba(0,0,0,.3)}}
+@font-face{font-family:'IBM Plex Mono';font-weight:400;font-style:normal;font-display:swap;src:url(data:font/woff2;base64,F400) format('woff2')}
+@font-face{font-family:'IBM Plex Mono';font-weight:500;font-style:normal;font-display:swap;src:url(data:font/woff2;base64,F500) format('woff2')}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:400 14px/1.55 'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-main{max-width:980px;margin:0 auto;padding:40px 24px 56px}
-h1{font-size:22px;font-weight:500;margin:0}
-h2{font-size:13px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:36px 0 10px}
-.sub{color:var(--mut);margin-top:4px}
-.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px}
-.card{border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-.card b{display:block;font-size:20px;font-weight:500}
-.card span{color:var(--mut);font-size:12px}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 14px/1.6 'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;-webkit-font-smoothing:antialiased}
+.bar{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 82%,transparent);-webkit-backdrop-filter:saturate(180%) blur(18px);backdrop-filter:saturate(180%) blur(18px);border-bottom:1px solid var(--hair)}
+.bar-in{max-width:1000px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{font-weight:500;letter-spacing:.02em;font-size:13px}.brand i{font-style:normal;color:var(--acc-t)}
+.seg{display:inline-flex;background:var(--soft);border:1px solid var(--hair);border-radius:999px;padding:3px;gap:2px}
+.seg button{font:inherit;font-size:12px;font-weight:500;background:none;border:0;border-radius:999px;color:var(--soft-fg);padding:5px 14px;cursor:pointer;transition:background 140ms var(--ease),color 140ms var(--ease)}
+.seg button:hover{color:var(--fg)}
+body[data-lang=de] nav.lang button[data-set=de],body[data-lang=en] nav.lang button[data-set=en],body[data-tab=r] nav.tabs button[data-tab=r],body[data-tab=d] nav.tabs button[data-tab=d]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(20,20,19,.12)}
+main{max-width:1000px;margin:0 auto;padding:40px 24px 64px}
+body[data-lang=de] main.l-en,body[data-lang=en] main.l-de{display:none}
+.eyebrow{font-size:12px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--acc-t);margin-bottom:8px}
+h1{font-size:30px;line-height:1.2;font-weight:500;margin:0;letter-spacing:-.01em}
+h2{font-size:12px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--soft-fg);margin:40px 0 12px}
+.sub{color:var(--soft-fg);margin-top:8px;font-size:13px}
+nav.tabs{margin:28px 0 4px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:28px}
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:var(--r);padding:18px 18px 16px;box-shadow:var(--shadow)}
+.card b{display:block;font-size:26px;line-height:1.15;font-weight:500;letter-spacing:-.01em}
+.card span{display:block;margin-top:6px;color:var(--soft-fg);font-size:12px;line-height:1.4}
+.panel{background:var(--surface);border:1px solid var(--hair);border-radius:var(--r);box-shadow:var(--shadow);padding:6px 20px;overflow-x:auto}
 table{width:100%;border-collapse:collapse}
-th{font-weight:500;text-align:left;color:var(--mut);font-size:12px;border-bottom:1px solid var(--fg);padding:6px 10px 6px 0}
-td{border-bottom:1px solid var(--line);padding:8px 10px 8px 0;vertical-align:top}
+th{font-weight:500;text-align:left;color:var(--soft-fg);font-size:11px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--line);padding:12px 12px 10px 0}
+td{border-bottom:1px solid var(--hair);padding:11px 12px 11px 0;vertical-align:top}
+tr:last-child td{border-bottom:0}
 td.g{font-weight:500;white-space:nowrap}
 .call{font-weight:500;white-space:nowrap}
-.full{display:block;color:var(--mut);font-size:12px}
-.d{white-space:nowrap;line-height:1.55}
-th:nth-child(4),td:nth-child(4){width:70px}
-.f{display:inline-block;width:9px;height:9px;border-radius:50%;border:1px solid var(--mut);margin-right:3px}
-.f.on{background:var(--ok);border-color:var(--ok)}
-.note{color:var(--mut);font-size:12px}
+.full{display:block;color:var(--soft-fg);font-size:12px}
+.d{white-space:nowrap;line-height:1.6}
+th:nth-child(4),td:nth-child(4){width:76px}
+.f{display:inline-block;width:8px;height:8px;border-radius:50%;border:1px solid var(--line);margin-right:4px}
+.f.on{background:var(--okdot);border-color:var(--okdot)}
+.note{color:var(--soft-fg);font-size:12px;line-height:1.55}
 .warn{color:var(--warn)}
 .pos{color:var(--warn);font-weight:500}
-.cls td{background:var(--soft);color:var(--mut);font-size:12px;letter-spacing:.06em;text-transform:uppercase;padding:5px 8px;border-bottom:1px solid var(--line)}
-a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
-details{border-bottom:1px solid var(--line);padding:6px 0}
-summary{cursor:pointer;list-style:none}summary::-webkit-details-marker{display:none}
-summary:before{content:'+ ';color:var(--mut)}details[open] summary:before{content:'– '}
-.kv{color:var(--mut);font-size:12px;margin:8px 0}
-.dt{font-size:12px;margin:6px 0 10px}.dt td,.dt th{padding:4px 10px 4px 0}.dt td:last-child{min-width:16em}
+.cls td{background:none;color:var(--acc-t);font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;padding:20px 0 8px;border-bottom:1px solid var(--line)}
+a{color:var(--acc-t);text-decoration:none}a:hover{text-decoration:underline}
+details{background:var(--surface);border:1px solid var(--hair);border-radius:var(--r);margin:0 0 10px;padding:0 20px;box-shadow:0 1px 2px rgba(20,20,19,.04);transition:box-shadow 220ms var(--ease)}
+details[open]{box-shadow:var(--shadow);padding-bottom:12px}
+summary{cursor:pointer;list-style:none;padding:14px 0;display:flex;align-items:baseline;gap:12px}summary::-webkit-details-marker{display:none}
+summary:after{content:'';margin-left:auto;width:7px;height:7px;border-right:1.5px solid var(--soft-fg);border-bottom:1.5px solid var(--soft-fg);transform:rotate(-45deg);transition:transform 220ms var(--ease);align-self:center}
+details[open] summary:after{transform:rotate(45deg)}
+summary b{font-weight:500;min-width:4.5em}
+.kv{color:var(--mut);font-size:12px;margin:10px 0}
+.kv b{color:var(--fg);font-weight:500}
+.dt{font-size:12px;margin:6px 0 12px;background:var(--bg);border-radius:10px}
+.dt th{padding:9px 12px 7px}.dt td{padding:7px 12px}.dt td:last-child{min-width:16em}
+.reason{font-size:12px;color:var(--mut);border-left:2px solid var(--acc);padding:2px 0 2px 10px;margin:4px 0 14px}
 .ok{color:var(--ok)}
-body[data-lang=de] main.l-en,body[data-lang=en] main.l-de{display:none}
-nav.lang{max-width:980px;margin:0 auto;padding:16px 24px 0;text-align:right}
-nav.lang button{font:inherit;font-size:12px;background:none;border:1px solid var(--line);color:var(--mut);padding:3px 10px;cursor:pointer}
-body[data-lang=de] nav.lang button[data-set=de],body[data-lang=en] nav.lang button[data-set=en]{color:var(--fg);border-color:var(--fg)}
-@media print{nav.lang{display:none}}
-footer{margin-top:40px;border-top:1px solid var(--fg);padding-top:14px;color:var(--mut);font-size:12px}
+@media print{.bar,nav.tabs{display:none}section.tab-r,section.tab-d{display:block!important}section.tab-d{break-before:page}}
+body[data-tab=r] section.tab-d,body[data-tab=d] section.tab-r{display:none}
+footer{margin-top:48px;border-top:1px solid var(--line);padding-top:18px;color:var(--soft-fg);font-size:12px}
 footer p{margin:6px 0}
 .cite{color:var(--fg)}
-@media (max-width:720px){.cards{grid-template-columns:repeat(2,1fr)}.hide{display:none}}
-@media print{main{padding:0;max-width:none}a{color:inherit}tr{break-inside:avoid}body{font-size:11px}}
+@media (max-width:720px){.cards{grid-template-columns:repeat(2,1fr)}.hide{display:none}h1{font-size:24px}.panel,details{padding-left:14px;padding-right:14px}}
+@media print{:root{--bg:#fff;--surface:#fff;--shadow:none}main{padding:0;max-width:none}a{color:inherit}tr,details{break-inside:avoid}body{font-size:11px}.card,.panel,details{box-shadow:none}}
 ";
+
+// IBM Plex Mono (SIL Open Font License 1.1, src/fonts/OFL.txt), embedded so the page needs no network
+const FONT400: &[u8] = include_bytes!("fonts/plex-mono-400.woff2");
+const FONT500: &[u8] = include_bytes!("fonts/plex-mono-500.woff2");
+
+fn b64(d: &[u8]) -> String {
+    const A: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut o = String::with_capacity(d.len() / 3 * 4 + 4);
+    for c in d.chunks(3) {
+        let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        for i in 0..4 {
+            o.push(if i <= c.len() { A[(n >> (18 - 6 * i) & 63) as usize] as char } else { '=' });
+        }
+    }
+    o
+}
 
 fn class_of(g: &str) -> u8 {
     match g {
@@ -88,10 +122,11 @@ fn class_of(g: &str) -> u8 {
 /// the page holds the result in German and in English; a switch at the top shows one of them,
 /// the default follows HLA_WGS_LANG / LANG
 pub fn render(rep: &Value, sample: &str) -> String {
+    let css = CSS.replace("F400", &b64(FONT400)).replace("F500", &b64(FONT500));
     let de = german();
     let first = if de { "de" } else { "en" };
     format!(
-        "<!DOCTYPE html>\n<html lang=\"{first}\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>hla-wgs · {}</title>\n<style>{CSS}</style></head><body data-lang=\"{first}\">\n<nav class=\"lang\"><button type=\"button\" data-set=\"de\">Deutsch</button><button type=\"button\" data-set=\"en\">English</button></nav>\n<main lang=\"de\" class=\"l-de\">\n{}</main>\n<main lang=\"en\" class=\"l-en\">\n{}</main>\n<script>\nfunction setL(l){{document.body.dataset.lang=l;document.documentElement.lang=l;try{{localStorage.setItem('hla-wgs-lang',l)}}catch(e){{}}}}\ntry{{const s=localStorage.getItem('hla-wgs-lang');if(s==='de'||s==='en')setL(s)}}catch(e){{}}\ndocument.querySelectorAll('nav.lang button').forEach(b=>b.addEventListener('click',()=>setL(b.dataset.set)));\naddEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));\n</script></body></html>\n",
+        "<!DOCTYPE html>\n<html lang=\"{first}\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>hla-wgs · {}</title>\n<style>{css}</style></head><body data-lang=\"{first}\" data-tab=\"r\">\n<header class=\"bar\"><div class=\"bar-in\"><div class=\"brand\">PJ Labs <i>·</i> hla-wgs</div><nav class=\"lang seg\"><button type=\"button\" data-set=\"de\">Deutsch</button><button type=\"button\" data-set=\"en\">English</button></nav></div></header>\n<main lang=\"de\" class=\"l-de\">\n{}</main>\n<main lang=\"en\" class=\"l-en\">\n{}</main>\n<script>\nfunction setL(l){{document.body.dataset.lang=l;document.documentElement.lang=l;try{{localStorage.setItem('hla-wgs-lang',l)}}catch(e){{}}}}\ntry{{const s=localStorage.getItem('hla-wgs-lang');if(s==='de'||s==='en')setL(s)}}catch(e){{}}\ndocument.querySelectorAll('nav.lang button').forEach(b=>b.addEventListener('click',()=>setL(b.dataset.set)));\ndocument.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{{document.body.dataset.tab=b.dataset.tab;scrollTo(0,0)}}));\naddEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));\n</script></body></html>\n",
         esc(sample),
         render_one(rep, sample, true),
         render_one(rep, sample, false)
@@ -243,10 +278,15 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         ""
     ));
     h.push_str(&format!(
-        "<h1>{}</h1>\n<div class=\"sub\">{} · hla-wgs {} · {day}</div>\n",
-        esc(sample),
+        "<div class=\"eyebrow\">{}</div><h1>{}</h1>\n<div class=\"sub\">hla-wgs {} · {day}</div>\n",
         t("HLA-Typisierung aus dem Genom", "HLA typing from the genome"),
+        esc(sample),
         esc(version)
+    ));
+    h.push_str(&format!(
+        "<nav class=\"tabs seg\"><button type=\"button\" data-tab=\"r\">{}</button><button type=\"button\" data-tab=\"d\">{}</button></nav>\n<section class=\"tab-r\">\n",
+        t("Ergebnis", "Result"),
+        t("Details je Gen", "Details per gene")
     ));
     h.push_str(&format!(
         "<div class=\"cards\"><div class=\"card\"><b>{}</b><span>{}</span></div><div class=\"card\"><b>{n4} / {n_alleles}</b><span>{}</span></div><div class=\"card\"><b>{n_new}</b><span>{}</span></div><div class=\"card\"><b>{carriers}</b><span>{}</span></div></div>\n",
@@ -257,7 +297,7 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         t("pharmakogenetische Treffer", "pharmacogenetic findings")
     ));
     h.push_str(&format!(
-        "<h2>{}</h2>\n<table><thead><tr><th>{}</th><th>{} 1</th><th>{} 2</th><th>{}</th><th class=\"hide\">{}</th></tr></thead><tbody>\n{rows}</tbody></table>\n<p class=\"note\">{}</p>\n",
+        "<h2>{}</h2>\n<div class=\"panel\"><table><thead><tr><th>{}</th><th>{} 1</th><th>{} 2</th><th>{}</th><th class=\"hide\">{}</th></tr></thead><tbody>\n{rows}</tbody></table></div>\n<p class=\"note\">{}</p>\n",
         t("Ergebnis", "Result"),
         t("Gen", "Gene"),
         t("Allel", "Allele"),
@@ -269,17 +309,9 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
             "Shown is the safe call: as many fields of the allele name as the reads support. The dots count these fields. The nearest full name is given below it where it goes further."
         )
     ));
-    h.push_str(&format!(
-        "<h2>{}</h2>\n<p class=\"note\">{}</p>\n{details}",
-        t("Details je Gen", "Details per gene"),
-        t(
-            "Alle Werte aus .tsv und .conf.tsv. Vorsprung: wie viel besser (Log-Likelihood) das gewählte Allel die Reads erklärt als das beste Allel, das sich in diesem Feld unterscheidet; ab der Schwelle gilt das Feld als gesichert. Ein Klick öffnet ein Gen; beim Drucken sind alle offen.",
-            "All values of .tsv and .conf.tsv. Lead: how much better (log-likelihood) the chosen allele explains the reads than the best allele that differs in this field; at or above the threshold the field counts as supported. Click a gene to open it; all are open when printed."
-        )
-    ));
     if !pgx.is_empty() {
         h.push_str(&format!(
-            "<h2>{}</h2>\n<table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th class=\"hide\">{}</th></tr></thead><tbody>\n{pgx}</tbody></table>\n",
+            "<h2>{}</h2>\n<div class=\"panel\"><table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th class=\"hide\">{}</th></tr></thead><tbody>\n{pgx}</tbody></table></div>\n",
             t("Pharmakogenetische Allele", "Pharmacogenetic alleles"),
             t("Allel", "Allele"),
             t("Befund", "Finding"),
@@ -287,6 +319,14 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
             t("Quelle", "Source")
         ));
     }
+    h.push_str(&format!(
+        "</section>\n<section class=\"tab-d\">\n<h2>{}</h2>\n<p class=\"note\">{}</p>\n{details}</section>\n",
+        t("Details je Gen", "Details per gene"),
+        t(
+            "Alle Werte aus .tsv und .conf.tsv. Vorsprung: wie viel besser (Log-Likelihood) das gewählte Allel die Reads erklärt als das beste Allel, das sich in diesem Feld unterscheidet; ab der Schwelle gilt das Feld als gesichert. Ein Klick öffnet ein Gen; beim Drucken sind alle offen.",
+            "All values of .tsv and .conf.tsv. Lead: how much better (log-likelihood) the chosen allele explains the reads than the best allele that differs in this field; at or above the threshold the field counts as supported. Click a gene to open it; all are open when printed."
+        )
+    ));
     h.push_str(&format!(
         "<footer>\n<p class=\"cite\">{}: Jungwirth P. hla-wgs: HLA typing from whole-genome sequencing with a per-allele statement of what is certain. Zenodo. <a href=\"https://doi.org/{DOI}\">https://doi.org/{DOI}</a></p>\n<p>{}: <a href=\"{ARTICLE}\">{ARTICLE}</a> · {}: <a href=\"{SOURCE}\">{SOURCE}</a></p>\n<p>{}</p>\n<p>{}</p>\n</footer>\n",
         t("Zitieren", "Cite"),
@@ -356,7 +396,7 @@ fn gene_details(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static st
             ));
         }
         o.push_str("</table>\n");
-        o.push_str(&format!("<div class=\"kv\">{}: {}</div>\n", t("Grund der Feldzahl", "Why this many fields"), field_reason(name, a, t, thr)));
+        o.push_str(&format!("<div class=\"reason\">{}: {}</div>\n", t("Grund der Feldzahl", "Why this many fields"), field_reason(name, a, t, thr)));
         let sites = a["new_sites"].as_array().cloned().unwrap_or_default();
         if !sites.is_empty() {
             o.push_str(&format!("<table class=\"dt\"><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr>", t("Position im Gen", "Position in the gene"), t("Abweichung", "Difference"), t("Reads dafür / Tiefe", "Reads for it / depth"), t("Hinweis", "Note")));
