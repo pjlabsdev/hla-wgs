@@ -69,6 +69,28 @@ Genes with an estimated copy number also carry `copy_ratio` (depth relative to t
 genes). `margin` values are `null` when no competitor exists at that field; `new_sites` is `null`
 when the allele was not examined.
 
+## PREFIX.novel.fa
+
+Written when at least one allele has new sites that can be applied. One record per such allele:
+
+```
+>B_slot1_new nearest=B*15:03:01:02 changes=4022:G>A
+```
+
+`incomplete=` lists sites that are not part of the sequence (blind stretches, repeat lengths,
+unsupported positions that could not be applied); `phase=uncertain` says that at least one change
+was seen only in reads that fit both alleles. The sequence is a proposal from short reads, not a
+confirmed allele.
+
+## Groups and pharmacogenetic alleles (JSON)
+
+With `hla_nom_g.txt` and `hla_nom_p.txt` (folder `wmda` of the IPD-IMGT/HLA release) in the database
+directory, every allele carries `g_group` and `p_group` (`null` when the allele is alone in its
+group), and the top level has `"groups_loaded": true`. `expression` explains a suffix letter of the
+allele name. `pharmacogenetic_alleles` lists B\*57:01, B\*15:02, A\*31:01 and B\*58:01 with the number
+of copies called and `certain` (all calls concerned are certain at two fields or more). Research use
+only.
+
 ## Environment switches
 
 For experiments; the defaults are the validated configuration.
@@ -76,6 +98,9 @@ For experiments; the defaults are the validated configuration.
 | variable | effect |
 |---|---|
 | `HLA_NONOVEL` | skip the new-allele examination |
+| `HLA_NOREP` | skip the repeat-length examination |
+| `HLA_IO_RETRIES` | number of retries after an input I/O error (default 6) |
+| `HLA_SAVE_READS` | prefix for a FASTQ copy of the read pairs that pass the panel prefilter |
 | `HLA_NOKNOWN` | do not rename a call to the database allele that its new sites describe |
 | `HLA_NOBIG` | count long insertions and deletions per base instead of as one event |
 | `HLA_UNPH` | also cut the fourth field when a sibling allele differs only at positions without phase information (fewer wrong, clearly fewer certain calls) |

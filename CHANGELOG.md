@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased (1.1.0)
+
+- New alleles as sequence: `PREFIX.novel.fa` holds, for every allele with new sites, the nearest
+  database allele with the substitutions, insertions and deletions applied. The header names the
+  nearest allele and the changes, lists what could not be applied (`incomplete=`, for example blind
+  stretches) and marks changes that could belong to either allele (`phase=uncertain`).
+- Repeat lengths: single-base runs of 8 or more and short tandem repeats are examined with the reads
+  that span them with 10 bases on both sides. If these reads agree on another length than the
+  allele has, the site is reported as `rep+N` / `rep-N` and limits the resolution like any other new
+  site. On the 80 development samples this removed one inexact four-field statement and no exact
+  one. Lengths of repeats longer than about 20 bases stay undetermined with short reads.
+- JSON: `g_group` and `p_group` per allele when `hla_nom_g.txt` and `hla_nom_p.txt` of the
+  IPD-IMGT/HLA release lie in the database directory, `expression` for alleles with a suffix
+  (N, L, S, Q, C, A), and `pharmacogenetic_alleles` (B*57:01, B*15:02, A*31:01, B*58:01 with copy
+  count and whether the two-field statement is certain).
+- Input: an I/O error (for example a USB disk that drops out) no longer aborts the run. The input is
+  reopened after a pause and reading resumes after the last record (`HLA_IO_RETRIES`, default 6).
+- `HLA_SAVE_READS=PREFIX` writes the read pairs that pass the panel prefilter as FASTQ; typing these
+  files gives the same result without reading the BAM or CRAM again.
+
 ## 1.0.0 (2026-11-19)
 
 First public release.

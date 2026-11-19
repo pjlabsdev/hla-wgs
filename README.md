@@ -100,6 +100,9 @@ counted; it writes `hladb/panel.fa.mask.bed`. The genome is assumed to be GRCh38
 assembly pass a BED file with the MHC region to exclude as third argument. Validation used
 IPD-IMGT/HLA release 3.66.
 
+Optional: copy `wmda/hla_nom_g.txt` and `wmda/hla_nom_p.txt` of the same release into `hladb/` to get
+G and P groups in the JSON output.
+
 `data/freq_1000g_2field.json` holds two-field allele frequencies of A, B, C, DRB1 and DQB1 counted
 from the public 1000 Genomes laboratory typing (`data/build_freq.py`). They serve as a weak prior
 between otherwise equal candidates.

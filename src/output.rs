@@ -26,6 +26,7 @@ pub fn write(
     drb: &AHashMap<String, f64>,
     nov: &AHashMap<String, [Vec<crate::novel::Site>; 2]>,
     known: &AHashMap<String, [Option<String>; 2]>,
+    grp: &crate::groups::Groups,
     log: &dyn Fn(String),
 ) {
     let mut fh = std::fs::File::create(format!("{prefix}.tsv")).unwrap();
@@ -34,6 +35,8 @@ pub fn write(
     writeln!(fh, "gene\tallele1\tallele2\tcall1\tcall2\tgap\treads\tcopies").unwrap();
     let mut js: Vec<serde_json::Value> = vec![];
     let mut fasta = String::new();
+    // per reported allele: (name, resolution) for the pharmacogenetic summary
+    let mut called: Vec<(String, usize)> = vec![];
     for &g in genes {
         // HLA-H and HLA-K sit in a segment that is deleted on some haplotypes (seen on 19 of 80
         // HPRC samples); copies = reads relative to the always-diploid neighbours F, G, V
@@ -172,8 +175,11 @@ pub fn write(
                     if let Some(rec) = novel_record(g, sl + 1, fin, &a.genomic, v) { fasta.push_str(&rec); }
                 }
             }
+            called.push((shown.clone(), res_));
             jal.push(serde_json::json!({
                 "allele": shown, "safe_call": safe, "resolution": res_,
+                "g_group": grp.g(shown), "p_group": grp.p(shown),
+                "expression": crate::groups::expression(shown),
                 "renamed_from": if renamed { serde_json::json!(fin) } else { serde_json::Value::Null },
                 "margin": {"2": mj(m[0]), "3": mj(m[1]), "4": mj(m[2])},
                 "alternative": {"2": alt[0], "3": alt[1], "4": alt[2]},
@@ -189,6 +195,16 @@ pub fn write(
     let rep = serde_json::json!({
         "tool": "hla-wgs", "version": env!("CARGO_PKG_VERSION"), "schema": "genome.hla.v1",
         "thresholds": {"2": T[0], "3": T[1], "4": T[2]}, "genes": js,
+        "groups_loaded": grp.loaded,
+        "pharmacogenetic_alleles": crate::groups::PGX.iter().map(|(al, drugs)| {
+            let hits: Vec<&(String, usize)> = called.iter().filter(|(n, _)| two(n) == *al).collect();
+            serde_json::json!({
+                "allele": al, "drugs": drugs, "source": "CPIC guideline",
+                "copies": hits.len(),
+                // the two-field statement holds when every carrying call is certain at two fields or more
+                "certain": if hits.is_empty() { let v: Vec<&(String, usize)> = called.iter().filter(|(n, _)| n.split('*').next() == al.split('*').next()).collect(); !v.is_empty() && v.iter().all(|(_, r)| *r >= 2) } else { hits.iter().all(|(_, r)| *r >= 2) },
+            })
+        }).collect::<Vec<_>>(),
     });
     std::fs::write(format!("{prefix}.json"), serde_json::to_string_pretty(&rep).unwrap()).unwrap();
     if !fasta.is_empty() {

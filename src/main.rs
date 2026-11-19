@@ -2,6 +2,7 @@ mod align;
 mod bamin;
 mod builddb;
 mod db;
+mod groups;
 mod kern;
 mod prior;
 mod refine;
@@ -221,7 +222,8 @@ fn main() {
     }
 
     let drb = drb_copies(&ctx, &res, &p.assign, &log);
-    output::write(&out, &genes, &ctx, &res, &depth, &drb, &nov, &known, &log);
+    let grp = groups::Groups::load(std::path::Path::new(&a[1]).parent().unwrap_or(std::path::Path::new(".")));
+    output::write(&out, &genes, &ctx, &res, &depth, &drb, &nov, &known, &grp, &log);
     log("total".to_string());
 }
 
