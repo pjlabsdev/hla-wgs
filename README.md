@@ -62,14 +62,24 @@ All scripts and result tables are in [`validation/`](validation/).
 | 45 further 1000 Genomes samples with laboratory typing (A, B, C, DRB1, DQB1) | 438 / 450 at two fields; of 12 differences 5 are resolution limits of the laboratory method, 3 are probable laboratory errors (B\*27:05 against 27:03), 4 are open |
 | GIAB trios (Ashkenazi, Han Chinese), 60x to 100x | no Mendelian conflict at two or three fields in any gene; none at four fields among calls reported as certain |
 
-The 22 certain four-field calls that are not exact: 9 differ only in the length of a homopolymer or
+With the 1.1 development version (this branch):
+
+| Test | Result |
+|---|---|
+| 80 HPRC samples, 18 genes | two fields 2,486 / 2,489, three fields 2,482 / 2,489; certain at four fields 1,747, of these 1,726 exact (98.8 %) |
+| 59 HGSVC3 samples never used at any stage, assembly truth, 18 genes | two fields 1,833 / 1,833, three fields 1,830 / 1,833; certain at four fields 1,206, of these 1,191 exact (98.8 %) |
+| Eight added genes (DMA, DMB, DOA, DOB, MICA, MICB, TAP1, TAP2), 80 HPRC samples | calls certain to three fields or more with every exon equal to the assembly: 988 / 999; fourth field DMA 153 / 153, DOA 112 / 115, DOB 134 / 136, TAP1 40 / 41; DMB and TAP2 are reported to three fields at most, MICA and MICB do not reach four |
+
+The figures below belong to release 1.0.0. The 22 certain four-field calls that are not exact: 9 differ only in the length of a homopolymer or
 short tandem repeat, 4 are phase swaps at the 3' end of HLA-B that short reads cannot resolve, 9
 are single missed variants in other genes.
 
 The 80 HPRC samples were used to develop the four-field logic. On 30 further HPRC samples that played
 no part in developing these rules (they had been the first held-out round of the two-field typer),
 607 of 621 alleles reported as certain at four fields were exact (97.7 %), two fields 935 / 935 and
-three fields 934 / 935. A test on genomes never used at any stage is still missing.
+three fields 934 / 935. The test on genomes never used at any stage is the HGSVC3 row above
+([`validation/results/hgsvc3_v1.1/`](validation/results/hgsvc3_v1.1/)); the frequency table may
+include laboratory types of some of these samples.
 
 The full report is in [`docs/paper/hla-wgs-report.pdf`](docs/paper/hla-wgs-report.pdf).
 
