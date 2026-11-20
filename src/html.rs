@@ -160,6 +160,9 @@ fn legend(t: &dyn Fn(&'static str, &'static str) -> &'static str, example: &(Str
 fn short_reason(a: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static str, thr: &dyn Fn(&str) -> f64) -> &'static str {
     let r = a["resolution"].as_u64().unwrap_or(0);
     let next = (r + 1).max(2).to_string();
+    if a["gene_cap"].as_bool().unwrap_or(false) {
+        return t("bei diesem Gen in der Validierung nicht verlässlich genug", "not reliable enough for this gene in validation");
+    }
     if a["margin"][next.as_str()].as_f64().map(|m| m < thr(&next)).unwrap_or(false) {
         return t("Reads unterscheiden nicht klar vom nächsten Allel", "reads do not clearly tell it from the next allele");
     }

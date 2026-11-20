@@ -7,13 +7,16 @@ use std::io::Write;
 
 const T: [f64; 3] = [6.0, 6.0, 4.0];
 
-/// Highest resolution that validation against assembly truth supports per gene.
-/// HLA-E: 4th-field differences sit in UTR repeats / span ends and were miscalled with
-/// large margins on HPRC assemblies, so E is never reported safe beyond 3 fields.
-// every gene may reach four fields; HLA-E was capped at three until 1.1 (its fourth field is now exact
-// in 274 of 275 alleles reported certain: 80 HPRC, 30 check and 38 HGSVC3 samples)
-fn max_res(_g: &str) -> usize {
-    4
+/// Highest resolution that validation against assembly truth supports per gene. DMB and TAP2 stay
+/// at three fields: on 80 HPRC samples their fourth field equalled the assembly in only 88 of 106
+/// and 38 of 44 alleles that would have been reported certain (the other genes: about 99 of 100),
+/// while their three-field calls were exact at exon level (158 of 158, 116 of 122). HLA-E was
+/// capped until 1.1 and is not any more.
+fn max_res(g: &str) -> usize {
+    match g {
+        "DMB" | "TAP2" => 3,
+        _ => 4,
+    }
 }
 
 pub fn write(
@@ -167,6 +170,7 @@ pub fn write(
             };
             // resolution never exceeds the gene cap or the number of fields the allele name has
             let res_ = res_full.min(max_res(g)).min(f.len().max(1)).min(new_cap);
+            let gene_cap = res_full.min(f.len().max(1)).min(new_cap) > res_;
             let safe = format!("{}*{}", g, f[..res_.min(f.len()).max(1)].join(":"));
             // no competing allele at a level: print "-" / null instead of the internal 999
             let ms = |x: f64| if x >= 999.0 { "-".to_string() } else { format!("{x:.1}") };
@@ -188,7 +192,7 @@ pub fn write(
             called.push((shown.clone(), res_));
             safes[sl] = safe.split('*').nth(1).unwrap_or("-").to_string();
             jal.push(serde_json::json!({
-                "allele": shown, "safe_call": safe, "resolution": res_,
+                "allele": shown, "safe_call": safe, "resolution": res_, "gene_cap": gene_cap,
                 "g_group": grp.g(shown), "p_group": grp.p(shown),
                 "expression": crate::groups::expression(shown),
                 "renamed_from": if renamed { serde_json::json!(fin) } else { serde_json::Value::Null },

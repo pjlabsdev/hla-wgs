@@ -106,6 +106,9 @@ genes the table lists what else lies on the reads (for example HLA-J, L, DPA2, D
 
 ## Groups and pharmacogenetic alleles (JSON)
 
+`gene_cap` is `true` when the resolution was limited by the gene and not by the reads: DMB and TAP2
+are reported to three fields at most, because their fourth field was not reliable enough in validation.
+
 With `hla_nom_g.txt` and `hla_nom_p.txt` (folder `wmda` of the IPD-IMGT/HLA release) in the database
 directory, every allele carries `g_group` and `p_group` (`null` when the allele is alone in its
 group), and the top level has `"groups_loaded": true`. `expression` explains a suffix letter of the
