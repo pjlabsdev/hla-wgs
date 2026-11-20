@@ -69,6 +69,8 @@ With the 1.1 development version (this branch):
 | 80 HPRC samples, 18 genes | two fields 2,486 / 2,489, three fields 2,482 / 2,489; certain at four fields 1,749, of these 1,728 exact (98.8 %) |
 | 59 HGSVC3 samples never used at any stage, assembly truth, 18 genes | two fields 1,833 / 1,833, three fields 1,830 / 1,833; certain at four fields 1,206, of these 1,191 exact (98.8 %) |
 | Eight added genes (DMA, DMB, DOA, DOB, MICA, MICB, TAP1, TAP2), 80 HPRC samples | calls certain to three fields or more with every exon equal to the assembly: 988 / 999; fourth field DMA 153 / 153, DOA 112 / 115, DOB 134 / 136, TAP1 40 / 41; DMB and TAP2 are reported to three fields at most, MICA and MICB do not reach four |
+| Same 80 samples thinned to 20x, 15x, 10x | two fields 2,485 / 2,481 / 2,476 of 2,489; certain at four fields 1,660 / 1,539 / 1,082, of these exact 98.8 / 98.6 / 97.9 % (`validation/results/depth`) |
+| Second assembly truth (Lai et al. 2024), 40 shared samples, 11 genes | two fields equal in 489 / 492 allele calls of the two truths; no difference traced to an error of ours (`validation/results/lai2024`) |
 
 The figures below belong to release 1.0.0. The 22 certain four-field calls that are not exact: 9 differ only in the length of a homopolymer or
 short tandem repeat, 4 are phase swaps at the 3' end of HLA-B that short reads cannot resolve, 9

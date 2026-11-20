@@ -97,8 +97,15 @@ fn main() {
     if a.get(1).map_or(false, |d| std::path::Path::new(d).is_dir()) {
         let d = a[1].trim_end_matches('/').to_string();
         let f: u32 = std::fs::read_to_string(format!("{d}/format")).ok().and_then(|x| x.trim().parse().ok()).unwrap_or(1);
-        if let Ok(r) = std::fs::read_to_string(format!("{d}/release")) {
-            let _ = output::DB_RELEASE.set(r.trim().to_string());
+        // release of the database: DBDIR/release (written by build-db since 1.1), else the header of
+        // the WMDA G group file of the same release ("# version: IPD-IMGT/HLA 3.66.0")
+        let rel = std::fs::read_to_string(format!("{d}/release")).ok().map(|r| r.trim().to_string()).filter(|r| !r.is_empty()).or_else(|| {
+            std::fs::read_to_string(format!("{d}/hla_nom_g.txt")).ok().and_then(|t| {
+                t.lines().take(10).find_map(|l| l.strip_prefix("# version:").map(|v| v.trim().trim_start_matches("IPD-IMGT/HLA").trim().to_string()))
+            })
+        });
+        if let Some(r) = rel {
+            let _ = output::DB_RELEASE.set(r);
         }
         if f < builddb::DB_FORMAT {
             eprintln!("[db] {d} was built by an older version (format {f}, current {}): results for DMB, DOB, MICA, MICB, TAP1 and TAP2 are better after rebuilding it with build-db", builddb::DB_FORMAT);

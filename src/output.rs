@@ -173,9 +173,18 @@ pub fn write(
                 _ => 4,
             };
             // resolution never exceeds the gene cap or the number of fields the allele name has
-            let res_ = res_full.min(max_res(g)).min(f.len().max(1)).min(new_cap);
+            let mut res_ = res_full.min(max_res(g)).min(f.len().max(1)).min(new_cap);
             let gene_cap = res_full.min(f.len().max(1)).min(new_cap) > res_;
-            let safe = format!("{}*{}", g, f[..res_.min(f.len()).max(1)].join(":"));
+            // The first field has no lead of its own. When the best competitor at two fields belongs to
+            // another allele group and explains the reads about as well (lead below 1), the group is
+            // a coin toss: no field is certain. On 80 HPRC samples such near ties named the wrong group
+            // in 3 of 7 alleles at 30x and 6 of 23 at 10x; a lead up to 6 would also have withheld many
+            // right groups (137 right for 20 wrong at 10x). HLA_FIELD1=0: group always named.
+            let group = |n: &str| n.split('*').nth(1).and_then(|x| x.split(':').next()).unwrap_or("").to_string();
+            if res_full == 1 && m[0] < 1.0 && !renamed && alt[0].contains('*') && group(&alt[0]) != group(shown) && std::env::var("HLA_FIELD1").map_or(true, |v| v != "0") {
+                res_ = 0;
+            }
+            let safe = if res_ == 0 { g.to_string() } else { format!("{}*{}", g, f[..res_.min(f.len()).max(1)].join(":")) };
             // no competing allele at a level: print "-" / null instead of the internal 999
             let ms = |x: f64| if x >= 999.0 { "-".to_string() } else { format!("{x:.1}") };
             let mj = |x: f64| if x >= 999.0 { serde_json::Value::Null } else { serde_json::json!(x) };
@@ -198,7 +207,7 @@ pub fn write(
                 }
             }
             called.push((shown.clone(), res_));
-            safes[sl] = safe.split('*').nth(1).unwrap_or("-").to_string();
+            safes[sl] = safe.split('*').nth(1).unwrap_or("?").to_string();
             jal.push(serde_json::json!({
                 "allele": shown, "safe_call": safe, "resolution": res_, "gene_cap": gene_cap,
                 "g_group": grp.g(shown), "p_group": grp.p(shown),

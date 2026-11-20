@@ -603,6 +603,9 @@ fn field_reason(_gene: &str, a: &Value, t: &dyn Fn(&'static str, &'static str) -
     if r >= 4 || r >= nf {
         return t("alle Felder des Allelnamens gesichert", "all fields of the allele name are supported").to_string();
     }
+    if r == 0 {
+        return format!("{} {}", t("auch die Allelgruppe ist nicht gesichert: ein Allel einer anderen Gruppe erklärt die Reads fast gleich gut", "the allele group is not supported either: an allele of another group explains the reads almost as well"), esc(a["alternative"]["2"].as_str().unwrap_or("")));
+    }
     let next = (r + 1).max(2).to_string();
     if let Some(m) = a["margin"][next.as_str()].as_f64() {
         if m < thr(&next) {

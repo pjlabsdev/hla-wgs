@@ -27,8 +27,8 @@ One line per allele (`slot` 1 or 2).
 | column | meaning |
 |---|---|
 | `allele` | best database allele |
-| `safe_call` | `allele` cut to `resolution` fields |
-| `resolution` | number of fields supported by the reads, 1 to 4 |
+| `safe_call` | `allele` cut to `resolution` fields; only the gene name when `resolution` is 0 |
+| `resolution` | number of fields supported by the reads, 0 to 4; 0 when an allele of another allele group explains the reads about as well (lead at field 2 below 1) |
 | `margin2`, `margin3`, `margin4` | margin to the best competitor that differs at field 2, 3 or 4; `-` when there is none |
 | `alt2`, `alt3`, `alt4` | that competitor |
 | `new_sites` | number of positions at which the reads differ from `allele`; `-` if not examined |

@@ -294,6 +294,9 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
         tot.sort();
         let med = tot[tot.len() / 2].max(1);
         let mut v: Vec<Site> = vec![];
+        // reads a new site needs: five at the usual depth, fewer where the allele is thinly covered
+        // (at 10x a variant on one copy is carried by about five reads, so half of them were missed)
+        let nmin: u32 = std::env::var("HLA_NMIN").ok().and_then(|x| x.parse().ok()).unwrap_or(if med < 12 { 3 } else if med < 18 { 4 } else { 5 });
         let dbg: Option<(String, usize)> = std::env::var("HLA_NOVDBG").ok().and_then(|v| { let mut it = v.split(':'); Some((it.next()?.to_string(), it.next()?.parse().ok()?)) });
         if let Some((dg, dp)) = &dbg {
             if dg == g {
@@ -314,7 +317,7 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
             if *p < own_s + 2 || *p + 2 > own_e {
                 continue;
             }
-            if n < 5 || (n as f64) < need || ds + dsh > 2 * med {
+            if n < nmin || (n as f64) < need || ds + dsh > 2 * med {
                 continue;
             }
             // the first and last bases of a gene attract reads of related genes: ask for near-unanimous reads
@@ -428,6 +431,14 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
             if best >= 30 && total >= 300 {
                 v.push(Site { pos: bstart, what: format!("blind{total}bp"), alt: 0, depth: 0, exon: false, either: false });
             }
+        }
+        if std::env::var("HLA_THINDBG").is_ok() && own_e > own_s + 20 {
+            let mut c = [0usize; 6];
+            for p in own_s + 10..own_e - 10 {
+                let e = dspec[k][p] as f64 + dshared[k][p] as f64 / 2.0;
+                for (i, t) in [2.0, 3.0, 4.0, 5.0, 6.0, 8.0].iter().enumerate() { if e < *t { c[i] += 1; } }
+            }
+            eprintln!("THIN\t{g}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{med}", k + 1, a.name, c[0], c[1], c[2], c[3], c[4], c[5], own_e - own_s);
         }
         v.sort_by_key(|s| s.pos);
         out[k] = v;
