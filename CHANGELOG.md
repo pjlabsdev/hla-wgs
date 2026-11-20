@@ -2,6 +2,7 @@
 
 ## Unreleased (1.1.0)
 
+- A new site that read pairs specific to one allele carry, and that pairs specific to the other allele cover without carrying it, belongs to the first allele even when most reads show it; before, it was listed as "this allele" on one copy and "either allele" on the other. On 80 HPRC samples: certain four-field calls 1731 of 1752 exact (before 1728 of 1749), 10 fewer false sites.
 - Low depth: a new site needs 5 reads at the usual depth, 4 where the allele is covered by fewer than 18 reads and 3 below 12. At 10x a variant of one copy is carried by about five reads, so about half of them were missed and the fourth field looked certain. Certain four-field calls that are not exact on 80 HPRC samples: 10x 23 instead of 36, 15x 22 instead of 27, 20x 20 instead of 22; 30x unchanged (1728 of 1749 exact).
 - The allele group is no longer named as certain when an allele of another group explains the reads about as well (lead at field 2 below 1): `resolution` 0, `safe_call` is the gene name alone. Found in the depth study on HG004, where TAP2 at 20x named group 01 instead of 02. On 80 HPRC samples such near ties named the wrong group in 3 of 7 alleles at 30x.
 - The release of an existing database is read from the header of `hla_nom_g.txt` when `DBDIR/release` is missing, so references built before this change also name it.

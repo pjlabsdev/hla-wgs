@@ -449,7 +449,7 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
         }
     }
     if na == 2 && std::env::var("HLA_NOPHASE").is_err() {
-        phase_shared(&mut out, &links, &firm, &own);
+        phase_shared(&mut out, &links, &firm, &own, &dspec);
     }
     if hom {
         // one allele called twice: a site carried by about half the reads belongs to one copy only
@@ -465,7 +465,7 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
 /// carry, belongs to that allele alone; (b) a site that shared pairs show together with an
 /// assigned site (same pairs carry both, hardly any carry only one) belongs to the same allele.
 /// The assigned allele keeps the site as its own, the other allele loses it.
-fn phase_shared(out: &mut [Vec<Site>; 2], links: &[[(Vec<(usize, usize)>, Vec<(usize, String)>); 2]], firm: &[AHashMap<(usize, String), u32>; 2], own: &[(usize, usize); 2]) {
+fn phase_shared(out: &mut [Vec<Site>; 2], links: &[[(Vec<(usize, usize)>, Vec<(usize, String)>); 2]], firm: &[AHashMap<(usize, String), u32>; 2], own: &[(usize, usize); 2], dspec: &[Vec<u32>]) {
     let plain = |s: &Site| !s.what.contains('(') && !s.what.contains(':') && !s.what.starts_with("rep") && !s.what.starts_with("blind") && s.what != "break";
     // position on allele 1 of a difference seen on allele 0, from pairs that show the same differences on both
     let mut map: AHashMap<(usize, String), AHashMap<usize, u32>> = AHashMap::new();
@@ -512,7 +512,14 @@ fn phase_shared(out: &mut [Vec<Site>; 2], links: &[[(Vec<(usize, usize)>, Vec<(u
         let (a, b) = (&out[0][i], &out[1][j]);
         let f0 = firm[0].get(&(a.pos, a.what.clone())).copied().unwrap_or(0);
         let f1 = firm[1].get(&(b.pos, b.what.clone())).copied().unwrap_or(0);
-        if !(het(a) && het(b)) { None } else if f0 >= 3 && f1 == 0 { Some(0) } else if f1 >= 3 && f0 == 0 { Some(1) } else { None }
+        if f0 >= 3 && f1 == 0 && !a.either && b.either && dspec[1][b.pos] >= 3 && std::env::var("HLA_NOFIRM").is_err() {
+            // the site is carried by pairs specific to allele 0, and pairs specific to allele 1 cover it
+            // without it: it belongs to allele 0 even when most reads carry it (seen as "this allele" on
+            // one copy and "either allele" on the other)
+            Some(0)
+        } else if f1 >= 3 && f0 == 0 && !b.either && a.either && dspec[0][a.pos] >= 3 && std::env::var("HLA_NOFIRM").is_err() {
+            Some(1)
+        } else if !(het(a) && het(b)) { None } else if f0 >= 3 && f1 == 0 { Some(0) } else if f1 >= 3 && f0 == 0 { Some(1) } else { None }
     }).collect();
     // what a shared pair shows at a site, on allele 0: Some(true) the variant, Some(false) the allele's base
     let state = |l: &[(Vec<(usize, usize)>, Vec<(usize, String)>); 2], s: &Site| -> Option<bool> {

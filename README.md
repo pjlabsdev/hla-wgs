@@ -66,7 +66,7 @@ With the 1.1 development version (this branch):
 
 | Test | Result |
 |---|---|
-| 80 HPRC samples, 18 genes | two fields 2,486 / 2,489, three fields 2,482 / 2,489; certain at four fields 1,749, of these 1,728 exact (98.8 %) |
+| 80 HPRC samples, 18 genes | two fields 2,486 / 2,489, three fields 2,482 / 2,489; certain at four fields 1,752, of these 1,731 exact (98.8 %) |
 | 59 HGSVC3 samples never used at any stage, assembly truth, 18 genes | two fields 1,833 / 1,833, three fields 1,830 / 1,833; certain at four fields 1,206, of these 1,191 exact (98.8 %) |
 | Eight added genes (DMA, DMB, DOA, DOB, MICA, MICB, TAP1, TAP2), 80 HPRC samples | calls certain to three fields or more with every exon equal to the assembly: 988 / 999; fourth field DMA 153 / 153, DOA 112 / 115, DOB 134 / 136, TAP1 40 / 41; DMB and TAP2 are reported to three fields at most, MICA and MICB do not reach four |
 | Same 80 samples thinned to 20x, 15x, 10x | two fields 2,485 / 2,481 / 2,476 of 2,489; certain at four fields 1,660 / 1,539 / 1,082, of these exact 98.8 / 98.6 / 97.9 % (`validation/results/depth`) |
