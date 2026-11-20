@@ -122,6 +122,7 @@ For experiments; the defaults are the validated configuration.
 | `HLA_NONOVEL` | skip the new-allele examination |
 | `HLA_NOREP` | skip the repeat-length examination |
 | `HLA_IO_RETRIES` | number of retries after an input I/O error (default 6); wrong or damaged content (no index, truncated file, not a FASTQ) is not retried but reported at once |
+| `HLA_FULLKMERS` | set to use all panel 21-mers in the FASTQ prefilter, including those inside the repeat mask (slower, the behaviour before 1.1) |
 | `HLA_SAVE_READS` | prefix for a FASTQ copy of the read pairs that pass the panel prefilter |
 | `HLA_NOKNOWN` | do not rename a call to the database allele that its new sites describe |
 | `HLA_NOBIG` | count long insertions and deletions per base instead of as one event |

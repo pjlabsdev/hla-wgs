@@ -2,6 +2,7 @@
 
 ## Unreleased (1.1.0)
 
+- FASTQ input is faster: the 21-mer prefilter no longer uses 21-mers that lie inside the repeat mask (Alu, L1 and other copies found all over the genome). Pairs with only such seeds were aligned and then dropped by the mask rule anyway. On the 80 development samples no allele, safe call or resolution changed and the accuracy figures are identical; single read counts of sites differ in 31 samples. `HLA_FULLKMERS=1` restores the old prefilter.
 - New sites are assigned to one allele where the reads allow it: a site in a stretch where both alleles are identical used to be listed for both ("either"). It now goes to the allele whose own read pairs carry it, or whose assigned sites the same pairs carry along with it; the other allele loses it. On the 80 development samples the reported sites that are not in the assembly fell from 246 to 158, ten more true sites are attributed correctly, and seven more alleles are reported certain at four fields, all exact (1726 of 1747).
 - `build-db` reports a file that is not an hla.dat instead of aborting with a trace.
 

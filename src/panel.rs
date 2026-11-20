@@ -73,12 +73,12 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
     al.mapopt.best_n = std::env::var("MM2N").ok().and_then(|v| v.parse().ok()).unwrap_or(20);
     // exact 21-mer prefilter: minimap2 sr seeds are exact 21-mers, so a pair without any shared
     // 21-mer cannot get a hit; skipping it changes nothing but saves its seeding
-    let set = panel_kmers(panel);
     let pair_rule = std::env::var("HLA_PAIR").is_ok();
     // repeat mask: intervals of panel alleles whose 21-mers recur elsewhere in the genome. A pair counts for a
     // gene only if one mate aligns with at least MASK_ANCHOR bases outside the mask, so reads of repeat copies
     // from other chromosomes cannot enter through an intronic Alu or L1 copy
     let mask = load_mask(panel);
+    let set = panel_kmers(panel, &mask);
     // read the next batch while the current one is mapped
     let (tx, rx) = std::sync::mpsc::sync_channel::<(Vec<crate::util::Fq>, Vec<crate::util::Fq>)>(2);
     let inp = match input {
@@ -290,22 +290,44 @@ fn for_kmers(s: &[u8], mut f: impl FnMut(u64) -> bool) -> bool {
     false
 }
 
-fn panel_kmers(panel: &str) -> AHashSet<u64> {
+/// 21-mers of the panel for the prefilter. 21-mers that lie wholly inside a repeat-mask interval are
+/// left out: a pair needs 40 aligned bases outside the mask to count for a gene, so a pair whose only
+/// seeds are repeat 21-mers (Alu, L1 copies from all over the genome) would be aligned and then
+/// dropped. Without them the prefilter passes far fewer pairs of a whole-genome FASTQ.
+fn panel_kmers(panel: &str, mask: &AHashMap<String, Vec<(i64, i64)>>) -> AHashSet<u64> {
     let mut fa = String::new();
     open_reader(panel).read_to_string(&mut fa).unwrap();
     let mut set = AHashSet::with_capacity(8 << 20);
+    let mut rep: AHashSet<u64> = AHashSet::new();
     let mut seq: Vec<u8> = vec![];
+    let mut name = String::new();
+    let lean = std::env::var("HLA_FULLKMERS").is_err();
     for l in fa.lines().chain(std::iter::once(">")) {
-        if l.starts_with('>') {
+        if let Some(h) = l.strip_prefix('>') {
             for_kmers(&seq, |k| {
                 set.insert(k);
                 false
             });
+            if lean {
+                for &(a, b) in mask.get(name.as_str()).map(|v| v.as_slice()).unwrap_or(&[]) {
+                    let (a, b) = ((a.max(0) as usize).min(seq.len()), (b.max(0) as usize).min(seq.len()));
+                    if b > a {
+                        for_kmers(&seq[a..b], |k| {
+                            rep.insert(k);
+                            false
+                        });
+                    }
+                }
+            }
             seq.clear();
+            name = h.split_whitespace().next().unwrap_or("").to_string();
         } else {
             seq.extend_from_slice(l.trim().as_bytes());
         }
     }
+    let n = set.len();
+    set.retain(|k| !rep.contains(k));
+    eprintln!("[prefilter] {} panel 21-mers, {} inside the repeat mask left out", n, n - set.len());
     set
 }
 
