@@ -6,8 +6,8 @@
 set -u
 case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in *UTF-8*) ;; *) export LC_CTYPE=en_US.UTF-8 ;; esac
 
-HLA_DAT_URL="https://github.com/ANHIG/IMGTHLA/raw/3660/hla.dat.zip"
-WMDA_URL="https://github.com/ANHIG/IMGTHLA/raw/3660/wmda"
+# release the shipped repeat mask belongs to; HLA_WGS_RELEASE selects another one
+BASE_REL="3.66"
 FREQ_URL="https://raw.githubusercontent.com/pjlabsdev/hla-wgs/main/data/freq_1000g_2field.json"
 MASK_URL="https://raw.githubusercontent.com/pjlabsdev/hla-wgs/main/data/panel_mask_3.66.bed"
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -133,48 +133,78 @@ if [ -z "$BIN" ]; then
 fi
 
 # ── reference: HLA_WGS_DB, else ref/hladb in the folder of this file (built there on the first start) ──
-DB="${HLA_WGS_DB:-$HERE/ref/hladb}"
+# Another IPD-IMGT/HLA release in one step: HLA_WGS_RELEASE=3.67 builds ref/hladb_3.67 beside the
+# 3.66 reference and carries the repeat mask over from it (no genome needed).
+REL="${HLA_WGS_RELEASE:-$BASE_REL}"
+case "$REL" in
+  [0-9].[0-9][0-9]|[0-9].[0-9][0-9].[0-9]) REL="$(printf '%s' "$REL" | cut -d. -f1,2)" ;;
+  *) printf '\n  %s%s %s%s\n' "$ERR" "$(tr_ "HLA_WGS_RELEASE muss wie 3.67 aussehen:" "HLA_WGS_RELEASE must look like 3.67:")" "$REL" "$RST"; finish 1 ;;
+esac
+BASE_DB="$HERE/ref/hladb"
+if [ "$REL" = "$BASE_REL" ]; then DB="${HLA_WGS_DB:-$BASE_DB}"; else DB="${HLA_WGS_DB:-$HERE/ref/hladb_$REL}"; fi
+relbranch() { printf '%s' "$1" | awk -F. '{ printf "%d%02d0", $1, $2 }'; }  # 3.66 -> 3660
 
-# a database built by an older program version is rebuilt (format number in $DB/format)
-DBFMT_HAVE="$(cat "$DB/format" 2>/dev/null || echo 1)"
 DBFMT_NEED="$("$BIN" --db-format 2>/dev/null || echo 1)"
-case "$DBFMT_HAVE$DBFMT_NEED" in *[!0-9]*) DBFMT_HAVE=1; DBFMT_NEED=1 ;; esac
-DBOLD=0
-if [ -f "$DB/hladb.json.gz" ] && [ "$DBFMT_HAVE" -lt "$DBFMT_NEED" ]; then DBOLD=1; fi
-if [ ! -f "$DB/hladb.json.gz" ] || [ ! -f "$DB/panel.fa" ] || [ "$DBOLD" = 1 ]; then
-  WORK="$(dirname "$DB")"; mkdir -p "$DB"
-  printf '\n'
-  if [ "$DBOLD" = 1 ]; then
-    row 2 "$(tr_ "Referenz wird erneuert" "Reference is renewed")" "IPD-IMGT/HLA 3.66" "$ACC"
-    printf '  %s%s%s\n' "$MUT" "$(tr_ "Diese Programmversion baut die Referenz genauer (DMB, DOB, MICA, MICB, TAP1, TAP2)." "This program version builds a more accurate reference (DMB, DOB, MICA, MICB, TAP1, TAP2).")" "$RST"
-  else
-    row 2 "$(tr_ "Einmalige Einrichtung" "One-time setup")" "IPD-IMGT/HLA 3.66" "$ACC"
+case "$DBFMT_NEED" in *[!0-9]*|"") DBFMT_NEED=1 ;; esac
+dbformat() { local f; f="$(cat "$1/format" 2>/dev/null || echo 1)"; case "$f" in *[!0-9]*|"") f=1 ;; esac; printf '%s' "$f"; }
+
+build_ref() {  # build_ref DIR RELEASE ASK: download hla.dat of the release (ASK=1: or take a dropped one) and build the database
+  local db="$1" rel="$2" work dat freq
+  work="$(dirname "$db")"; mkdir -p "$db"
+  printf '  %s%s%s\n' "$MUT" "$db" "$RST"
+  dat=""
+  if [ "$3" = 1 ]; then
+    askpath "hla.dat hineinziehen oder Pfad eingeben, oder nur Enter zum Herunterladen (etwa 45 MB):" "Drop hla.dat or enter its path, or just press Enter to download it (about 45 MB):" empty
+    dat="$REPLY_PATH"
   fi
-  printf '  %s%s%s\n' "$MUT" "$DB" "$RST"
-  askpath "hla.dat hineinziehen oder Pfad eingeben, oder nur Enter zum Herunterladen (etwa 45 MB):" "Drop hla.dat or enter its path, or just press Enter to download it (about 45 MB):" empty
-  DAT="$REPLY_PATH"
   printf '\n'
-  if [ -z "$DAT" ]; then
-    download "$HLA_DAT_URL" "$WORK/hla.dat.zip" || { result fail "Download" "" "$(secs "$T0")"; finish 1; }
-    result ok "Download" "$(awk -v s="$(stat -f %z "$WORK/hla.dat.zip" 2>/dev/null || echo 0)" 'BEGIN{printf "%.1f MB", s/1048576}')" "$(secs "$T0")"
-    step "$(tr_ "Entpacken" "Unpacking")" unzip -o -q "$WORK/hla.dat.zip" -d "$WORK" || { result fail "$(tr_ "Entpacken" "Unpacking")" "" "$(secs "$T0")"; finish 1; }
+  T0=$(now)
+  if [ -z "$dat" ]; then
+    download "https://github.com/ANHIG/IMGTHLA/raw/$(relbranch "$rel")/hla.dat.zip" "$work/hla.dat.zip" || { result fail "Download" "IPD-IMGT/HLA $rel" "$(secs "$T0")"; finish 1; }
+    result ok "Download" "$(awk -v s="$(stat -f %z "$work/hla.dat.zip" 2>/dev/null || stat -c %s "$work/hla.dat.zip" 2>/dev/null || echo 0)" 'BEGIN{printf "%.1f MB", s/1048576}')" "$(secs "$T0")"
+    step "$(tr_ "Entpacken" "Unpacking")" unzip -o -q "$work/hla.dat.zip" -d "$work" || { result fail "$(tr_ "Entpacken" "Unpacking")" "" "$(secs "$T0")"; finish 1; }
     result ok "$(tr_ "Entpacken" "Unpacking")" "hla.dat" "$(secs "$T0")"
-    DAT="$WORK/hla.dat"
+    dat="$work/hla.dat"
   fi
-  FREQ="$HERE/freq_1000g_2field.json"
-  [ -f "$FREQ" ] || FREQ="$HERE/../data/freq_1000g_2field.json"
-  if [ ! -f "$FREQ" ]; then
-    FREQ="$WORK/freq_1000g_2field.json"
-    [ -f "$FREQ" ] || curl -fsL -o "$FREQ" "$FREQ_URL" || { result fail "$(tr_ "Häufigkeitstabelle" "Frequency table")" "" ""; finish 1; }
+  freq="$HERE/freq_1000g_2field.json"
+  [ -f "$freq" ] || freq="$HERE/../data/freq_1000g_2field.json"
+  if [ ! -f "$freq" ]; then
+    freq="$work/freq_1000g_2field.json"
+    [ -f "$freq" ] || curl -fsL -o "$freq" "$FREQ_URL" || { result fail "$(tr_ "Häufigkeitstabelle" "Frequency table")" "" ""; finish 1; }
   fi
-  step "$(tr_ "Datenbank bauen" "Building the database")" "$BIN" build-db "$DAT" "$FREQ" "$DB" || { result fail "$(tr_ "Datenbank" "Database")" "" "$(secs "$T0")"; cat "$WORKLOG"; finish 1; }
+  step "$(tr_ "Datenbank bauen" "Building the database")" "$BIN" build-db "$dat" "$freq" "$db" || { result fail "$(tr_ "Datenbank" "Database")" "" "$(secs "$T0")"; cat "$WORKLOG"; finish 1; }
   result ok "$(tr_ "Datenbank" "Database")" "build-db" "$(secs "$T0")"
   # the downloaded hla.dat is only needed for the build (about 390 MB); a dropped one is left alone
-  if [ "$DAT" = "$WORK/hla.dat" ]; then rm -f "$WORK/hla.dat" "$WORK/hla.dat.zip"; fi
+  if [ "$dat" = "$work/hla.dat" ]; then rm -f "$work/hla.dat" "$work/hla.dat.zip"; fi
+}
+shipped_mask() {  # repeat mask of the 3.66 panel (allele names and intervals only): next to this file, in the repository, or downloaded
+  local c
+  for c in "$HERE/panel_mask_3.66.bed" "$HERE/../data/panel_mask_3.66.bed"; do
+    if [ -s "$c" ]; then cp "$c" "$1/panel.fa.mask.bed"; break; fi
+  done
+  [ -s "$1/panel.fa.mask.bed" ] || curl -fsL -o "$1/panel.fa.mask.bed" "$MASK_URL" || rm -f "$1/panel.fa.mask.bed"
+  [ -s "$1/panel.fa.mask.bed" ]
+}
+
+# a database built by an older program version is rebuilt (format number in $DB/format)
+DBOLD=0
+if [ -f "$DB/hladb.json.gz" ] && [ "$(dbformat "$DB")" -lt "$DBFMT_NEED" ]; then DBOLD=1; fi
+if [ ! -f "$DB/hladb.json.gz" ] || [ ! -f "$DB/panel.fa" ] || [ "$DBOLD" = 1 ]; then
+  printf '\n'
+  if [ "$DBOLD" = 1 ]; then
+    row 2 "$(tr_ "Referenz wird erneuert" "Reference is renewed")" "IPD-IMGT/HLA $REL" "$ACC"
+    printf '  %s%s%s\n' "$MUT" "$(tr_ "Diese Programmversion baut die Referenz genauer (DMB, DOB, MICA, MICB, TAP1, TAP2)." "This program version builds a more accurate reference (DMB, DOB, MICA, MICB, TAP1, TAP2).")" "$RST"
+  else
+    row 2 "$(tr_ "Einmalige Einrichtung" "One-time setup")" "IPD-IMGT/HLA $REL" "$ACC"
+  fi
+  # a rebuilt panel needs its mask again when the release is not the shipped one
+  [ "$REL" = "$BASE_REL" ] || rm -f "$DB/panel.fa.mask.bed"
+  if [ "$REL" = "$BASE_REL" ]; then build_ref "$DB" "$REL" 1; else build_ref "$DB" "$REL" 0; fi
 fi
 # G and P groups (WMDA files of the same release); without them the groups stay empty
 if [ ! -f "$DB/hla_nom_g.txt" ] || [ ! -f "$DB/hla_nom_p.txt" ]; then
   T0=$(now)
+  WMDA_URL="https://github.com/ANHIG/IMGTHLA/raw/$(relbranch "$REL")/wmda"
   if curl -fsL -o "$DB/hla_nom_g.txt" "$WMDA_URL/hla_nom_g.txt" && curl -fsL -o "$DB/hla_nom_p.txt" "$WMDA_URL/hla_nom_p.txt"; then
     result ok "$(tr_ "G- und P-Gruppen" "G and P groups")" "hla_nom_g/p" "$(secs "$T0")"
   else
@@ -182,15 +212,25 @@ if [ ! -f "$DB/hla_nom_g.txt" ] || [ ! -f "$DB/hla_nom_p.txt" ]; then
     result fail "$(tr_ "G- und P-Gruppen" "G and P groups")" "$(tr_ "weiter ohne" "continuing without")" "$(secs "$T0")"
   fi
 fi
-# repeat mask for the 3.66 panel (allele names and intervals only): shipped next to this file, in the
-# repository, or downloaded; building it from a GRCh38 FASTA remains possible
+# repeat mask: shipped for the 3.66 panel; for another release it is carried over from the 3.66
+# reference (set up first if it is missing); building it from a GRCh38 FASTA remains possible
 if [ ! -f "$DB/panel.fa.mask.bed" ]; then
   T0=$(now)
-  for c in "$HERE/panel_mask_3.66.bed" "$HERE/../data/panel_mask_3.66.bed"; do
-    if [ -s "$c" ]; then cp "$c" "$DB/panel.fa.mask.bed"; break; fi
-  done
-  [ -s "$DB/panel.fa.mask.bed" ] || curl -fsL -o "$DB/panel.fa.mask.bed" "$MASK_URL" || rm -f "$DB/panel.fa.mask.bed"
-  [ -s "$DB/panel.fa.mask.bed" ] && result ok "$(tr_ "Wiederholungsmaske" "Repeat mask")" "IMGT 3.66" "$(secs "$T0")"
+  if [ "$REL" = "$BASE_REL" ]; then
+    shipped_mask "$DB" && result ok "$(tr_ "Wiederholungsmaske" "Repeat mask")" "IMGT $BASE_REL" "$(secs "$T0")"
+  else
+    if [ ! -f "$BASE_DB/panel.fa" ]; then
+      row 2 "$(tr_ "Vorlage für die Wiederholungsmaske" "Template for the repeat mask")" "IPD-IMGT/HLA $BASE_REL" "$ACC"
+      build_ref "$BASE_DB" "$BASE_REL" 0
+    fi
+    [ -s "$BASE_DB/panel.fa.mask.bed" ] || shipped_mask "$BASE_DB"
+    T0=$(now)
+    if [ -s "$BASE_DB/panel.fa.mask.bed" ] && step "$(tr_ "Wiederholungsmaske übertragen" "Carrying the repeat mask over")" "$BIN" build-mask "$DB" --from "$BASE_DB" && [ -s "$DB/panel.fa.mask.bed" ]; then
+      result ok "$(tr_ "Wiederholungsmaske" "Repeat mask")" "$(tr_ "übertragen von" "carried over from") $BASE_REL" "$(secs "$T0")"
+    else
+      rm -f "$DB/panel.fa.mask.bed"
+    fi
+  fi
 fi
 if [ ! -f "$DB/panel.fa.mask.bed" ]; then
   printf '  %s%s%s\n' "$ERR" "$(tr_ "Ohne Wiederholungsmaske ist das Ergebnis weniger zuverlässig." "Without the repeat mask the result is less reliable.")" "$RST"

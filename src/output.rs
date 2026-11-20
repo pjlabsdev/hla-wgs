@@ -7,6 +7,9 @@ use std::io::Write;
 
 const T: [f64; 3] = [6.0, 6.0, 4.0];
 
+/// IPD-IMGT/HLA release of the database (file DBDIR/release, written by build-db)
+pub static DB_RELEASE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
 /// Highest resolution that validation against assembly truth supports per gene. DMB and TAP2 stay
 /// at three fields: on 80 HPRC samples their fourth field equalled the assembly in only 88 of 106
 /// and 38 of 44 alleles that would have been reported certain (the other genes: about 99 of 100),
@@ -37,6 +40,7 @@ pub fn write(
     writeln!(fh, "gene\tallele1\tallele2\tcall1\tcall2\tgap\treads\tcopies").unwrap();
     let mut js: Vec<serde_json::Value> = vec![];
     let mut fasta = String::new();
+    let mut sheet = String::new();
     // per reported allele: (name, resolution) for the pharmacogenetic summary
     let mut called: Vec<(String, usize)> = vec![];
     for &g in genes {
@@ -184,9 +188,13 @@ pub fn write(
             let nd = if renamed { format!("known:{fin}+{nd}") } else { nd };
             let nc = if renamed { "0".to_string() } else { ns.map(|v| v.len().to_string()).unwrap_or_else(|| "-".to_string()) };
             writeln!(cf, "{g}\t{}\t{shown}\t{safe}\t{res_}\t{}\t{}\t{}\t{}\t{}\t{}\t{nc}\t{}", sl + 1, ms(m[0]), ms(m[1]), ms(m[2]), alt[0], alt[1], alt[2], if nd.is_empty() { "-" } else { nd.as_str() }).unwrap();
+            let fa = al.iter().find(|a| a.name == *fin);
             if !renamed {
-                if let (Some(v), Some(a)) = (ns, al.iter().find(|a| a.name == *fin)) {
-                    if let Some(rec) = novel_record(g, sl + 1, fin, &a.genomic, v) { fasta.push_str(&rec); }
+                if let (Some(v), Some(a)) = (ns, fa) {
+                    if let Some((rec, applied)) = novel_record(g, sl + 1, fin, &a.genomic, v) {
+                        fasta.push_str(&rec);
+                        sheet.push_str(&novel_rows(g, sl + 1, a, v, &applied));
+                    }
                 }
             }
             called.push((shown.clone(), res_));
@@ -198,7 +206,11 @@ pub fn write(
                 "renamed_from": if renamed { serde_json::json!(fin) } else { serde_json::Value::Null },
                 "margin": {"2": mj(m[0]), "3": mj(m[1]), "4": mj(m[2])},
                 "alternative": {"2": alt[0], "3": alt[1], "4": alt[2]},
-                "new_sites": if renamed { Some(vec![]) } else { ns.map(|v| v.iter().map(|s| serde_json::json!({"pos": s.pos + 1, "change": s.what, "reads": s.alt, "depth": s.depth, "exon": s.exon, "either_allele": s.either})).collect::<Vec<_>>()) },
+                "new_sites": if renamed { Some(vec![]) } else { ns.map(|v| v.iter().map(|s| {
+                    let an = fa.map(|a| annotate(a, s.pos, &s.what));
+                    serde_json::json!({"pos": s.pos + 1, "change": s.what, "reads": s.alt, "depth": s.depth, "exon": s.exon, "either_allele": s.either,
+                        "region": an.as_ref().map(|x| x.region.clone()), "effect": an.as_ref().map(|x| x.effect.clone())})
+                }).collect::<Vec<_>>()) },
             }));
         }
         // call1/call2: the safe call (the fields the reads support), without the gene prefix
@@ -212,6 +224,7 @@ pub fn write(
     let rep = serde_json::json!({
         "tool": "hla-wgs", "version": env!("CARGO_PKG_VERSION"), "schema": "genome.hla.v1",
         "thresholds": {"2": T[0], "3": T[1], "4": T[2]}, "genes": js,
+        "database_release": DB_RELEASE.get(),
         "groups_loaded": grp.loaded,
         "repeat_mask": crate::panel::MASK_LOADED.load(std::sync::atomic::Ordering::Relaxed),
         "pharmacogenetic_alleles": crate::groups::PGX.iter().map(|(al, drugs)| {
@@ -229,6 +242,12 @@ pub fn write(
     std::fs::write(format!("{prefix}.html"), crate::html::render(&rep, &sample)).unwrap();
     if !fasta.is_empty() {
         std::fs::write(format!("{prefix}.novel.fa"), fasta).unwrap();
+        let head = format!("# hla-wgs {}: candidates for new alleles, one line per difference from the nearest database allele\n\
+# pos counts from the first base of that allele's genomic sequence, cds_pos and the codon number from the start codon\n\
+# a proposal from short reads is not a confirmed allele: before a submission to IPD-IMGT/HLA the sequence normally has to be\n\
+# confirmed independently (for example by long reads or Sanger sequencing of the separated allele); see the database's current guidelines\n\
+gene\tslot\trecord\tnearest_allele\tpos\tchange\tregion\tcds_pos\teffect\treads\tdepth\tassignment\tin_sequence\tstatus\n", env!("CARGO_PKG_VERSION"));
+        std::fs::write(format!("{prefix}.novel.tsv"), head + &sheet).unwrap();
     }
 }
 
@@ -236,7 +255,7 @@ pub fn write(
 /// and deletions applied. The header names the nearest allele and the applied changes, and says when
 /// the sequence is incomplete (blind stretches, unresolved repeat lengths) or when a change could
 /// belong to either allele.
-fn novel_record(g: &str, slot: usize, name: &str, genomic: &[u8], sites: &[crate::novel::Site]) -> Option<String> {
+fn novel_record(g: &str, slot: usize, name: &str, genomic: &[u8], sites: &[crate::novel::Site]) -> Option<(String, Vec<String>)> {
     let mut seq = genomic.to_vec();
     let mut applied = vec![];
     let mut open = vec![];
@@ -279,5 +298,120 @@ fn novel_record(g: &str, slot: usize, name: &str, genomic: &[u8], sites: &[crate
         out.push_str(std::str::from_utf8(c).unwrap_or(""));
         out.push('\n');
     }
-    Some(out)
+    Some((out, applied))
+}
+
+/// Where a position of an allele's genomic sequence lies and what a change there does to the protein.
+pub struct Ann {
+    pub region: String,
+    /// 1-based position in the coding sequence (exons joined, from the start codon)
+    pub cds_pos: Option<usize>,
+    pub effect: String,
+}
+
+fn amino(c: &[u8]) -> char {
+    const T: &[u8] = b"FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG";
+    let ix = |b: u8| match b { b'T' => Some(0), b'C' => Some(1), b'A' => Some(2), b'G' => Some(3), _ => None };
+    match (ix(c[0]), ix(c[1]), ix(c[2])) {
+        (Some(a), Some(b), Some(d)) => T[a * 16 + b * 4 + d] as char,
+        _ => 'X',
+    }
+}
+
+/// Region (exon, intron, untranslated end) of position `p` and the effect of the change `what`.
+/// Codons are counted from the start codon; each change is judged on its own.
+pub fn annotate(a: &crate::db::Allele, p: usize, what: &str) -> Ann {
+    // exons located on the genomic sequence, in exon order
+    let mut ex: Vec<(u32, usize, usize)> = vec![];
+    let mut all = !a.exons.is_empty();
+    for (k, e) in &a.exons {
+        match a.genomic.windows(e.len().max(1)).position(|w| w == e.as_slice()) {
+            Some(s) if !e.is_empty() => ex.push((*k, s, s + e.len())),
+            _ => all = false,
+        }
+    }
+    ex.sort_by_key(|x| x.1);
+    let none = |region: String, effect: &str| Ann { region, cds_pos: None, effect: effect.to_string() };
+    if ex.is_empty() {
+        return none("-".to_string(), "-");
+    }
+    let w = what.trim_end_matches("(unsupported)");
+    let Some(i) = ex.iter().position(|&(_, s, e)| p >= s && p < e) else {
+        if p < ex[0].1 { return none("5' UTR".to_string(), "non-coding"); }
+        if p >= ex[ex.len() - 1].2 { return none("3' UTR".to_string(), "non-coding"); }
+        let j = ex.iter().rposition(|&(_, _, e)| p >= e).unwrap_or(0);
+        // the two bases next to an exon inside an intron
+        let splice = p < ex[j].2 + 2 || ex.get(j + 1).map_or(false, |n| p + 2 >= n.1);
+        return none(format!("intron {}", ex[j].0), if splice { "splice site" } else { "non-coding" });
+    };
+    let region = format!("exon {}", ex[i].0);
+    let cds: Vec<u8> = ex.iter().flat_map(|&(_, s, e)| a.genomic[s..e].iter().copied()).collect();
+    if !all || !cds.starts_with(b"ATG") {
+        return none(region, "-");
+    }
+    let off: usize = ex[..i].iter().map(|&(_, s, e)| e - s).sum::<usize>() + (p - ex[i].1);
+    let stop = (0..cds.len() / 3).find(|&c| amino(&cds[c * 3..c * 3 + 3]) == '*');
+    let codon = off / 3;
+    let effect = if stop.map_or(false, |s| codon > s) {
+        "after an early stop codon".to_string()
+    } else if let Some((r, v)) = w.split_once('>') {
+        if r.len() == 1 && v.len() == 1 && codon * 3 + 3 <= cds.len() && cds[off] == r.as_bytes()[0] {
+            let mut alt = cds[codon * 3..codon * 3 + 3].to_vec();
+            alt[off % 3] = v.as_bytes()[0];
+            let (x, y) = (amino(&cds[codon * 3..codon * 3 + 3]), amino(&alt));
+            let n = codon + 1;
+            if x == y { format!("synonymous p.{x}{n}=") } else if codon == 0 { format!("start codon lost p.{x}{n}{y}") } else if y == '*' { format!("stop gained p.{x}{n}*") } else if x == '*' { format!("stop lost p.*{n}{y}") } else { format!("missense p.{x}{n}{y}") }
+        } else {
+            "-".to_string()
+        }
+    } else {
+        let len = if let Some(d) = w.strip_prefix("del").or_else(|| w.strip_prefix("ins")) { Some(d.len()) } else { w.strip_prefix("rep").and_then(|d| d.parse::<i64>().ok()).map(|d| d.unsigned_abs() as usize) };
+        match len {
+            Some(l) if l % 3 != 0 => "frameshift".to_string(),
+            Some(_) => "in-frame length change".to_string(),
+            None => "-".to_string(),
+        }
+    };
+    Ann { region, cds_pos: Some(off + 1), effect }
+}
+
+/// lines of PREFIX.novel.tsv for one new allele
+fn novel_rows(g: &str, slot: usize, a: &crate::db::Allele, sites: &[crate::novel::Site], applied: &[String]) -> String {
+    let inseq = |s: &crate::novel::Site| applied.contains(&format!("{}:{}", s.pos + 1, s.what.trim_end_matches("(unsupported)")));
+    let status = if sites.iter().any(|s| !inseq(s)) { "incomplete" } else if sites.iter().any(|s| s.either) { "phase uncertain" } else { "complete" };
+    let mut out = String::new();
+    for s in sites {
+        let an = annotate(a, s.pos, &s.what);
+        let blind = s.what.starts_with("blind");
+        out.push_str(&format!("{g}\t{slot}\t{g}_slot{slot}_new\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{status}\n",
+            a.name, s.pos + 1, s.what, if blind { "-" } else { an.region.as_str() }, an.cds_pos.map(|x| x.to_string()).unwrap_or_else(|| "-".to_string()),
+            if blind { "-" } else { an.effect.as_str() }, s.alt, s.depth, if s.either { "either allele" } else { "this allele" }, if inseq(s) { "yes" } else { "no" }));
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::annotate;
+    use crate::db::Allele;
+
+    fn allele() -> Allele {
+        // 5' UTR, exon 1 (ATGGCC), intron, exon 2 (AAATAG), 3' UTR
+        let genomic = b"CCCCATGGCCGTAAGTTTCAGAAATAGTTTT".to_vec();
+        Allele { name: "X*01:01".into(), genomic, exons: vec![(1, b"ATGGCC".to_vec()), (2, b"AAATAG".to_vec())], imputed: false, partial: false, extended: false, imputed_from: None, orig: None }
+    }
+
+    #[test]
+    fn regions_and_effects() {
+        let a = allele();
+        let r = |p: usize, w: &str| { let x = annotate(&a, p, w); (x.region, x.cds_pos, x.effect) };
+        assert_eq!(r(1, "C>T"), ("5' UTR".to_string(), None, "non-coding".to_string()));
+        assert_eq!(r(9, "C>T"), ("exon 1".to_string(), Some(6), "synonymous p.A2=".to_string()));
+        assert_eq!(r(8, "C>T"), ("exon 1".to_string(), Some(5), "missense p.A2V".to_string()));
+        assert_eq!(r(10, "G>A"), ("intron 1".to_string(), None, "splice site".to_string()));
+        assert_eq!(r(14, "G>A"), ("intron 1".to_string(), None, "non-coding".to_string()));
+        assert_eq!(r(21, "A>T"), ("exon 2".to_string(), Some(7), "stop gained p.K3*".to_string()));
+        assert_eq!(r(22, "delA"), ("exon 2".to_string(), Some(8), "frameshift".to_string()));
+        assert_eq!(r(28, "T>C"), ("3' UTR".to_string(), None, "non-coding".to_string()));
+    }
 }

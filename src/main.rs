@@ -97,6 +97,9 @@ fn main() {
     if a.get(1).map_or(false, |d| std::path::Path::new(d).is_dir()) {
         let d = a[1].trim_end_matches('/').to_string();
         let f: u32 = std::fs::read_to_string(format!("{d}/format")).ok().and_then(|x| x.trim().parse().ok()).unwrap_or(1);
+        if let Ok(r) = std::fs::read_to_string(format!("{d}/release")) {
+            let _ = output::DB_RELEASE.set(r.trim().to_string());
+        }
         if f < builddb::DB_FORMAT {
             eprintln!("[db] {d} was built by an older version (format {f}, current {}): results for DMB, DOB, MICA, MICB, TAP1 and TAP2 are better after rebuilding it with build-db", builddb::DB_FORMAT);
         }

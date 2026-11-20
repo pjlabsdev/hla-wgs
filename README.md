@@ -66,7 +66,7 @@ With the 1.1 development version (this branch):
 
 | Test | Result |
 |---|---|
-| 80 HPRC samples, 18 genes | two fields 2,486 / 2,489, three fields 2,482 / 2,489; certain at four fields 1,747, of these 1,726 exact (98.8 %) |
+| 80 HPRC samples, 18 genes | two fields 2,486 / 2,489, three fields 2,482 / 2,489; certain at four fields 1,749, of these 1,728 exact (98.8 %) |
 | 59 HGSVC3 samples never used at any stage, assembly truth, 18 genes | two fields 1,833 / 1,833, three fields 1,830 / 1,833; certain at four fields 1,206, of these 1,191 exact (98.8 %) |
 | Eight added genes (DMA, DMB, DOA, DOB, MICA, MICB, TAP1, TAP2), 80 HPRC samples | calls certain to three fields or more with every exon equal to the assembly: 988 / 999; fourth field DMA 153 / 153, DOA 112 / 115, DOB 134 / 136, TAP1 40 / 41; DMB and TAP2 are reported to three fields at most, MICA and MICB do not reach four |
 
@@ -103,6 +103,11 @@ the repeat mask `data/panel_mask_3.66.bed`; `HLA_WGS_DB` points to another one),
 hla-wgs into `~/Downloads/hla-wgs-<sample>` (a new folder if one with results exists) and shows the
 result table with an animated progress display, and opens the result page `PREFIX.html`. For PacBio HiFi reads start it with `--long` (or `HLA_WGS_LONG=1`). It looks for the `hla-wgs` program next to itself, in `../target/release` or in PATH.
 
+Another IPD-IMGT/HLA release in one step: start it with `HLA_WGS_RELEASE=3.67` (any release
+number). It then builds `ref/hladb_3.67` beside the 3.66 reference and carries the repeat mask over
+from it; the 3.66 reference is set up first if it is missing. Validation used release 3.66; the
+result page and the JSON name the release of the database that was used.
+
 ## Build the reference once
 
 The IPD-IMGT/HLA database is licensed CC BY-ND and is **not** part of this repository. Download
@@ -119,6 +124,11 @@ panel that also occur outside the MHC in the genome (repeats), so that reads fro
 counted; it writes `hladb/panel.fa.mask.bed`. The genome is assumed to be GRCh38; for another
 assembly pass a BED file with the MHC region to exclude as third argument. Validation used
 IPD-IMGT/HLA release 3.66.
+
+A database of another release does not need the genome again:
+`hla-wgs build-mask hladb_new --from hladb` carries the mask over. Alleles with unchanged sequence
+keep their intervals; for new or changed alleles, the positions whose 21-mers lie inside masked
+intervals of the older panel are marked and joined by the same rules.
 
 Optional: copy `wmda/hla_nom_g.txt` and `wmda/hla_nom_p.txt` of the same release into `hladb/` to get
 G and P groups in the JSON output.

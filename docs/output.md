@@ -59,7 +59,8 @@ Schema `genome.hla.v1`.
           "margin": {"2": 29.8, "3": 29.8, "4": 29.8},
           "alternative": {"2": "DPB1*979:01", "3": "DPB1*979:01", "4": "DPB1*01:01:12"},
           "new_sites": [
-            {"pos": 3468, "change": "T>A", "reads": 20, "depth": 33, "exon": false, "either_allele": true}
+            {"pos": 3468, "change": "T>A", "reads": 20, "depth": 33, "exon": false, "either_allele": true,
+             "region": "intron 2", "effect": "non-coding"}
           ]
         }
       ]
@@ -84,6 +85,29 @@ Written when at least one allele has new sites that can be applied. One record p
 unsupported positions that could not be applied); `phase=uncertain` says that at least one change
 was seen only in reads that fit both alleles. The sequence is a proposal from short reads, not a
 confirmed allele.
+
+## PREFIX.novel.tsv
+
+Written together with `PREFIX.novel.fa`: a worksheet for looking at a candidate allele and for
+preparing a submission to IPD-IMGT/HLA. One line per difference from the nearest database allele.
+
+| column | meaning |
+|---|---|
+| `gene`, `slot`, `record` | gene, allele slot and the name of the record in `PREFIX.novel.fa` |
+| `nearest_allele` | database allele the sequence is derived from |
+| `pos`, `change` | position on that allele's genomic sequence (from its first base) and the difference |
+| `region` | `exon N`, `intron N`, `5' UTR` or `3' UTR` |
+| `cds_pos` | position in the coding sequence, from the start codon (exonic sites) |
+| `effect` | `non-coding`, `splice site` (the two intron bases next to an exon), `synonymous p.L45=`, `missense p.R68K`, `stop gained`, `stop lost`, `start codon lost`, `frameshift`, `in-frame length change`, `after an early stop codon`; codons count from the start codon, not from the mature protein, and each change is judged on its own |
+| `reads`, `depth` | reads that show the difference and reads that cover the position |
+| `assignment` | `this allele`, or `either allele` when the reads cannot tell which copy carries it |
+| `in_sequence` | whether the difference is part of the FASTA record |
+| `status` | per record: `complete`, `phase uncertain` (at least one site may belong to the other copy) or `incomplete` (a site is not in the sequence, or a stretch was not seen) |
+
+The same `region` and `effect` are given for every entry of `new_sites` in the JSON. A candidate
+from short reads is not a confirmed allele; the database's submission rules ask for more than a
+short-read proposal, so treat the worksheet as the starting point for a confirmation (long reads or
+Sanger sequencing of the separated allele).
 
 ## PREFIX.long.tsv and PREFIX.long.fa (`hla-wgs long`)
 
@@ -114,7 +138,8 @@ directory, every allele carries `g_group` and `p_group` (`null` when the allele 
 group), and the top level has `"groups_loaded": true`. `expression` explains a suffix letter of the
 allele name. `pharmacogenetic_alleles` lists B\*57:01, B\*15:02, A\*31:01 and B\*58:01 with the number
 of copies called and `certain` (all calls concerned are certain at two fields or more). Research use
-only.
+only. `database_release` is the IPD-IMGT/HLA release of the database (`null` for a database built
+before 1.1).
 
 ## Environment switches
 

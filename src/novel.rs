@@ -269,6 +269,7 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
         }
     }
     let mut out: [Vec<Site>; 2] = [vec![], vec![]];
+    let mut own: [(usize, usize); 2] = [(0, usize::MAX), (0, usize::MAX)];
     for k in 0..na {
         let a = if k == 0 { a0 } else { a1 };
         // exon intervals on the genomic sequence
@@ -288,6 +289,7 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
             },
             _ => (0, a.genomic.len()),
         };
+        own[k] = (own_s, own_e);
         let mut tot: Vec<u32> = dspec[k].iter().zip(dshared[k].iter()).map(|(x, y)| x + y).collect();
         tot.sort();
         let med = tot[tot.len() / 2].max(1);
@@ -436,7 +438,7 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
         }
     }
     if na == 2 && std::env::var("HLA_NOPHASE").is_err() {
-        phase_shared(&mut out, &links, &firm);
+        phase_shared(&mut out, &links, &firm, &own);
     }
     if hom {
         // one allele called twice: a site carried by about half the reads belongs to one copy only
@@ -452,7 +454,7 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
 /// carry, belongs to that allele alone; (b) a site that shared pairs show together with an
 /// assigned site (same pairs carry both, hardly any carry only one) belongs to the same allele.
 /// The assigned allele keeps the site as its own, the other allele loses it.
-fn phase_shared(out: &mut [Vec<Site>; 2], links: &[[(Vec<(usize, usize)>, Vec<(usize, String)>); 2]], firm: &[AHashMap<(usize, String), u32>; 2]) {
+fn phase_shared(out: &mut [Vec<Site>; 2], links: &[[(Vec<(usize, usize)>, Vec<(usize, String)>); 2]], firm: &[AHashMap<(usize, String), u32>; 2], own: &[(usize, usize); 2]) {
     let plain = |s: &Site| !s.what.contains('(') && !s.what.contains(':') && !s.what.starts_with("rep") && !s.what.starts_with("blind") && s.what != "break";
     // position on allele 1 of a difference seen on allele 0, from pairs that show the same differences on both
     let mut map: AHashMap<(usize, String), AHashMap<usize, u32>> = AHashMap::new();
@@ -463,6 +465,24 @@ fn phase_shared(out: &mut [Vec<Site>; 2], links: &[[(Vec<(usize, usize)>, Vec<(u
                 *map.entry(a.clone()).or_default().entry(b.0).or_insert(0) += 1;
             }
         }
+    }
+    // A site seen only in pairs that fit both alleles, at a place where the other allele has no
+    // sequence of its own (donor flank of an extended allele): the reads differ from the borrowed
+    // flank as well, so the site says nothing about this allele.
+    let mut rmap: AHashMap<(usize, String), AHashMap<usize, u32>> = AHashMap::new();
+    for (k, m) in &map {
+        for (p1, n) in m {
+            *rmap.entry((*p1, k.1.clone())).or_default().entry(k.0).or_insert(0) += n;
+        }
+    }
+    for k in 0..2 {
+        let (m, o) = (if k == 0 { &map } else { &rmap }, own[1 - k]);
+        out[k].retain(|s| {
+            if !plain(s) || !s.either { return true; }
+            let Some(mm) = m.get(&(s.pos, s.what.clone())) else { return true };
+            let Some((&po, _)) = mm.iter().max_by_key(|(p, n)| (**n, std::cmp::Reverse(**p))) else { return true };
+            po >= o.0 && po < o.1
+        });
     }
     // common sites: (index in out[0], index in out[1])
     let mut common: Vec<(usize, usize)> = vec![];

@@ -473,8 +473,9 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
             "Allele 1 and allele 2 are the two copies of the gene, one from the mother and one from the father; the number does not say which is which. All values of .tsv and .conf.tsv. Lead: how much better (log-likelihood) the chosen allele explains the reads than the best allele that differs in this field; at or above the threshold the field counts as supported. Click a gene to open it; all are open when printed."
         )
     ));
+    let rel = rep["database_release"].as_str().map(|r| format!(" {} {}.", t("Datenbank: IPD-IMGT/HLA", "Database: IPD-IMGT/HLA"), esc(r))).unwrap_or_default();
     h.push_str(&format!(
-        "<footer>\n<p class=\"cite\">{}: Jungwirth P. hla-wgs: HLA typing from whole-genome sequencing with a per-allele statement of what is certain. Zenodo. <a href=\"https://doi.org/{DOI}\">https://doi.org/{DOI}</a></p>\n<p>{}: <a href=\"{ARTICLE}\">{ARTICLE}</a> · {}: <a href=\"{SOURCE}\">{SOURCE}</a></p>\n<p>{}</p>\n<p>{}</p>\n</footer>\n",
+        "<footer>\n<p class=\"cite\">{}: Jungwirth P. hla-wgs: HLA typing from whole-genome sequencing with a per-allele statement of what is certain. Zenodo. <a href=\"https://doi.org/{DOI}\">https://doi.org/{DOI}</a></p>\n<p>{}: <a href=\"{ARTICLE}\">{ARTICLE}</a> · {}: <a href=\"{SOURCE}\">{SOURCE}</a></p>\n<p>{}{rel}</p>\n<p>{}</p>\n</footer>\n",
         t("Zitieren", "Cite"),
         t("Forschungsbeitrag mit Methode und Prüfung", "Research article with method and validation"),
         t("Quelltext", "Source code"),
@@ -560,11 +561,17 @@ fn gene_details(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static st
             o.push_str(&format!("<table class=\"dt\"><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr>", t("Position im Gen", "Position in the gene"), t("Abweichung", "Difference"), t("Reads dafür / Tiefe", "Reads for it / depth"), t("Hinweis", "Note")));
             for x in &sites {
                 let ch = x["change"].as_str().unwrap_or("");
-                let mut nt = vec![];
-                if x["exon"].as_bool().unwrap_or(false) { nt.push(t("im Exon", "in an exon")); }
-                if x["either_allele"].as_bool().unwrap_or(false) { nt.push(t("keiner Kopie sicher zuzuordnen", "cannot be assigned to one copy")); }
-                if ch.starts_with("blind") { nt.push(t("Strecke ohne eindeutig zuordenbare Reads", "stretch without uniquely placed reads")); }
-                if ch.contains("unsupported") { nt.push(t("Datenbank-Base von keinem Read gestützt", "database base backed by no read")); }
+                let mut nt: Vec<String> = vec![];
+                let seen = !ch.starts_with("blind");
+                let reg = x["region"].as_str().filter(|r| *r != "-" && seen).map(|r| r.replace("exon", t("Exon", "exon")).replace("intron", t("Intron", "intron")));
+                match reg {
+                    Some(r) => nt.push(r),
+                    None => if x["exon"].as_bool().unwrap_or(false) { nt.push(t("im Exon", "in an exon").to_string()) },
+                }
+                if let Some(e) = x["effect"].as_str().filter(|e| *e != "-" && seen) { nt.push(effect_text(e, t)); }
+                if x["either_allele"].as_bool().unwrap_or(false) { nt.push(t("keiner Kopie sicher zuzuordnen", "cannot be assigned to one copy").to_string()); }
+                if ch.starts_with("blind") { nt.push(t("Strecke ohne eindeutig zuordenbare Reads", "stretch without uniquely placed reads").to_string()); }
+                if ch.contains("unsupported") { nt.push(t("Datenbank-Base von keinem Read gestützt", "database base backed by no read").to_string()); }
                 let rd = if ch.starts_with("blind") { "–".to_string() } else { format!("{} / {}", x["reads"], x["depth"]) };
                 o.push_str(&format!("<tr><td>{}</td><td>{}</td><td>{rd}</td><td>{}</td></tr>", x["pos"], esc(ch), nt.join(", ")));
             }
@@ -576,6 +583,20 @@ fn gene_details(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static st
 }
 
 /// why the safe call stops at its number of fields
+/// effect of a new site on the protein, in the page language (the JSON carries the English text)
+fn effect_text(e: &str, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> String {
+    for (en, de) in [
+        ("non-coding", "nicht kodierend"), ("splice site", "Spleißstelle"), ("synonymous", "still"), ("missense", "Aminosäure-Austausch"),
+        ("stop gained", "Stopp entsteht"), ("stop lost", "Stopp entfällt"), ("start codon lost", "Startcodon entfällt"),
+        ("frameshift", "Leseraster verschoben"), ("in-frame length change", "Längenänderung im Leseraster"), ("after an early stop codon", "hinter einem vorzeitigen Stoppcodon"),
+    ] {
+        if let Some(rest) = e.strip_prefix(en) {
+            return format!("{}{}", t(de, en), esc(rest));
+        }
+    }
+    esc(e)
+}
+
 fn field_reason(_gene: &str, a: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static str, thr: &dyn Fn(&str) -> f64) -> String {
     let r = a["resolution"].as_u64().unwrap_or(0);
     let nf = a["allele"].as_str().and_then(|x| x.split('*').nth(1)).map(|x| x.split(':').count() as u64).unwrap_or(4);
