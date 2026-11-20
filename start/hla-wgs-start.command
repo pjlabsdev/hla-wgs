@@ -135,10 +135,21 @@ fi
 # ── reference: HLA_WGS_DB, else ref/hladb in the folder of this file (built there on the first start) ──
 DB="${HLA_WGS_DB:-$HERE/ref/hladb}"
 
-if [ ! -f "$DB/hladb.json.gz" ] || [ ! -f "$DB/panel.fa" ]; then
+# a database built by an older program version is rebuilt (format number in $DB/format)
+DBFMT_HAVE="$(cat "$DB/format" 2>/dev/null || echo 1)"
+DBFMT_NEED="$("$BIN" --db-format 2>/dev/null || echo 1)"
+case "$DBFMT_HAVE$DBFMT_NEED" in *[!0-9]*) DBFMT_HAVE=1; DBFMT_NEED=1 ;; esac
+DBOLD=0
+if [ -f "$DB/hladb.json.gz" ] && [ "$DBFMT_HAVE" -lt "$DBFMT_NEED" ]; then DBOLD=1; fi
+if [ ! -f "$DB/hladb.json.gz" ] || [ ! -f "$DB/panel.fa" ] || [ "$DBOLD" = 1 ]; then
   WORK="$(dirname "$DB")"; mkdir -p "$DB"
   printf '\n'
-  row 2 "$(tr_ "Einmalige Einrichtung" "One-time setup")" "IPD-IMGT/HLA 3.66" "$ACC"
+  if [ "$DBOLD" = 1 ]; then
+    row 2 "$(tr_ "Referenz wird erneuert" "Reference is renewed")" "IPD-IMGT/HLA 3.66" "$ACC"
+    printf '  %s%s%s\n' "$MUT" "$(tr_ "Diese Programmversion baut die Referenz genauer (DMB, DOB, MICA, MICB, TAP1, TAP2)." "This program version builds a more accurate reference (DMB, DOB, MICA, MICB, TAP1, TAP2).")" "$RST"
+  else
+    row 2 "$(tr_ "Einmalige Einrichtung" "One-time setup")" "IPD-IMGT/HLA 3.66" "$ACC"
+  fi
   printf '  %s%s%s\n' "$MUT" "$DB" "$RST"
   askpath "hla.dat hineinziehen oder Pfad eingeben, oder nur Enter zum Herunterladen (etwa 45 MB):" "Drop hla.dat or enter its path, or just press Enter to download it (about 45 MB):" empty
   DAT="$REPLY_PATH"

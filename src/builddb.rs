@@ -216,7 +216,7 @@ fn refbuild(alleles: Vec<Al>) -> Vec<(String, Vec<Al>)> {
     bygene
 }
 
-const TARGET: [&str; 23] = ["A", "B", "C", "E", "F", "G", "H", "J", "K", "L", "DRA", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DQA2", "DQB2", "DPA2", "DPB2"];
+const TARGET: [&str; 31] = ["A", "B", "C", "E", "F", "G", "H", "J", "K", "L", "DRA", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DQA2", "DQB2", "DPA2", "DPB2", "DMA", "DMB", "DOA", "DOB", "MICA", "MICB", "TAP1", "TAP2"];
 
 /// numpy.percentile(x, q) with linear interpolation
 fn percentile(v: &[usize], q: f64) -> f64 {
@@ -227,6 +227,10 @@ fn percentile(v: &[usize], q: f64) -> f64 {
     let hi = pos.ceil() as usize;
     s[lo] + (s[hi] - s[lo]) * (pos - lo as f64)
 }
+
+/// Layout of the built database, written to `DBDIR/format`. 2: short alleles of DMA, DMB, DOA, DOB,
+/// MICA, MICB, TAP1 and TAP2 carry donor flanks like those of the other genes (1.1).
+pub const DB_FORMAT: u32 = 2;
 
 /// extend.py: give short alleles the 5'/3' flanks of the nearest full-span allele
 fn extend(genes: &mut [(String, Vec<Al>)]) {
@@ -416,5 +420,6 @@ pub fn run(args: &[String]) {
     serde_json::to_writer(&mut gz, &donor_j).unwrap();
     gz.write_all(b"}").unwrap();
     gz.finish().unwrap();
+    std::fs::write(format!("{outdir}/format"), format!("{DB_FORMAT}\n")).unwrap_or_else(|e| crate::util::die(&format!("{outdir}/format: {e}")));
     eprintln!("[{:.0}s] wrote {outdir}/hladb.json.gz and {outdir}/panel.fa", t.elapsed().as_secs_f64());
 }

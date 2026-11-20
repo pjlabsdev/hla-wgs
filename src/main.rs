@@ -87,6 +87,7 @@ fn main() {
         Some("build-mask") => return mask::run(&a[2..]),
         Some("long") => return long::run(&a[2..]),
         Some("--version") | Some("-V") => return println!("hla-wgs {}", env!("CARGO_PKG_VERSION")),
+        Some("--db-format") => return println!("{}", builddb::DB_FORMAT),
         _ => {}
     }
     if a.len() >= 4 && !std::path::Path::new(&a[1]).exists() {
@@ -95,6 +96,10 @@ fn main() {
     // a database directory stands for its two files
     if a.get(1).map_or(false, |d| std::path::Path::new(d).is_dir()) {
         let d = a[1].trim_end_matches('/').to_string();
+        let f: u32 = std::fs::read_to_string(format!("{d}/format")).ok().and_then(|x| x.trim().parse().ok()).unwrap_or(1);
+        if f < builddb::DB_FORMAT {
+            eprintln!("[db] {d} was built by an older version (format {f}, current {}): results for DMB, DOB, MICA, MICB, TAP1 and TAP2 are better after rebuilding it with build-db", builddb::DB_FORMAT);
+        }
         a[1] = format!("{d}/hladb.json.gz");
         a.insert(2, format!("{d}/panel.fa"));
     }
