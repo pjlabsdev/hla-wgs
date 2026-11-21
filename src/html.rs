@@ -113,7 +113,10 @@ details.more{margin-top:14px}details.more table{margin-bottom:6px}
 .prose{padding:8px 20px}.prose p{margin:10px 0;color:var(--mut);font-size:13px;line-height:1.65}
 @page{size:A4;margin:16mm 14mm 18mm;@bottom-right{content:counter(page) ' / ' counter(pages);font:400 9px 'IBM Plex Mono',monospace;color:#6E6C63}@bottom-left{content:'hla-wgs · RUO';font:400 9px 'IBM Plex Mono',monospace;color:#6E6C63}}
 @media print{.copy{display:none}.head{grid-template-columns:repeat(4,1fr)}}
-@media (max-width:720px){.head{grid-template-columns:repeat(2,1fr)}.head div:nth-child(4n){border-right:1px solid var(--hair)}.head div:nth-child(2n){border-right:0}.head div:nth-last-child(-n+4){border-bottom:1px solid var(--hair)}.head div:nth-last-child(-n+2){border-bottom:0}}
+@media (max-width:720px){table.clin .call{white-space:normal;font-size:13px}table.clin td:nth-child(2),table.clin td:nth-child(3){width:auto}#tt{max-width:calc(100vw - 16px)}.head{grid-template-columns:repeat(2,1fr)}.head div:nth-child(4n){border-right:1px solid var(--hair)}.head div:nth-child(2n){border-right:0}.head div:nth-last-child(-n+4){border-bottom:1px solid var(--hair)}.head div:nth-last-child(-n+2){border-bottom:0}}
+.tip{cursor:help;text-decoration:underline dotted color-mix(in srgb,var(--soft-fg) 70%,transparent);text-underline-offset:3px;text-decoration-thickness:1px;outline:none}.tip:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:3px}
+#tt{position:fixed;z-index:50;max-width:min(420px,calc(100vw - 24px));background:var(--fg);color:var(--bg);font:400 11.5px/1.55 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:0;text-transform:none;white-space:pre-line;padding:10px 12px;border-radius:10px;box-shadow:0 8px 28px rgba(20,20,19,.22);pointer-events:none;opacity:0;transform:translateY(2px);transition:opacity 120ms var(--ease),transform 120ms var(--ease)}#tt.on{opacity:1;transform:none}
+@media print{#tt{display:none}.tip{text-decoration:none}}
 footer{margin-top:48px;border-top:1px solid var(--line);padding-top:18px;color:var(--soft-fg);font-size:12px}
 footer p{margin:6px 0}
 .cite{color:var(--fg)}
@@ -147,7 +150,7 @@ fn name_html(full: &str, res: u64) -> String {
             o.push_str(&format!("<span class=\"c{}\">:</span>", if (i as u64) < res { "" } else { " off" }));
         }
         let k = i + 1;
-        o.push_str(&format!("<span class=\"fd k{k}{}\" title=\"{k}\">{}</span>", if (k as u64) <= res { "" } else { " off" }, esc(f)));
+        o.push_str(&format!("<span class=\"fd k{k}{}\">{}</span>", if (k as u64) <= res { "" } else { " off" }, esc(f)));
     }
     o.push_str("</span>");
     o
@@ -248,6 +251,104 @@ fn field_diagram(full: &str, res: u64, labels: &[String]) -> String {
     }
     o.push_str("</svg>");
     o
+}
+
+/// a term with an explanation shown on hover, focus or tap (one floating box, placed by the script)
+fn tip(label: &str, text: &str) -> String {
+    format!("<span class=\"tip\" tabindex=\"0\" data-tip=\"{}\">{label}</span>", esc(text))
+}
+
+/// what a gene is, in one or two sentences
+fn gene_info(g: &str, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> &'static str {
+    match g {
+        "A" | "B" | "C" => t("Klassisches HLA-Gen der Klasse I: zeigt Peptide aus dem Zellinneren den CD8-T-Zellen. Wichtig bei Transplantation, Spenderauswahl und Arzneimittel-Überempfindlichkeit.", "Classical HLA class I gene: shows peptides from inside the cell to CD8 T cells. Matters for transplantation, donor selection and drug hypersensitivity."),
+        "DRB1" => t("Klassisches HLA-Gen der Klasse II (beta-Kette von HLA-DR): zeigt Peptide den CD4-T-Zellen. Bei Transplantationen besonders wichtig.", "Classical HLA class II gene (beta chain of HLA-DR): shows peptides to CD4 T cells. Particularly important in transplantation."),
+        "DRB3" | "DRB4" | "DRB5" => t("Zweites DR-beta-Gen, nur auf manchen Haplotypen vorhanden: DRB3 gehört zu DR52, DRB4 zu DR53, DRB5 zu DR51. 0, 1 oder 2 Kopien sind normal.", "Second DR beta gene, present only on some haplotypes: DRB3 belongs to DR52, DRB4 to DR53, DRB5 to DR51. 0, 1 or 2 copies are normal."),
+        "DQA1" | "DQB1" => t("Klassisches HLA-Gen der Klasse II: alpha- und beta-Kette von HLA-DQ. Wichtig bei Transplantation und Antikörpern gegen Spender-HLA.", "Classical HLA class II gene: alpha and beta chain of HLA-DQ. Matters in transplantation and for antibodies against donor HLA."),
+        "DPA1" | "DPB1" => t("Klassisches HLA-Gen der Klasse II: alpha- und beta-Kette von HLA-DP. Wichtig bei Stammzelltransplantation.", "Classical HLA class II gene: alpha and beta chain of HLA-DP. Matters in stem cell transplantation."),
+        "DRA" => t("Alpha-Kette von HLA-DR; kaum variabel.", "Alpha chain of HLA-DR; hardly variable."),
+        "DMA" | "DMB" => t("HLA-DM: hilft im Zellinneren, Peptide auf HLA der Klasse II zu laden; präsentiert selbst nicht.", "HLA-DM: helps load peptides onto class II HLA inside the cell; presents none itself."),
+        "DOA" | "DOB" => t("HLA-DO: reguliert HLA-DM in B-Zellen und im Thymus.", "HLA-DO: regulates HLA-DM in B cells and the thymus."),
+        "E" => t("Nicht klassisches Klasse-I-Gen: Ligand des NK-Zell-Rezeptors NKG2A/CD94.", "Non-classical class I gene: ligand of the natural killer cell receptor NKG2A/CD94."),
+        "F" => t("Nicht klassisches Klasse-I-Gen mit wenig Variation; Rolle in der Immunregulation.", "Non-classical class I gene with little variation; role in immune regulation."),
+        "G" => t("Nicht klassisches Klasse-I-Gen, vor allem in der Plazenta: schützt den Fötus vor der mütterlichen Abwehr.", "Non-classical class I gene, mainly in the placenta: protects the fetus from the maternal immune system."),
+        "H" | "J" | "K" | "L" | "V" | "Y" => t("Pseudogen: Rest eines HLA-Gens ohne funktionierendes Protein. Für Forschung und als Marker für Haplotypen.", "Pseudogene: remnant of an HLA gene without a working protein. For research and as a haplotype marker."),
+        "MICA" | "MICB" => t("MHC-Klasse-I-ähnliches Gen: Stresssignal auf Zellen, erkannt vom NK-Zell-Rezeptor NKG2D.", "MHC class I related gene: stress signal on cells, recognised by the natural killer cell receptor NKG2D."),
+        "TAP1" | "TAP2" => t("Transporter, der Peptide ins endoplasmatische Retikulum bringt, wo sie auf HLA der Klasse I geladen werden.", "Transporter that brings peptides into the endoplasmic reticulum, where they are loaded onto class I HLA."),
+        "HFE" => t("HLA-ähnliches Gen des Eisenstoffwechsels; hier nur typisiert, ohne Aussage zur Hämochromatose.", "HLA-like gene of iron metabolism; typed here only, without a statement on haemochromatosis."),
+        _ => t("Gen der MHC-Region.", "Gene of the MHC region."),
+    }
+}
+
+fn res_tip(res: u64, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> &'static str {
+    match res {
+        0 => t("Die Reads entscheiden nicht einmal die Allelgruppe sicher: ein Allel einer anderen Gruppe erklärt sie fast gleich gut.", "The reads do not even settle the allele group: an allele of another group explains them almost as well."),
+        1 => t("Gesichert ist nur die Allelgruppe (erstes Feld), etwa das serologische Antigen.", "Only the allele group (first field) is certain, roughly the serological antigen."),
+        2 => t("Gesichert bis zum Protein: die Aminosäuresequenz ist bestimmt. Diese Auflösung verlangen die meisten klinischen Fragen.", "Certain up to the protein: the amino acid sequence is determined. Most clinical questions need this resolution."),
+        3 => t("Gesichert bis zur kodierenden Sequenz: auch stille Basenänderungen in den Exons sind bestimmt; außerhalb der Exons nicht.", "Certain up to the coding sequence: silent base changes in the exons are determined too; outside the exons they are not."),
+        _ => t("Gesichert bis zum vollständigen Allel einschließlich der Introns und nicht übersetzten Bereiche.", "Certain up to the complete allele including introns and untranslated regions."),
+    }
+}
+
+fn ligand_tip(l: &str, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> &'static str {
+    if l.starts_with("Bw4-80I") {
+        t("Bw4 mit Isoleucin an Position 80: Ligand des hemmenden NK-Zell-Rezeptors KIR3DL1, eher starke Bindung. Bedeutsam bei der Spenderauswahl für Stammzelltransplantation.", "Bw4 with isoleucine at position 80: ligand of the inhibitory natural killer cell receptor KIR3DL1, rather strong binding. Relevant in donor selection for stem cell transplantation.")
+    } else if l.starts_with("Bw4") {
+        t("Bw4 mit Threonin an Position 80: Ligand des NK-Zell-Rezeptors KIR3DL1, eher schwächere Bindung.", "Bw4 with threonine at position 80: ligand of the natural killer cell receptor KIR3DL1, rather weaker binding.")
+    } else if l == "Bw6" {
+        t("Bw6 (Glycin an Position 83): kein Ligand für KIR3DL1. Jedes HLA-B-Allel ist entweder Bw4 oder Bw6.", "Bw6 (glycine at position 83): no ligand of KIR3DL1. Every HLA-B allele is either Bw4 or Bw6.")
+    } else if l == "C1" {
+        t("C1 (Asparagin an Position 80): Ligand der NK-Zell-Rezeptoren KIR2DL2 und KIR2DL3.", "C1 (asparagine at position 80): ligand of the natural killer cell receptors KIR2DL2 and KIR2DL3.")
+    } else {
+        t("C2 (Lysin an Position 80): Ligand des NK-Zell-Rezeptors KIR2DL1.", "C2 (lysine at position 80): ligand of the natural killer cell receptor KIR2DL1.")
+    }
+}
+
+/// the measured values behind one allele, for its info box: lead per field against the threshold
+/// and the competitor, groups, the reason for the number of fields and the differing sites
+fn allele_tech(g: &Value, a: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static str, thr: &dyn Fn(&str) -> f64) -> String {
+    let res = a["resolution"].as_u64().unwrap_or(0);
+    let mut l = vec![format!("{} {} · {}: {} ({} {})", t("Allel", "Allele"), a["allele"].as_str().unwrap_or(""), t("gesichert", "certain"), a["safe_call"].as_str().unwrap_or(""), res, if res == 1 { t("Feld", "field") } else { t("Felder", "fields") })];
+    let f4_01 = a["allele"].as_str().and_then(|x| x.split('*').nth(1)).and_then(|x| x.split(':').nth(3)).map_or(false, |x| x == "01");
+    for k in ["2", "3", "4"] {
+        let th = if k == "4" && f4_01 { 1.0 } else { thr(k) };
+        let alt = a["alternative"][k].as_str().filter(|x| !x.is_empty()).unwrap_or("–");
+        let line = match a["margin"][k].as_f64() {
+            Some(m) => format!("{} {k}: {} {m:.1} {} {} ({} {th:.0}) {}", t("Feld", "Field"), t("Vorsprung", "lead"), t("vor", "over"), alt, t("Schwelle", "threshold"), if m >= th { "✓" } else { "✗" }),
+            None => format!("{} {k}: {}", t("Feld", "Field"), t("kein Konkurrent", "no competitor")),
+        };
+        l.push(line);
+    }
+    if f4_01 { l.push(t("Viertes Feld 01 (zuerst beschriebenes Allel): Schwelle 1 statt 4", "Fourth field 01 (first-described allele): threshold 1 instead of 4").to_string()); }
+    if a["gene_cap"].as_bool().unwrap_or(false) { l.push(t("Feldzahl durch das Gen begrenzt (in der Prüfung nicht verlässlich genug)", "Number of fields capped by the gene (not reliable enough in validation)").to_string()); }
+    l.push(format!("G: {} · P: {}", a["g_group"].as_str().unwrap_or("–"), a["p_group"].as_str().unwrap_or("–")));
+    l.push(format!("{}: {}", t("Grund der Feldzahl", "Why this many fields"), field_reason("", a, t, thr)));
+    let sites = a["new_sites"].as_array().cloned().unwrap_or_default();
+    for x in sites.iter().take(8) {
+        let ch = x["change"].as_str().unwrap_or("");
+        if let Some(b) = ch.strip_prefix("blind") {
+            l.push(format!("{} {}: {} {}", t("Ungeprüfte Strecke ab Position", "Unchecked stretch from position"), x["pos"], b, t("ohne eindeutig zuordenbare Reads", "without uniquely placed reads")));
+        } else {
+            let reg = x["region"].as_str().filter(|r| *r != "-").unwrap_or("");
+            let eff = x["effect"].as_str().filter(|e| *e != "-").map(|e| effect_text(e, t)).unwrap_or_default();
+            l.push(format!("{} {}: {ch} · {} {}/{} · {reg} {eff}{}", t("Position", "Position"), x["pos"], t("Reads", "reads"), x["reads"], x["depth"], if x["either_allele"].as_bool().unwrap_or(false) { t(" · keiner Kopie sicher zuzuordnen", " · not assignable to one copy") } else { "" }));
+        }
+    }
+    if sites.len() > 8 { l.push(format!("… {} {}", sites.len() - 8, t("weitere Stellen in den Details", "more sites in the details"))); }
+    l.push(format!("{}: {} · {}: {}", t("Reads des Gens", "Reads of the gene"), g["reads"].as_u64().map(|x| x.to_string()).unwrap_or_else(|| "–".into()), t("Vorsprung des besten Allelpaars", "lead of the best allele pair"), g["gap"].as_f64().map(|x| format!("{x:.1}")).unwrap_or_else(|| "–".into())));
+    l.join("\n")
+}
+
+/// gene, reads, copies and lead of the pair, for the info box of a gene name
+fn gene_tech(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> String {
+    let name = g["gene"].as_str().unwrap_or("");
+    let mut l = vec![gene_info(name, t).to_string()];
+    l.push(format!("{}: {} · {}: {} · {}: {}",
+        t("Reads", "Reads"), g["reads"].as_u64().map(|x| x.to_string()).unwrap_or_else(|| "–".into()),
+        t("Kopien", "Copies"), g["copies"].as_u64().map(|x| x.to_string()).unwrap_or_else(|| "–".into()),
+        t("Vorsprung des besten Allelpaars (Log-Likelihood)", "lead of the best allele pair (log-likelihood)"), g["gap"].as_f64().map(|x| format!("{x:.1}")).unwrap_or_else(|| "–".into())));
+    if let Some(r) = g["copy_ratio"].as_f64() { l.push(format!("{}: {r:.2}", t("Kopienverhältnis (1 Kopie ≈ 1, 2 Kopien ≈ 2)", "copy ratio (1 copy ≈ 1, 2 copies ≈ 2)"))); }
+    l.join("\n")
 }
 
 /// the loci of a clinical HLA typing (transplantation, platelet and donor matching), in report order
@@ -352,13 +453,13 @@ fn drugs_text(d: &str, t: &dyn Fn(&'static str, &'static str) -> &'static str) -
 }
 
 /// the clinical summary: the eleven loci at two fields with group, antigen and receptor ligand
-fn clinical(genes: &[Value], t: &dyn Fn(&'static str, &'static str) -> &'static str) -> String {
+fn clinical(genes: &[Value], t: &dyn Fn(&'static str, &'static str) -> &'static str, thr: &dyn Fn(&str) -> f64) -> String {
     let empty = vec![];
     let mut rows = String::new();
     let drb345 = genes.iter().any(|g| matches!(g["gene"].as_str(), Some("DRB3" | "DRB4" | "DRB5")) && g["called"].as_bool().unwrap_or(false) && g["copies"].as_u64().unwrap_or(2) > 0);
     for name in CLINICAL {
         if name == "DRB3" && !drb345 {
-            rows.push_str(&format!("<tr><td class=\"g\">HLA-DRB3/4/5</td><td class=\"note\" colspan=\"2\">{}</td></tr>\n", t("keines vorhanden", "none present")));
+            rows.push_str(&format!("<tr><td class=\"g\">{}</td><td class=\"note\" colspan=\"2\">{}</td></tr>\n", tip("HLA-DRB3/4/5", gene_info("DRB3", t)), t("keines vorhanden", "none present")));
         }
         let Some(g) = genes.iter().find(|g| g["gene"] == name) else { continue };
         let copies = g["copies"].as_u64().unwrap_or(2);
@@ -380,21 +481,22 @@ fn clinical(genes: &[Value], t: &dyn Fn(&'static str, &'static str) -> &'static 
             let safe = a["safe_call"].as_str().unwrap_or("");
             let mut sub: Vec<String> = vec![];
             if res >= 2 {
-                if let Some(x) = a["g_group"].as_str() { sub.push(format!("G {}", esc(x.split('*').nth(1).unwrap_or(x)))); }
+                if let Some(x) = a["g_group"].as_str() { sub.push(tip(&format!("G {}", esc(x.split('*').nth(1).unwrap_or(x))), t("G-Gruppe: alle Allele mit derselben Basenfolge in den Exons der Antigen-Bindungsstelle (Exon 2 und 3 bei Klasse I, Exon 2 bei Klasse II). Für die Spenderauswahl gelten Allele einer G-Gruppe als gleich.", "G group: all alleles with the same base sequence in the exons of the antigen-binding site (exons 2 and 3 for class I, exon 2 for class II). In donor selection alleles of one G group count as equal."))); }
             }
             if let Some(x) = a["serology"].as_str() {
                 let assumed = a["serology_assumed"].as_bool().unwrap_or(false);
-                sub.push(format!("<span title=\"{}\">{}{}</span>", t("serologisches Antigen (WHO)", "serological antigen (WHO)"), esc(x), if assumed { "*" } else { "" }));
+                let txt = if assumed { t("Serologisches Antigen nach WHO, wie es Antikörpertests erkennen; in Klammern das übergeordnete (breite) Antigen. *: angenommen oder durch Experten zugeordnet, nicht serologisch getestet.", "Serological antigen after WHO, as antibody tests see it; in brackets the broad parent antigen. *: assumed or assigned by experts, not tested serologically.") } else { t("Serologisches Antigen nach WHO, wie es Antikörpertests erkennen; in Klammern das übergeordnete (breite) Antigen. Wichtig zum Abgleich mit HLA-Antikörpern.", "Serological antigen after WHO, as antibody tests see it; in brackets the broad parent antigen. Matters when comparing with HLA antibodies.") };
+                sub.push(tip(&format!("{}{}", esc(x), if assumed { "*" } else { "" }), txt));
             }
-            if let Some(x) = a["ligand"].as_str() { sub.push(format!("<span title=\"{}\">{}</span>", t("Ligand der NK-Zell-Rezeptoren (KIR)", "ligand of the natural killer cell receptors (KIR)"), esc(x))); }
+            if let Some(x) = a["ligand"].as_str() { sub.push(tip(&esc(x), ligand_tip(x, t))); }
             let expr = a["expression"].as_str().map(|_| {
                 let last = a["allele"].as_str().unwrap_or("").chars().last().unwrap_or(' ');
-                format!(" <span class=\"pos\" title=\"{}\">{}</span>", t("Expressionsvariante", "expression variant"), match last { 'N' => t("Null-Allel", "null allele"), 'L' => t("geringe Expression", "low expression"), 'S' => t("nur sezerniert", "secreted only"), 'Q' => t("Expression fraglich", "questionable expression"), _ => t("abweichende Expression", "aberrant expression") })
+                format!(" <span class=\"pos tip\" tabindex=\"0\" data-tip=\"{}\">{}</span>", t("Expressionsvariante laut Allelname: N = nicht exprimiert (Null-Allel), L = gering, S = nur sezerniert, Q = fraglich. Ein Null-Allel bildet kein Protein an der Zelloberfläche.", "Expression variant by the allele name: N = not expressed (null allele), L = low, S = secreted only, Q = questionable. A null allele makes no protein on the cell surface."), match last { 'N' => t("Null-Allel", "null allele"), 'L' => t("geringe Expression", "low expression"), 'S' => t("nur sezerniert", "secreted only"), 'Q' => t("Expression fraglich", "questionable expression"), _ => t("abweichende Expression", "aberrant expression") })
             }).unwrap_or_default();
-            let call = if res == 0 { format!("<span class=\"note\">{}</span>", t("nicht bestimmt", "not determined")) } else { format!("<span class=\"call\">{}</span>", esc(&two_field(safe))) };
-            cells.push(format!("<td>{call}{expr}<span class=\"full\">{}</span><span class=\"full\">{}</span></td>", sub.join(" · "), res_word(res, t)));
+            let call = if res == 0 { format!("<span class=\"note\">{}</span>", t("nicht bestimmt", "not determined")) } else { format!("<span class=\"call tip\" tabindex=\"0\" data-tip=\"{}\">{}</span>", esc(&allele_tech(g, a, t, thr)), esc(&two_field(safe))) };
+            cells.push(format!("<td>{call}{expr}<span class=\"full\">{}</span><span class=\"full\">{}</span></td>", sub.join(" · "), tip(res_word(res, t), res_tip(res, t))));
         }
-        rows.push_str(&format!("<tr><td class=\"g\">HLA-{}</td>{}</tr>\n", esc(name), cells.join("")));
+        rows.push_str(&format!("<tr><td class=\"g\">{}</td>{}</tr>\n", tip(&format!("HLA-{}", esc(name)), &gene_tech(g, t)), cells.join("")));
     }
     format!(
         "<div class=\"panel\"><table class=\"clin\"><thead><tr><th>{}</th><th>{} 1</th><th>{} 2</th></tr></thead><tbody>\n{rows}</tbody></table></div>\n<p class=\"note\">{}</p>\n",
@@ -436,7 +538,7 @@ pub fn render(rep: &Value, sample: &str) -> String {
     let de = german();
     let first = if de { "de" } else { "en" };
     format!(
-        "<!DOCTYPE html>\n<html lang=\"{first}\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>hla-wgs · {}</title>\n<style>{css}</style></head><body data-lang=\"{first}\" data-tab=\"r\">\n<header class=\"bar\"><div class=\"bar-in\"><div class=\"brand\">PJ Labs <i>·</i> hla-wgs</div><nav class=\"lang seg\"><button type=\"button\" data-set=\"de\">Deutsch</button><button type=\"button\" data-set=\"en\">English</button></nav></div></header>\n<main lang=\"de\" class=\"l-de\">\n{}</main>\n<main lang=\"en\" class=\"l-en\">\n{}</main>\n<script>\nfunction aria(){{document.querySelectorAll('nav.lang button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.set===document.body.dataset.lang));document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tab===document.body.dataset.tab))}}\nfunction setL(l){{document.body.dataset.lang=l;document.documentElement.lang=l;aria();try{{localStorage.setItem('hla-wgs-lang',l)}}catch(e){{}}}}\ntry{{const s=localStorage.getItem('hla-wgs-lang');if(s==='de'||s==='en')setL(s)}}catch(e){{}}\ndocument.querySelectorAll('nav.lang button').forEach(b=>b.addEventListener('click',()=>setL(b.dataset.set)));\ndocument.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{{document.body.dataset.tab=b.dataset.tab;aria();scrollTo(0,0)}}));\ndocument.querySelectorAll('button.copy').forEach(b=>b.addEventListener('click',()=>{{const c=document.getElementById(b.dataset.copy);if(c&&navigator.clipboard)navigator.clipboard.writeText(c.textContent).then(()=>{{const o=b.textContent;b.textContent='✓';setTimeout(()=>b.textContent=o,1200)}})}}));\naria();\naddEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));\n</script></body></html>\n",
+        "<!DOCTYPE html>\n<html lang=\"{first}\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>hla-wgs · {}</title>\n<style>{css}</style></head><body data-lang=\"{first}\" data-tab=\"r\">\n<header class=\"bar\"><div class=\"bar-in\"><div class=\"brand\">PJ Labs <i>·</i> hla-wgs</div><nav class=\"lang seg\"><button type=\"button\" data-set=\"de\">Deutsch</button><button type=\"button\" data-set=\"en\">English</button></nav></div></header>\n<main lang=\"de\" class=\"l-de\">\n{}</main>\n<main lang=\"en\" class=\"l-en\">\n{}</main>\n<script>\nfunction aria(){{document.querySelectorAll('nav.lang button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.set===document.body.dataset.lang));document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tab===document.body.dataset.tab))}}\nfunction setL(l){{document.body.dataset.lang=l;document.documentElement.lang=l;aria();try{{localStorage.setItem('hla-wgs-lang',l)}}catch(e){{}}}}\ntry{{const s=localStorage.getItem('hla-wgs-lang');if(s==='de'||s==='en')setL(s)}}catch(e){{}}\ndocument.querySelectorAll('nav.lang button').forEach(b=>b.addEventListener('click',()=>setL(b.dataset.set)));\ndocument.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{{document.body.dataset.tab=b.dataset.tab;aria();scrollTo(0,0)}}));\nconst tt=document.createElement('div');tt.id='tt';tt.setAttribute('role','tooltip');document.body.appendChild(tt);let cur=null;\nfunction showT(el){{cur=el;tt.textContent=el.dataset.tip;tt.classList.add('on');const r=el.getBoundingClientRect(),w=tt.offsetWidth,h=tt.offsetHeight;let x=Math.min(Math.max(8,r.left),innerWidth-w-8),y=r.bottom+8;if(y+h>innerHeight-8)y=Math.max(8,r.top-h-8);tt.style.left=x+'px';tt.style.top=y+'px'}}\nfunction hideT(){{cur=null;tt.classList.remove('on')}}\ndocument.addEventListener('pointerover',e=>{{if(e.pointerType!=='mouse')return;const el=e.target.closest('[data-tip]');if(el&&el!==cur)showT(el);else if(!el&&cur)hideT()}});\ndocument.addEventListener('focusin',e=>{{const el=e.target.closest('[data-tip]');if(el)showT(el)}});document.addEventListener('focusout',hideT);\ndocument.addEventListener('click',e=>{{const el=e.target.closest('[data-tip]');if(el&&el.tagName!=='A')showT(el);else if(!el)hideT()}});\naddEventListener('scroll',hideT,{{passive:true}});addEventListener('keydown',e=>{{if(e.key==='Escape')hideT()}});\ndocument.querySelectorAll('button.copy').forEach(b=>b.addEventListener('click',()=>{{const c=document.getElementById(b.dataset.copy);if(c&&navigator.clipboard)navigator.clipboard.writeText(c.textContent).then(()=>{{const o=b.textContent;b.textContent='✓';setTimeout(()=>b.textContent=o,1200)}})}}));\naria();\naddEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));\n</script></body></html>\n",
         esc(sample),
         render_one(rep, sample, true),
         render_one(rep, sample, false)
@@ -505,8 +607,8 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
                     n4 += 1;
                 }
                 let _ = safe;
-                cells[i] = format!("<td>{}</td>", name_html(full, res));
-                dots.push_str(&format!("<div class=\"d\" title=\"{res} {}\">", t("Felder gesichert", "fields supported")));
+                cells[i] = format!("<td><span class=\"tip\" tabindex=\"0\" data-tip=\"{}\">{}</span></td>", esc(&allele_tech(g, a, &t, &thr)), name_html(full, res));
+                dots.push_str(&format!("<div class=\"d tip\" tabindex=\"0\" data-tip=\"{}\">", esc(&format!("{}: {}", res_word(res, &t), res_tip(res, &t)))));
                 for k in 1..=4 {
                     dots.push_str(if k <= res { "<i class=\"f on\"></i>" } else { "<i class=\"f\"></i>" });
                 }
@@ -550,7 +652,7 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         details.push_str(&gene_details(g, &t, &thr, &f1));
         (if c >= 2 { &mut rrows } else { &mut rows }).push_str(&format!(
             "<tr><td class=\"g\">{}</td>{}{}<td>{dots}</td><td class=\"note hide\">{}</td></tr>\n",
-            esc(name),
+            tip(&esc(name), &gene_tech(g, &t)),
             cells[0],
             cells[1],
             notes.join("<br>")
@@ -577,10 +679,12 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
             (0, false) => t("Bestätigung durch ein HLA-Labor nötig", "confirmation by an HLA laboratory needed").to_string(),
             _ => format!("<span class=\"pos\">{}</span>", esc(rec)),
         };
+        let state = tip(&state, &format!("{}: {n} · {}: {} · {}", t("Kopien des Allels", "copies of the allele"), t("auf zwei Feldern gesichert", "certain at two fields"), if certain { t("ja", "yes") } else { t("nein", "no") }, t("Gezählt werden die gesicherten Rufe dieses Gens; ein Allel ist erst ab zwei gesicherten Feldern sicher bestimmt.", "The certain calls of this gene are counted; an allele is determined only from two certain fields.")));
         pgx.push_str(&format!(
-            "<tr><td class=\"g\">HLA-{}</td><td>{state}</td><td>{}</td><td>{advice}</td><td class=\"note hide\"><a href=\"{url}\">{gl}</a></td></tr>\n",
+            "<tr><td class=\"g\">HLA-{}</td><td>{state}</td><td>{}</td><td>{advice}</td><td class=\"note hide\"><a class=\"tip\" data-tip=\"{}\" href=\"{url}\">{gl}</a></td></tr>\n",
             esc(al),
-            esc(&drugs_text(p["drugs"].as_str().unwrap_or(""), &t))
+            esc(&drugs_text(p["drugs"].as_str().unwrap_or(""), &t)),
+            esc(&format!("{} {gl} · {url}", t("Leitlinie des Clinical Pharmacogenetics Implementation Consortium,", "Guideline of the Clinical Pharmacogenetics Implementation Consortium,")))
         ));
     }
 
@@ -613,18 +717,24 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
     if !clin_ok { limits.push(t("klinischer Locus ohne Ergebnis", "clinical locus without result")); }
     let qc = if limits.is_empty() { format!("<span class=\"ok\">{}</span>", t("bestanden", "passed")) } else { format!("<span class=\"warn\">{}: {}</span>", t("eingeschränkt", "limited"), limits.join(", ")) };
     let input = rep["input"].as_array().map(|v| v.iter().filter_map(|x| x.as_str()).map(esc).collect::<Vec<_>>().join(", ")).filter(|x| !x.is_empty()).unwrap_or_else(|| "–".into());
-    let kv = [
-        (t("Probe", "Sample"), esc(sample)),
-        (t("Berichtsnummer", "Report number"), report_id(rep)),
-        (t("Eingabe", "Input"), input),
-        (t("Analyse", "Analysis"), day.clone()),
-        (t("Programm", "Software"), format!("hla-wgs {}", esc(version))),
-        (t("Datenbank", "Database"), rep["database_release"].as_str().map(|r| format!("IPD-IMGT/HLA {}", esc(r))).unwrap_or_else(|| "IPD-IMGT/HLA".into())),
-        (t("Tiefe über HLA", "Depth over HLA"), depth.map(|d| format!("≈ {d:.0}x")).unwrap_or_else(|| "–".into())),
-        (t("Qualität", "Quality"), qc),
+    let yesno = |b: bool| if b { t("geladen", "loaded") } else { t("fehlt", "missing") };
+    let th = |k: &str| rep["thresholds"][k].as_f64().unwrap_or(0.0);
+    let kv: Vec<(&str, String, String)> = vec![
+        (t("Probe", "Sample"), esc(sample), t("Name der Probe, aus dem Namen der Ausgabedateien.", "Name of the sample, from the name of the output files.").to_string()),
+        (t("Berichtsnummer", "Report number"), report_id(rep), t("Prüfsumme (FNV-1a) über alle Ergebnisse und die Namen der Eingabedateien: gleiches Ergebnis, gleiche Nummer; jede Änderung ergibt eine andere.", "Checksum (FNV-1a) over all results and the names of the input files: same result, same number; any change gives another.").to_string()),
+        (t("Eingabe", "Input"), input, t("Eingabedateien ohne Ordner: FASTQ-Paar oder BAM/CRAM.", "Input files without folders: FASTQ pair or BAM/CRAM.").to_string()),
+        (t("Analyse", "Analysis"), day.clone(), t("Datum des Laufs (UTC).", "Date of the run (UTC).").to_string()),
+        (t("Programm", "Software"), format!("hla-wgs {}", esc(version)), format!("hla-wgs {} · {}: {:.0} / {:.0} / {:.0} ({}) · DOI {DOI}", version, t("Schwellen für Feld 2 / 3 / 4", "thresholds for field 2 / 3 / 4"), th("2"), th("3"), th("4"), t("Log-Likelihood-Vorsprung vor dem nächsten Allel, das sich in diesem Feld unterscheidet", "log-likelihood lead over the nearest allele that differs in this field"))),
+        (t("Datenbank", "Database"), rep["database_release"].as_str().map(|r| format!("IPD-IMGT/HLA {}", esc(r))).unwrap_or_else(|| "IPD-IMGT/HLA".into()), format!("IPD-IMGT/HLA {} · {}: {} · {}: {} · {}: {}",
+            rep["database_release"].as_str().unwrap_or("?"),
+            t("G/P-Gruppen (hla_nom_g/p.txt)", "G/P groups (hla_nom_g/p.txt)"), yesno(rep["groups_loaded"].as_bool().unwrap_or(false)),
+            t("Serologie (rel_dna_ser.txt)", "serology (rel_dna_ser.txt)"), yesno(rep["serology_loaded"].as_bool().unwrap_or(false)),
+            t("Wiederholungsmaske (panel.fa.mask.bed)", "repeat mask (panel.fa.mask.bed)"), yesno(rep["repeat_mask"].as_bool().unwrap_or(false)))),
+        (t("Tiefe über HLA", "Depth over HLA"), depth.map(|d| format!("≈ {d:.0}x")).unwrap_or_else(|| "–".into()), format!("{} {}", depth.map(|d| format!("{d:.1}x.")).unwrap_or_default(), t("Read-Paare der zehn Gene A, B, C, DPA1, DPB1, DQA1, DQB1, E, F, G (immer zwei Kopien), geteilt durch ihren Median bei 30x in der Prüfung (8056), mal 30. Unter 18x sinkt die Zahl gesicherter Felder.", "Read pairs of the ten genes A, B, C, DPA1, DPB1, DQA1, DQB1, E, F, G (always two copies), divided by their median at 30x in the validation (8056), times 30. Below 18x fewer fields are supported."))),
+        (t("Qualität", "Quality"), qc, t("Bestanden, wenn: Tiefe mindestens 18x, Wiederholungsmaske geladen, G/P-Gruppen geladen und alle klinischen Loci (A, B, C, DRB1, DQA1, DQB1, DPA1, DPB1) mit Ergebnis. Sonst eingeschränkt, mit Grund.", "Passed when: depth at least 18x, repeat mask loaded, G/P groups loaded and all clinical loci (A, B, C, DRB1, DQA1, DQB1, DPA1, DPB1) with a result. Otherwise limited, with the reason.").to_string()),
     ];
     h.push_str("<div class=\"head\">");
-    for (k, v) in kv { h.push_str(&format!("<div><span>{k}</span><b>{v}</b></div>")); }
+    for (k, v, tp) in kv { h.push_str(&format!("<div><span>{}</span><b>{v}</b></div>", tip(k, &tp))); }
     h.push_str("</div>\n");
     if rep["repeat_mask"].as_bool() == Some(false) {
         h.push_str(&format!("<div class=\"alert\">{}</div>\n", t(
@@ -656,12 +766,12 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
     h.push_str(&format!(
         "<div class=\"cards\"><div class=\"card\"><b>{}</b><span>{}</span></div><div class=\"card\"><b>{n4} / {n_alleles}</b><span>{}</span></div><div class=\"card\"><b>{n_new}</b><span>{}</span></div><div class=\"card\"><b>{carriers}</b><span>{}</span></div></div>\n",
         genes.len(),
-        t("Gene ausgewertet", "genes typed"),
-        t("Allele auf vier Felder gesichert", "alleles supported to four fields"),
-        t("Gene mit Abweichungen von der Datenbank", "genes with differences from the database"),
-        t("pharmakogenetische Treffer", "pharmacogenetic findings")
+        tip(t("Gene ausgewertet", "genes typed"), t("Alle Gene der Datenbank, die das Programm typisiert: klassische, nicht klassische, Pseudogene und weitere Gene der MHC-Region.", "All genes of the database the program types: classical, non-classical, pseudogenes and further genes of the MHC region.")),
+        tip(t("Allele auf vier Felder gesichert", "alleles supported to four fields"), t("Allele, bei denen alle vier Felder gesichert sind, von allen Allelen der vorhandenen Gene. In der Prüfung an 80 Genomen waren 1778 von 1801 solcher Angaben exakt.", "Alleles with all four fields certain, of all alleles of the genes present. In the validation on 80 genomes 1778 of 1801 such calls were exact.")),
+        tip(t("Gene mit Abweichungen von der Datenbank", "genes with differences from the database"), t("Gene, bei denen die Reads einheitlich eine Base zeigen, die das nächste Datenbank-Allel nicht hat: mögliches neues Allel. Ungeprüfte Strecken zählen nicht.", "Genes where the reads consistently show a base the nearest database allele lacks: possibly a new allele. Unchecked stretches do not count.")),
+        tip(t("pharmakogenetische Treffer", "pharmacogenetic findings"), t("Anzahl der CPIC-Allele (B*57:01, B*15:02, A*31:01, B*58:01), die in dieser Probe vorkommen.", "Number of CPIC alleles (B*57:01, B*15:02, A*31:01, B*58:01) present in this sample."))
     ));
-    h.push_str(&format!("<h2>{}</h2>\n{}", t("Klinische Kurzfassung", "Clinical summary"), clinical(genes, &t)));
+    h.push_str(&format!("<h2>{}</h2>\n{}", t("Klinische Kurzfassung", "Clinical summary"), clinical(genes, &t, &thr)));
     let gl = gl_string(genes);
     if !gl.is_empty() {
         h.push_str(&format!(
@@ -893,7 +1003,8 @@ mod tests {
         assert_eq!(super::gl_string(&genes), "HLA-A*02:01:01:01+HLA-A*01:01:01^HLA-B*40:01:02:01+HLA-B*08:01:01");
         assert_eq!(super::two_field("B*40:01:02"), "HLA-B*40:01");
         let t = |d: &'static str, _e: &'static str| d;
-        let c = super::clinical(&genes, &t);
+        let thr = |_: &str| 6.0;
+        let c = super::clinical(&genes, &t, &thr);
         assert!(c.contains("HLA-B*40:01") && c.contains("B60 (B40)") && c.contains("Bw6") && c.contains("keines vorhanden"));
         assert!(!c.contains("HLA-DRB4<"));
         assert_eq!(super::drugs_text("carbamazepine, oxcarbazepine, phenytoin, fosphenytoin", &t), "Carbamazepin, Oxcarbazepin, Phenytoin, Fosphenytoin");
