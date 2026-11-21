@@ -156,7 +156,11 @@ pub fn write(
             let shown: &String = if sl == 0 { &s1 } else { &s2 };
             let renamed = shown != fin;
             let f = fields(shown);
-            let res_full = if m[2] >= T[2] && m[1] >= T[1] && m[0] >= T[0] {
+            // The first-described allele of a three-field group (fourth field 01) is mostly the common one;
+            // against a rarer sibling a lead of 1 at field 4 is enough. 80 HPRC samples: 38 more exact
+            // four-field calls, 2 wrong; 59 unseen HGSVC3 samples: 22 more exact, 1 wrong. HLA_F401=0: off.
+            let f401 = std::env::var("HLA_F401").map_or(true, |v| v != "0") && fields(shown).get(3).map_or(false, |x| x == "01") && m[2] >= 1.0;
+            let res_full = if (m[2] >= T[2] || f401) && m[1] >= T[1] && m[0] >= T[0] {
                 4
             } else if m[1] >= T[1] && m[0] >= T[0] {
                 3
