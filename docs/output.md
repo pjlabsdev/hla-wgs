@@ -138,7 +138,7 @@ directory, every allele carries `g_group` and `p_group` (`null` when the allele 
 group), and the top level has `"groups_loaded": true`. `expression` explains a suffix letter of the
 allele name. `pharmacogenetic_alleles` lists B\*57:01, B\*15:02, A\*31:01 and B\*58:01 with the number
 of copies called and `certain` (all calls concerned are certain at two fields or more). Research use
-only. `database_release` is the IPD-IMGT/HLA release of the database (`null` for a database built
+only. `depth_estimate` is a rough depth over the HLA genes (read pairs of ten genes always present in two copies, scaled to their median at 30x in the validation); below 18 the page says that fewer fields are supported and the fourth field is somewhat less often exact. `database_release` is the IPD-IMGT/HLA release of the database (`null` for a database built
 before 1.1).
 
 ## Environment switches

@@ -236,6 +236,7 @@ pub fn write(
         "database_release": DB_RELEASE.get(),
         "groups_loaded": grp.loaded,
         "repeat_mask": crate::panel::MASK_LOADED.load(std::sync::atomic::Ordering::Relaxed),
+        "depth_estimate": depth_estimate(res),
         "pharmacogenetic_alleles": crate::groups::PGX.iter().map(|(al, drugs)| {
             let hits: Vec<&(String, usize)> = called.iter().filter(|(n, _)| two(n) == *al).collect();
             serde_json::json!({
@@ -423,4 +424,16 @@ mod tests {
         assert_eq!(r(22, "delA"), ("exon 2".to_string(), Some(8), "frameshift".to_string()));
         assert_eq!(r(28, "T>C"), ("3' UTR".to_string(), None, "non-coding".to_string()));
     }
+}
+
+/// Approximate sequencing depth over the HLA genes: read pairs of ten genes that are always present
+/// in two copies, against their median on the 80 HPRC development samples at 30x (8056 pairs, 150 bp
+/// reads). Only a rough guide: read length and library change the count.
+fn depth_estimate(res: &AHashMap<String, (StageB, Option<Vec<String>>, RMarg)>) -> Option<f64> {
+    const GENES: [&str; 10] = ["A", "B", "C", "DPA1", "DPB1", "DQA1", "DQB1", "E", "F", "G"];
+    let mut n = 0f64;
+    for g in GENES {
+        n += res.get(g)?.0.nreads as f64;
+    }
+    Some((n / 8056.0 * 30.0 * 10.0).round() / 10.0)
 }

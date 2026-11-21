@@ -422,6 +422,16 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
             "Run without the repeat mask: reads from similar places in the genome can be counted. The result is less reliable than in the validation (too many fields for MICA/MICB, apparent differences in DRB1/DRB4). Set up the mask (hla-wgs build-mask) and run again."
         )));
     }
+    if let Some(dx) = rep["depth_estimate"].as_f64().filter(|d| *d < 18.0) {
+        // validation, 80 HPRC samples thinned (validation/results/depth): certain four-field calls exact
+        // 98.8 % at 30x and 20x, 98.6 % at 15x, 97.9 % at 10x, and about 40 % fewer of them at 10x
+        let msg = if de {
+            format!("Geringe Tiefe: etwa {dx:.0}x über den HLA-Genen. Das Programm sichert dann weniger Felder, und gesicherte vierte Felder sind etwas seltener exakt (Prüfung bei 10x: 97,9 % statt 98,8 % bei 30x). Für ein verlässliches viertes Feld sind 15x oder mehr ratsam.")
+        } else {
+            format!("Low depth: about {dx:.0}x over the HLA genes. Fewer fields are then supported, and supported fourth fields are somewhat less often exact (validation at 10x: 97.9 % instead of 98.8 % at 30x). For a dependable fourth field, 15x or more is advisable.")
+        };
+        h.push_str(&format!("<div class=\"alert soft\">{}</div>\n", esc(&msg)));
+    }
     if !rep["groups_loaded"].as_bool().unwrap_or(true) {
         h.push_str(&format!("<div class=\"alert soft\">{}</div>\n", t(
             "G- und P-Gruppen fehlen: hla_nom_g.txt und hla_nom_p.txt liegen nicht in der Datenbank.",
