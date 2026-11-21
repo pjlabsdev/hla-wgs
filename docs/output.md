@@ -46,7 +46,7 @@ Schema `genome.hla.v1`.
 ```json
 {
   "tool": "hla-wgs", "version": "1.0.0", "schema": "genome.hla.v1",
-  "thresholds": {"2": 6.0, "3": 6.0, "4": 4.0},
+  "thresholds": {"2": 6.0, "3": 6.0, "4": 4.0, "4_01": 1.0},
   "genes": [
     {
       "gene": "DPB1", "called": true, "copies": 2, "reads": 1341, "gap": 1.52,
@@ -165,7 +165,7 @@ For experiments; the defaults are the validated configuration.
 | `HLA_NOKNOWN` | do not rename a call to the database allele that its new sites describe |
 | `HLA_NOBIG` | count long insertions and deletions per base instead of as one event |
 | `HLA_UNPH` | also cut the fourth field when a sibling allele differs only at positions without phase information (fewer wrong, clearly fewer certain calls) |
-| `HLA_F401=0` | fourth field 01 needs the full lead of 4 like any other allele |
+| `HLA_F401=0` | fourth field 01 needs the full lead of 4 like any other allele | (`thresholds.4_01` is then null)
 | `HLA_UNSTHIN=0` | old rule for unsupported database bases: also in stretches with fewer than half the usual reads |
 | `HLA_PHASE`, `HLA_BREAK` | experimental phase and break-point rules, off by default |
 
