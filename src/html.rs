@@ -342,6 +342,15 @@ fn pgx_rec(allele: &str, t: &dyn Fn(&'static str, &'static str) -> &'static str)
     }
 }
 
+/// drug names in the page language (the JSON carries the English names)
+fn drugs_text(d: &str, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> String {
+    let mut o = d.to_string();
+    for (en, de) in [("carbamazepine", "Carbamazepin"), ("oxcarbazepine", "Oxcarbazepin"), ("fosphenytoin", "Fosphenytoin"), ("phenytoin", "Phenytoin"), ("abacavir", "Abacavir"), ("allopurinol", "Allopurinol")] {
+        o = o.split(", ").map(|w| if w == en { t(de, en).to_string() } else { w.to_string() }).collect::<Vec<_>>().join(", ");
+    }
+    o
+}
+
 /// the clinical summary: the eleven loci at two fields with group, antigen and receptor ligand
 fn clinical(genes: &[Value], t: &dyn Fn(&'static str, &'static str) -> &'static str) -> String {
     let empty = vec![];
@@ -571,7 +580,7 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         pgx.push_str(&format!(
             "<tr><td class=\"g\">HLA-{}</td><td>{state}</td><td>{}</td><td>{advice}</td><td class=\"note hide\"><a href=\"{url}\">{gl}</a></td></tr>\n",
             esc(al),
-            esc(p["drugs"].as_str().unwrap_or(""))
+            esc(&drugs_text(p["drugs"].as_str().unwrap_or(""), &t))
         ));
     }
 
@@ -887,5 +896,6 @@ mod tests {
         let c = super::clinical(&genes, &t);
         assert!(c.contains("HLA-B*40:01") && c.contains("B60 (B40)") && c.contains("Bw6") && c.contains("keines vorhanden"));
         assert!(!c.contains("HLA-DRB4<"));
+        assert_eq!(super::drugs_text("carbamazepine, oxcarbazepine, phenytoin, fosphenytoin", &t), "Carbamazepin, Oxcarbazepin, Phenytoin, Fosphenytoin");
     }
 }
