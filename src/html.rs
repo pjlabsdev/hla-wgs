@@ -99,7 +99,7 @@ svg.fdia .br,svg.fdia .ln{fill:none!important}
 svg.fdia .lb{font:400 12px 'IBM Plex Mono',ui-monospace,monospace;fill:var(--mut)}svg.fdia .lb.off{fill:var(--soft-fg)}
 .legend{background:var(--surface);border:1px solid var(--hair);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 20px 6px;margin:0 0 14px;overflow-x:auto}.legend .note{margin:2px 0 10px}h4.ah{font-size:12px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--acc-t);margin:18px 0 2px;padding-top:12px;border-top:1px solid var(--hair)}details h4.ah:first-of-type{border-top:0;padding-top:0}.legend h3{font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--soft-fg);margin:0 0 6px}
 .alert{margin:22px 0 0;padding:12px 16px;border-radius:var(--r);background:color-mix(in srgb,var(--acc) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);font-size:12px;line-height:1.55}.alert.soft{background:var(--surface);border-color:var(--hair)}
-@media print{.bar,nav.tabs{display:none}section.tab-r,section.tab-d{display:block!important}section.tab-d{break-before:page}}
+@media print{.bar,nav.tabs{display:none}summary:after{display:none}}
 body[data-tab=r] section.tab-d,body[data-tab=d] section.tab-r{display:none}
 .ruo{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--acc-t);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);border-radius:999px;display:inline-block;padding:3px 12px;margin:0 0 22px}
 .head{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:22px;background:var(--surface);border:1px solid var(--hair);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
@@ -121,7 +121,7 @@ footer{margin-top:48px;border-top:1px solid var(--line);padding-top:18px;color:v
 footer p{margin:6px 0}
 .cite{color:var(--fg)}
 @media (max-width:720px){.cards{grid-template-columns:repeat(2,1fr)}.hide{display:none}h1{font-size:24px}.panel,details{padding-left:14px;padding-right:14px}}
-@media print{:root{--bg:#fff;--surface:#fff;--shadow:none}main{padding:0;max-width:none}a{color:inherit}tr,details{break-inside:avoid}body{font-size:11px}.card,.panel,details{box-shadow:none}}
+@media print{:root{--bg:#fff;--surface:#fff;--shadow:none}main{padding:0;max-width:none}a{color:inherit}tr,summary,.kv{break-inside:avoid}h4{break-after:avoid}body{font-size:11px}.card,.panel,details{box-shadow:none}}
 ";
 
 // IBM Plex Mono (SIL Open Font License 1.1, src/fonts/OFL.txt), embedded so the page needs no network
@@ -549,7 +549,9 @@ fn class_of(g: &str) -> u8 {
 /// the page holds the result in German and in English; a switch at the top shows one of them,
 /// the default follows HLA_WGS_LANG / LANG
 pub fn render(rep: &Value, sample: &str) -> String {
-    let css = CSS.replace("F400", &b64(FONT400)).replace("F500", &b64(FONT500));
+    // every printed page names the sample and the report number, so a loose sheet can be assigned
+    let foot = format!("{sample} · {} · hla-wgs · RUO", report_id(rep)).replace('\\', "").replace('\'', "\\'");
+    let css = CSS.replace("F400", &b64(FONT400)).replace("F500", &b64(FONT500)) + &format!("@page{{@bottom-left{{content:'{foot}'}}}}");
     let de = german();
     let first = if de { "de" } else { "en" };
     format!(
@@ -846,8 +848,8 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         "</section>\n<section class=\"tab-d\">\n<h2>{}</h2>\n<p class=\"note\">{}</p>\n{details}</section>\n",
         t("Details je Gen", "Details per gene"),
         t(
-            "Allel 1 und Allel 2 sind die beiden Kopien des Gens, eine von der Mutter und eine vom Vater; die Nummer sagt nicht, von wem welche stammt. Alle Werte aus .tsv und .conf.tsv. Vorsprung: wie viel besser (Log-Likelihood) das gewählte Allel die Reads erklärt als das beste Allel, das sich in diesem Feld unterscheidet; ab der Schwelle gilt das Feld als gesichert. Ein Klick öffnet ein Gen; beim Drucken sind alle offen.",
-            "Allele 1 and allele 2 are the two copies of the gene, one from the mother and one from the father; the number does not say which is which. All values of .tsv and .conf.tsv. Lead: how much better (log-likelihood) the chosen allele explains the reads than the best allele that differs in this field; at or above the threshold the field counts as supported. Click a gene to open it; all are open when printed."
+            "Allel 1 und Allel 2 sind die beiden Kopien des Gens, eine von der Mutter und eine vom Vater; die Nummer sagt nicht, von wem welche stammt. Alle Werte aus .tsv und .conf.tsv. Vorsprung: wie viel besser (Log-Likelihood) das gewählte Allel die Reads erklärt als das beste Allel, das sich in diesem Feld unterscheidet; ab der Schwelle gilt das Feld als gesichert. Ein Klick öffnet ein Gen. Gedruckt wird der Reiter, der gerade offen ist; dieser hier mit allen Genen aufgeklappt.",
+            "Allele 1 and allele 2 are the two copies of the gene, one from the mother and one from the father; the number does not say which is which. All values of .tsv and .conf.tsv. Lead: how much better (log-likelihood) the chosen allele explains the reads than the best allele that differs in this field; at or above the threshold the field counts as supported. Click a gene to open it. Printing prints the tab that is open; this one with all genes opened."
         )
     ));
     let rel = rep["database_release"].as_str().map(|r| format!(" {} {}.", t("Datenbank: IPD-IMGT/HLA", "Database: IPD-IMGT/HLA"), esc(r))).unwrap_or_default();
