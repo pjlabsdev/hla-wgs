@@ -2,6 +2,7 @@
 
 ## Unreleased (1.1.0)
 
+- A database base is no longer called unsupported where the stretch has fewer than half the usual reads (a repeat piece whose reads the mask removes, such as the L1 piece in intron 1 of DPB1) and more than one read of the allele itself backs it. On 80 HPRC samples: certain four-field calls 1740 of 1761 exact (before 1731 of 1752), 14 fewer false sites, no true site lost. `HLA_UNSTHIN=0` restores the old rule.
 - Result page in the form of a laboratory report: a head with sample, report number, input files, date, software, database, depth and a quality line; a clinical summary of the eleven loci of a clinical typing (A, B, C, DRB1, DRB3/4/5, DQA1, DQB1, DPA1, DPB1) at two fields with G group, WHO serological antigen and natural killer cell receptor ligand; the GL String to copy; pharmacogenetics as positive or negative with the CPIC recommendation in one sentence; resolution in words; new alleles with the nearest allele and whether the protein changes; non-classical genes, pseudogenes, MIC, TAP and HFE folded away; method and limits; A4 printing with page numbers. No disease associations.
 - JSON: `serology` and `serology_assumed` per allele from the WMDA files `rel_dna_ser.txt` and `rel_ser_ser.txt` (the start file fetches them), `ligand` (Bw4-80I/T, Bw6, C1, C2) from the protein, `input`, `analysis_time`, `serology_loaded`.
 - `hla-wgs html PREFIX.json` writes the page again from the JSON.

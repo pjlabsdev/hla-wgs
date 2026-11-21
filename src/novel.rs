@@ -381,7 +381,10 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
                 let own = dspec[k][*p] + dshared[k][*p];
                 if *p < own_s + 10 || *p + 10 > own_e || v.iter().any(|s| s.pos == *p) { continue; }
                 if w.starts_with("del") || w.starts_with("ins") { continue; }
-                if own <= (med / 8).max(2) && *n >= 7 && (*n as f64) >= 0.7 * dlose[k][*p] as f64 && dlose[k][*p] <= 2 * med {
+                // a stretch that half the reads miss (a repeat piece whose reads the mask takes away): the few own
+                // reads left there are real support, so the allowance for stray reads shrinks with the depth
+                let tol = if 2 * (own + dlose[k][*p]) < med && std::env::var("HLA_UNSTHIN").map_or(true, |v| v != "0") { 1 } else { (med / 8).max(2) };
+                if own <= tol && *n >= 7 && (*n as f64) >= 0.7 * dlose[k][*p] as f64 && dlose[k][*p] <= 2 * med {
                     v.push(Site { pos: *p, what: format!("{w}(unsupported)"), alt: *n as usize, depth: (own + dlose[k][*p]) as usize, exon: ex.iter().any(|&(s, e)| *p >= s && *p < e), either: false });
                 }
             }

@@ -165,6 +165,7 @@ For experiments; the defaults are the validated configuration.
 | `HLA_NOKNOWN` | do not rename a call to the database allele that its new sites describe |
 | `HLA_NOBIG` | count long insertions and deletions per base instead of as one event |
 | `HLA_UNPH` | also cut the fourth field when a sibling allele differs only at positions without phase information (fewer wrong, clearly fewer certain calls) |
+| `HLA_UNSTHIN=0` | old rule for unsupported database bases: also in stretches with fewer than half the usual reads |
 | `HLA_PHASE`, `HLA_BREAK` | experimental phase and break-point rules, off by default |
 
 ## PREFIX.html
