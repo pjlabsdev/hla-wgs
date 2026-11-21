@@ -62,14 +62,26 @@ All scripts and result tables are in [`validation/`](validation/).
 | 45 further 1000 Genomes samples with laboratory typing (A, B, C, DRB1, DQB1) | 438 / 450 at two fields; of 12 differences 5 are resolution limits of the laboratory method, 3 are probable laboratory errors (B\*27:05 against 27:03), 4 are open |
 | GIAB trios (Ashkenazi, Han Chinese), 60x to 100x | no Mendelian conflict at two or three fields in any gene; none at four fields among calls reported as certain |
 
-The 22 certain four-field calls that are not exact: 9 differ only in the length of a homopolymer or
+With the 1.1 development version (this branch):
+
+| Test | Result |
+|---|---|
+| 80 HPRC samples, 18 genes | two fields 2,486 / 2,489, three fields 2,482 / 2,489; certain at four fields 1,752, of these 1,731 exact (98.8 %) |
+| 59 HGSVC3 samples never used at any stage, assembly truth, 18 genes | two fields 1,833 / 1,833, three fields 1,830 / 1,833; certain at four fields 1,206, of these 1,191 exact (98.8 %) |
+| Eight added genes (DMA, DMB, DOA, DOB, MICA, MICB, TAP1, TAP2), 80 HPRC samples | calls certain to three fields or more with every exon equal to the assembly: 988 / 999; fourth field DMA 153 / 153, DOA 112 / 115, DOB 134 / 136, TAP1 40 / 41; DMB and TAP2 are reported to three fields at most, MICA and MICB do not reach four |
+| Same 80 samples thinned to 20x, 15x, 10x | two fields 2,485 / 2,481 / 2,476 of 2,489; certain at four fields 1,660 / 1,539 / 1,082, of these exact 98.8 / 98.6 / 97.9 % (`validation/results/depth`) |
+| Second assembly truth (Lai et al. 2024), 40 shared samples, 11 genes | two fields equal in 489 / 492 allele calls of the two truths; no difference traced to an error of ours (`validation/results/lai2024`) |
+
+The figures below belong to release 1.0.0. The 22 certain four-field calls that are not exact: 9 differ only in the length of a homopolymer or
 short tandem repeat, 4 are phase swaps at the 3' end of HLA-B that short reads cannot resolve, 9
 are single missed variants in other genes.
 
 The 80 HPRC samples were used to develop the four-field logic. On 30 further HPRC samples that played
 no part in developing these rules (they had been the first held-out round of the two-field typer),
 607 of 621 alleles reported as certain at four fields were exact (97.7 %), two fields 935 / 935 and
-three fields 934 / 935. A test on genomes never used at any stage is still missing.
+three fields 934 / 935. The test on genomes never used at any stage is the HGSVC3 row above
+([`validation/results/hgsvc3_v1.1/`](validation/results/hgsvc3_v1.1/)); the frequency table may
+include laboratory types of some of these samples.
 
 The full report is in [`docs/paper/hla-wgs-report.pdf`](docs/paper/hla-wgs-report.pdf).
 
@@ -82,6 +94,21 @@ cargo build --release          # Rust 1.85 or newer; a C compiler is needed for 
 ```
 
 Runs on Linux and macOS (x86-64 and ARM).
+
+## Start file
+
+`start/hla-wgs-start.command` is a double-clickable start file (on macOS it opens in Terminal; on
+Linux run it with `bash`). It asks for the input; drag the BAM, CRAM or FASTQ file into the window,
+which inserts its path, or type the path, then press Enter. If the reference is missing it sets it up
+once in `ref/` next to the start file (download of hla.dat 3.66, `build-db`, the WMDA G/P files and
+the repeat mask `data/panel_mask_3.66.bed`; `HLA_WGS_DB` points to another one), then runs
+hla-wgs into `~/Downloads/hla-wgs-<sample>` (a new folder if one with results exists) and shows the
+result table with an animated progress display, and opens the result page `PREFIX.html`. For PacBio HiFi reads start it with `--long` (or `HLA_WGS_LONG=1`). It looks for the `hla-wgs` program next to itself, in `../target/release` or in PATH.
+
+Another IPD-IMGT/HLA release in one step: start it with `HLA_WGS_RELEASE=3.67` (any release
+number). It then builds `ref/hladb_3.67` beside the 3.66 reference and carries the repeat mask over
+from it; the 3.66 reference is set up first if it is missing. Validation used release 3.66; the
+result page and the JSON name the release of the database that was used.
 
 ## Build the reference once
 
@@ -99,6 +126,17 @@ panel that also occur outside the MHC in the genome (repeats), so that reads fro
 counted; it writes `hladb/panel.fa.mask.bed`. The genome is assumed to be GRCh38; for another
 assembly pass a BED file with the MHC region to exclude as third argument. Validation used
 IPD-IMGT/HLA release 3.66.
+
+A database of another release does not need the genome again:
+`hla-wgs build-mask hladb_new --from hladb` carries the mask over. Alleles with unchanged sequence
+keep their intervals; for new or changed alleles, the positions whose 21-mers lie inside masked
+intervals of the older panel are marked and joined by the same rules.
+
+Optional: copy `wmda/hla_nom_g.txt` and `wmda/hla_nom_p.txt` of the same release into `hladb/` to get
+G and P groups in the JSON output, and `wmda/rel_dna_ser.txt` with `wmda/rel_ser_ser.txt` for the
+serological antigens (the start file fetches all four).
+
+`hla-wgs html PREFIX.json` writes the result page again from the JSON, for example after an update.
 
 `data/freq_1000g_2field.json` holds two-field allele frequencies of A, B, C, DRB1 and DQB1 counted
 from the public 1000 Genomes laboratory typing (`data/build_freq.py`). They serve as a weak prior
@@ -118,6 +156,20 @@ hla-wgs hladb sample.cram out/sample 4 GRCh38.fa
 From BAM/CRAM the program reads the MHC region (GRCh38 chr6:28,510,120-33,480,577 or GRCh37
 6:28,477,797-33,448,354), all ALT and HLA contigs, and the unmapped reads. The last argument is the
 number of threads.
+
+### Long reads (experimental, 1.1)
+
+```bash
+hla-wgs long hladb sample.hifi.bam out/sample 4      # indexed BAM: the MHC region is read
+hla-wgs long hladb mhc_reads.fastq.gz out/sample 4
+```
+
+For PacBio HiFi reads. A read of 10 to 25 kb usually holds a whole gene, so the sequence of each
+haplotype is built from the reads and compared with every full-length allele. This also reaches what
+short reads cannot: the Alu cluster and the long repeats in DRB1, DRB3 and DRB4, although the exact
+length of the longest repeats stays the weak point (marked as unsure sites). Output:
+`PREFIX.long.tsv` and `PREFIX.long.fa`, see [`docs/output.md`](docs/output.md). Tested on PacBio HiFi
+(26 samples); see `validation/results/long26/`.
 
 ## Output
 

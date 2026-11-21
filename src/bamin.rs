@@ -17,7 +17,7 @@ const GRCH38_CHR6: usize = 170_805_979;
 const GRCH37_CHR6: usize = 171_115_067;
 
 /// regions to query, as "name:start-end" strings (1-based, inclusive)
-fn regions(refs: &[(String, usize)]) -> Vec<String> {
+pub fn regions(refs: &[(String, usize)]) -> Vec<String> {
     let mut out = vec![];
     for (name, len) in refs {
         let n = name.as_str();
@@ -82,9 +82,52 @@ impl Pairer {
     }
 }
 
-/// stream all pairs of an indexed BAM or CRAM into `tx`; returns (records seen, pairs, singletons)
+/// stream all pairs of an indexed BAM or CRAM into `tx`; returns (records seen, pairs, singletons).
+/// An I/O error (USB disk dropping out, volume briefly unmounted) does not abort the run: the
+/// file is reopened after a pause and reading resumes after the last record already consumed.
+/// Records arrive in the same order as in an uninterrupted pass, so results are unchanged.
 pub fn stream(path: &str, reference: Option<&str>, threads: usize, tx: SyncSender<(Vec<Fq>, Vec<Fq>)>) -> (u64, u64, usize) {
     let mut p = Pairer { open: AHashMap::new(), b1: vec![], b2: vec![], tx, records: 0, pairs: 0 };
+    let tries = crate::util::io_retries();
+    let mut attempt = 0;
+    let mut last_eof: Option<u64> = None;
+    loop {
+        let skip = p.records;
+        match pass(path, reference, threads, skip, &mut p) {
+            Ok(()) => break,
+            Err(e) => {
+                // nothing read yet and the content is at fault (no index, not a BAM, cut short):
+                // a pause does not help
+                let eof = e.kind() == std::io::ErrorKind::UnexpectedEof;
+                if crate::util::permanent(&e) || (eof && p.records == 0) {
+                    crate::util::die(&format!("{path}: not a valid or complete BAM/CRAM with index ({e})"));
+                }
+                // the same early end at the same record after a reopen: the file itself is cut short
+                if eof && last_eof == Some(p.records) {
+                    crate::util::die(&format!("{path}: file ends early after {} records ({e}); it is truncated or damaged", p.records));
+                }
+                last_eof = if eof { Some(p.records) } else { None };
+                attempt += 1;
+                if attempt > tries {
+                    crate::util::die(&format!("{path}: {e} (gave up after {tries} retries)"));
+                }
+                let wait = crate::util::backoff(attempt);
+                eprintln!("[input] {path}: I/O error after {} records: {e}; retry {attempt}/{tries} in {wait}s", p.records);
+                std::thread::sleep(std::time::Duration::from_secs(wait));
+            }
+        }
+    }
+    p.flush();
+    (p.records, p.pairs, p.open.len())
+}
+
+fn err<E: std::fmt::Display>(e: E) -> std::io::Error {
+    std::io::Error::other(e.to_string())
+}
+
+/// one pass over regions and unmapped tail; records 1..=skip are read but not handed on
+fn pass(path: &str, reference: Option<&str>, threads: usize, skip: u64, p: &mut Pairer) -> std::io::Result<()> {
+    let mut seen: u64 = 0;
     let lower = path.to_ascii_lowercase();
     if lower.ends_with(".cram") {
         use noodles::{cram, fasta};
@@ -93,23 +136,28 @@ pub fn stream(path: &str, reference: Option<&str>, threads: usize, tx: SyncSende
             .map(fasta::repository::adapters::IndexedReader::new)
             .map(fasta::Repository::new)
             .unwrap_or_default();
-        let mut rd = cram::io::reader::Builder::default()
-            .set_reference_sequence_repository(repo)
-            .build_from_path(path)
-            .unwrap_or_else(|e| panic!("{path}: {e}"));
-        let header = rd.read_header().expect("CRAM header");
-        let index = cram::fs::read_associated_index(path).expect("CRAM index (.crai) next to the file");
+        let mut rd = cram::io::reader::Builder::default().set_reference_sequence_repository(repo).build_from_path(path)?;
+        let header = rd.read_header()?;
+        let index = cram::fs::read_associated_index(path)?;
         let refs: Vec<(String, usize)> = header.reference_sequences().iter().map(|(n, m)| (n.to_string(), m.length().get())).collect();
         for reg in regions(&refs) {
             let region = reg.parse().unwrap();
-            for r in rd.query(&header, &index, &region).expect("CRAM query").records() {
-                let r = r.expect("CRAM record");
+            for r in rd.query(&header, &index, &region)?.records() {
+                let r = r?;
+                seen += 1;
+                if seen <= skip {
+                    continue;
+                }
                 let nm = r.name().map(|n| n.to_vec()).unwrap_or_default();
                 p.add(&nm, r.flags(), r.sequence().as_ref().to_vec());
             }
         }
-        for r in rd.query_unmapped(&header, &index).expect("CRAM unmapped") {
-            let r = r.expect("CRAM record");
+        for r in rd.query_unmapped(&header, &index)? {
+            let r = r?;
+            seen += 1;
+            if seen <= skip {
+                continue;
+            }
             let nm = r.name().map(|n| n.to_vec()).unwrap_or_default();
             p.add(&nm, r.flags(), r.sequence().as_ref().to_vec());
         }
@@ -118,35 +166,45 @@ pub fn stream(path: &str, reference: Option<&str>, threads: usize, tx: SyncSende
         // multithreaded BGZF decompression over a large read buffer: the unmapped tail of a WGS
         // BAM is several GB, and USB disks like large sequential reads
         let workers = std::num::NonZero::new(threads.clamp(1, 8)).unwrap();
-        let f = std::fs::File::open(path).unwrap_or_else(|e| panic!("{path}: {e}"));
+        let f = std::fs::File::open(path)?;
         let mut rd = bam::io::Reader::from(bgzf::io::MultithreadedReader::with_worker_count(
             workers,
             std::io::BufReader::with_capacity(8 << 20, f),
         ));
-        let header = rd.read_header().expect("BAM header");
+        let header = rd.read_header()?;
         let index = bam::fs::read_associated_index(path)
             .or_else(|_| {
                 let alt = path.strip_suffix(".bam").map(|b| format!("{b}.bai")).unwrap_or_default();
                 noodles::bam::bai::fs::read(&alt).map(noodles::bam::Index::Bai)
             })
-            .unwrap_or_else(|e| panic!("{path}: index .bam.bai/.bai/.csi needed: {e}"));
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("index .bam.bai/.bai/.csi needed: {e}")))?;
         let refs: Vec<(String, usize)> = header.reference_sequences().iter().map(|(n, m)| (n.to_string(), m.length().get())).collect();
         for reg in regions(&refs) {
             let region = reg.parse().unwrap();
-            for r in rd.query(&header, &index, &region).expect("BAM query").records() {
-                let r = r.expect("BAM record");
+            for r in rd.query(&header, &index, &region)?.records() {
+                let r = r?;
+                seen += 1;
+                if seen <= skip {
+                    continue;
+                }
                 let nm = r.name().map(|n| n.to_vec()).unwrap_or_default();
                 let seq: Vec<u8> = r.sequence().iter().collect();
                 p.add(&nm, r.flags(), seq);
             }
         }
-        for r in rd.query_unmapped(&index).expect("BAM unmapped") {
-            let r = r.expect("BAM record");
+        for r in rd.query_unmapped(&index)? {
+            let r = r?;
+            seen += 1;
+            if seen <= skip {
+                continue;
+            }
+            if crate::util::test_fault(seen) {
+                return Err(err("injected test fault (HLA_TEST_IO_FAULT)"));
+            }
             let nm = r.name().map(|n| n.to_vec()).unwrap_or_default();
             let seq: Vec<u8> = r.sequence().iter().collect();
             p.add(&nm, r.flags(), seq);
         }
     }
-    p.flush();
-    (p.records, p.pairs, p.open.len())
+    Ok(())
 }

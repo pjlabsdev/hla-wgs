@@ -39,9 +39,26 @@ impl Al {
     }
 }
 
+/// newest release named in the DT lines ("Rel. 3.66.0"): the release of the file
+static RELEASE: std::sync::Mutex<(u32, u32, u32)> = std::sync::Mutex::new((0, 0, 0));
+
+fn note_release(line: &str) {
+    let Some(p) = line.find("(Rel. ") else { return };
+    let v: Vec<u32> = line[p + 6..].split(|c: char| !c.is_ascii_digit()).take(3).filter_map(|x| x.parse().ok()).collect();
+    if v.len() == 3 {
+        let mut r = RELEASE.lock().unwrap();
+        if (v[0], v[1], v[2]) > *r { *r = (v[0], v[1], v[2]); }
+    }
+}
+
 fn parse(dat: &str) -> Vec<Al> {
-    let f = std::fs::File::open(dat).unwrap_or_else(|e| panic!("{dat}: {e}"));
-    let rd = std::io::BufReader::with_capacity(1 << 20, f);
+    let f = std::fs::File::open(dat).unwrap_or_else(|e| crate::util::die(&format!("{dat}: {e}")));
+    let mut rd = std::io::BufReader::with_capacity(1 << 20, f);
+    // an EMBL flat file starts with "ID   HLA....."; anything else is the wrong file
+    let head = std::io::BufRead::fill_buf(&mut rd).unwrap_or_else(|e| crate::util::die(&format!("{dat}: {e}")));
+    if !head.starts_with(b"ID   HLA") {
+        crate::util::die(&format!("not an IPD-IMGT/HLA hla.dat file: {dat} (its first line must start with \"ID   HLA\"; unpack hla.dat.zip first)"));
+    }
     let mut out: Vec<Al> = vec![];
     let mut cur: Option<(Option<String>, bool, Vec<Feat>, String)> = None;
     let mut flush = |cur: &mut Option<(Option<String>, bool, Vec<Feat>, String)>, out: &mut Vec<Al>| {
@@ -60,11 +77,13 @@ fn parse(dat: &str) -> Vec<Al> {
         }
     };
     for line in rd.lines() {
-        let line = line.unwrap();
+        let line = line.unwrap_or_else(|e| crate::util::die(&format!("{dat}: {e}")));
         let tag = line.get(..2).unwrap_or("");
         if tag == "ID" {
             flush(&mut cur, &mut out);
             cur = Some((None, false, vec![], String::new()));
+        } else if tag == "DT" {
+            note_release(&line);
         } else if tag == "DE" {
             let c = cur.as_mut().unwrap();
             if c.0.is_none() {
@@ -211,7 +230,7 @@ fn refbuild(alleles: Vec<Al>) -> Vec<(String, Vec<Al>)> {
     bygene
 }
 
-const TARGET: [&str; 23] = ["A", "B", "C", "E", "F", "G", "H", "J", "K", "L", "DRA", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DQA2", "DQB2", "DPA2", "DPB2"];
+const TARGET: [&str; 31] = ["A", "B", "C", "E", "F", "G", "H", "J", "K", "L", "DRA", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DQA2", "DQB2", "DPA2", "DPB2", "DMA", "DMB", "DOA", "DOB", "MICA", "MICB", "TAP1", "TAP2"];
 
 /// numpy.percentile(x, q) with linear interpolation
 fn percentile(v: &[usize], q: f64) -> f64 {
@@ -222,6 +241,10 @@ fn percentile(v: &[usize], q: f64) -> f64 {
     let hi = pos.ceil() as usize;
     s[lo] + (s[hi] - s[lo]) * (pos - lo as f64)
 }
+
+/// Layout of the built database, written to `DBDIR/format`. 2: short alleles of DMA, DMB, DOA, DOB,
+/// MICA, MICB, TAP1 and TAP2 carry donor flanks like those of the other genes (1.1).
+pub const DB_FORMAT: u32 = 2;
 
 /// extend.py: give short alleles the 5'/3' flanks of the nearest full-span allele
 fn extend(genes: &mut [(String, Vec<Al>)]) {
@@ -411,5 +434,12 @@ pub fn run(args: &[String]) {
     serde_json::to_writer(&mut gz, &donor_j).unwrap();
     gz.write_all(b"}").unwrap();
     gz.finish().unwrap();
+    std::fs::write(format!("{outdir}/format"), format!("{DB_FORMAT}\n")).unwrap_or_else(|e| crate::util::die(&format!("{outdir}/format: {e}")));
+    let r = *RELEASE.lock().unwrap();
+    if r.0 > 0 {
+        let rel = format!("{}.{}.{}", r.0, r.1, r.2);
+        std::fs::write(format!("{outdir}/release"), format!("{rel}\n")).unwrap_or_else(|e| crate::util::die(&format!("{outdir}/release: {e}")));
+        eprintln!("[{:.0}s] IPD-IMGT/HLA release {rel}", t.elapsed().as_secs_f64());
+    }
     eprintln!("[{:.0}s] wrote {outdir}/hladb.json.gz and {outdir}/panel.fa", t.elapsed().as_secs_f64());
 }

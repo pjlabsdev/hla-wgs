@@ -1,6 +1,6 @@
 //! Stage 0: map the extracted read pairs to the gene panel (minimap2 sr, paired, -N 20) and
 //! assign every pair to the gene(s) with the best summed alignment score.
-use crate::util::{open_reader, read_fq};
+use crate::util::open_reader;
 use ahash::AHashMap;
 use minimap2::Aligner;
 use rayon::prelude::*;
@@ -56,8 +56,12 @@ fn load_mask(panel: &str) -> AHashMap<String, Vec<(i64, i64)>> {
         }
     }
     eprintln!("[mask] {} alleles with repeat intervals from {}", m.len(), p);
+    MASK_LOADED.store(!m.is_empty(), std::sync::atomic::Ordering::Relaxed);
     m
 }
+
+/// whether a repeat mask was in use (reported in PREFIX.json and on the result page)
+pub static MASK_LOADED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
     let mut al = Aligner::builder()
@@ -69,12 +73,12 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
     al.mapopt.best_n = std::env::var("MM2N").ok().and_then(|v| v.parse().ok()).unwrap_or(20);
     // exact 21-mer prefilter: minimap2 sr seeds are exact 21-mers, so a pair without any shared
     // 21-mer cannot get a hit; skipping it changes nothing but saves its seeding
-    let set = panel_kmers(panel);
     let pair_rule = std::env::var("HLA_PAIR").is_ok();
     // repeat mask: intervals of panel alleles whose 21-mers recur elsewhere in the genome. A pair counts for a
     // gene only if one mate aligns with at least MASK_ANCHOR bases outside the mask, so reads of repeat copies
     // from other chromosomes cannot enter through an intronic Alu or L1 copy
     let mask = load_mask(panel);
+    let set = panel_kmers(panel, &mask);
     // read the next batch while the current one is mapped
     let (tx, rx) = std::sync::mpsc::sync_channel::<(Vec<crate::util::Fq>, Vec<crate::util::Fq>)>(2);
     let inp = match input {
@@ -83,11 +87,9 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
     };
     let reader = std::thread::spawn(move || match inp {
         Input::Fastq(r1s, r2s) => {
-            let (mut f1, mut f2) = (open_reader(&r1s), open_reader(&r2s));
+            let mut src = crate::util::PairedFq::new(&r1s, &r2s);
             loop {
-                let b1 = read_fq(&mut *f1, 50_000);
-                let b2 = read_fq(&mut *f2, 50_000);
-                assert_eq!(b1.len(), b2.len(), "mates out of sync");
+                let (b1, b2) = src.batch(50_000);
                 if b1.is_empty() {
                     break;
                 }
@@ -104,7 +106,29 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
     let mut seqs: Vec<[Option<Vec<u8>>; 2]> = vec![];
     // per read: genes in first-hit order with best AS per mate
     let mut gscore: Vec<Vec<(String, [i64; 2])>> = vec![];
+    // optional read cache (env HLA_SAVE_READS=PREFIX): the pairs that pass the 21-mer prefilter
+    // are written to PREFIX.R1.fq.gz / PREFIX.R2.fq.gz in input order. Typing these files as
+    // FASTQ gives the same result as the original input, without reading the BAM/FASTQ again.
+    let mut cache = std::env::var("HLA_SAVE_READS").ok().map(|pre| {
+        let w = |m: u8| {
+            let f = std::fs::File::create(format!("{pre}.R{m}.fq.gz")).unwrap_or_else(|e| panic!("{pre}.R{m}.fq.gz: {e}"));
+            flate2::write::GzEncoder::new(std::io::BufWriter::with_capacity(1 << 20, f), flate2::Compression::fast())
+        };
+        (w(1), w(2))
+    });
     for (b1, b2) in rx {
+        if let Some((w1, w2)) = cache.as_mut() {
+            use std::io::Write;
+            let keep: Vec<bool> = b1.par_iter().zip(b2.par_iter()).map(|(x, y)| has_kmer(&x.seq, &set) || has_kmer(&y.seq, &set)).collect();
+            for ((x, y), k) in b1.iter().zip(b2.iter()).zip(keep) {
+                if k {
+                    for (w, r) in [(&mut *w1, x), (&mut *w2, y)] {
+                        let q = vec![b'I'; r.seq.len()];
+                        w.write_all(b"@").and_then(|_| w.write_all(r.name.as_bytes())).and_then(|_| w.write_all(b"\n")).and_then(|_| w.write_all(&r.seq)).and_then(|_| w.write_all(b"\n+\n")).and_then(|_| w.write_all(&q)).and_then(|_| w.write_all(b"\n")).expect("read cache write");
+                    }
+                }
+            }
+        }
         let res: Vec<Option<(String, [Option<Vec<u8>>; 2], Vec<(String, [i64; 2])>)>> = b1
             .par_iter()
             .zip(b2.par_iter())
@@ -205,6 +229,10 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
         }
     }
     reader.join().unwrap();
+    if let Some((w1, w2)) = cache {
+        w1.finish().and_then(|mut b| std::io::Write::flush(&mut b)).expect("read cache R1");
+        w2.finish().and_then(|mut b| std::io::Write::flush(&mut b)).expect("read cache R2");
+    }
     let mut assign: AHashMap<String, Vec<usize>> = AHashMap::new();
     for (q, gs) in gscore.iter().enumerate() {
         let tot: Vec<i64> = gs.iter().map(|(_, v)| v[0].max(0) + v[1].max(0)).collect();
@@ -262,22 +290,44 @@ fn for_kmers(s: &[u8], mut f: impl FnMut(u64) -> bool) -> bool {
     false
 }
 
-fn panel_kmers(panel: &str) -> AHashSet<u64> {
+/// 21-mers of the panel for the prefilter. 21-mers that lie wholly inside a repeat-mask interval are
+/// left out: a pair needs 40 aligned bases outside the mask to count for a gene, so a pair whose only
+/// seeds are repeat 21-mers (Alu, L1 copies from all over the genome) would be aligned and then
+/// dropped. Without them the prefilter passes far fewer pairs of a whole-genome FASTQ.
+fn panel_kmers(panel: &str, mask: &AHashMap<String, Vec<(i64, i64)>>) -> AHashSet<u64> {
     let mut fa = String::new();
     open_reader(panel).read_to_string(&mut fa).unwrap();
     let mut set = AHashSet::with_capacity(8 << 20);
+    let mut rep: AHashSet<u64> = AHashSet::new();
     let mut seq: Vec<u8> = vec![];
+    let mut name = String::new();
+    let lean = std::env::var("HLA_FULLKMERS").is_err();
     for l in fa.lines().chain(std::iter::once(">")) {
-        if l.starts_with('>') {
+        if let Some(h) = l.strip_prefix('>') {
             for_kmers(&seq, |k| {
                 set.insert(k);
                 false
             });
+            if lean {
+                for &(a, b) in mask.get(name.as_str()).map(|v| v.as_slice()).unwrap_or(&[]) {
+                    let (a, b) = ((a.max(0) as usize).min(seq.len()), (b.max(0) as usize).min(seq.len()));
+                    if b > a {
+                        for_kmers(&seq[a..b], |k| {
+                            rep.insert(k);
+                            false
+                        });
+                    }
+                }
+            }
             seq.clear();
+            name = h.split_whitespace().next().unwrap_or("").to_string();
         } else {
             seq.extend_from_slice(l.trim().as_bytes());
         }
     }
+    let n = set.len();
+    set.retain(|k| !rep.contains(k));
+    eprintln!("[prefilter] {} panel 21-mers, {} inside the repeat mask left out", n, n - set.len());
     set
 }
 

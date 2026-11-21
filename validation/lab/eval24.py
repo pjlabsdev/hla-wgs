@@ -23,7 +23,7 @@ def f2(x): return ":".join(x.split("*")[-1].split(":")[:2])
 def ours(s):
     d={}; c={}
     for l in open(f"{H}/lab/out24/{s}.tsv").read().splitlines()[1:]:
-        r=l.split("\t"); d[r[0]]=[f2(r[3]),f2(r[4]) if r[4]!="-" else f2(r[3])]
+        r=l.split("\t"); d[r[0]]=[f2(r[1]),f2(r[2]) if r[2]!="-" else f2(r[1])]
     for l in open(f"{H}/lab/out24/{s}.conf.tsv").read().splitlines()[1:]:
         r=l.split("\t"); c.setdefault(r[0],[]).append(int(r[4]))
     return d,c
