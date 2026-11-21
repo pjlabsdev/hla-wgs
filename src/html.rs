@@ -173,13 +173,19 @@ fn legend(t: &dyn Fn(&'static str, &'static str) -> &'static str, example: &(Str
 }
 
 /// the reason why a field is not supported, in a few words (the full text is in the details)
+/// threshold of a field for this allele: the fourth field 01 has its own (JSON "4_01") when the run used it
+fn eff_thr(a: &Value, k: &str, thr: &dyn Fn(&str) -> f64) -> f64 {
+    let f4_01 = a["allele"].as_str().and_then(|x| x.split('*').nth(1)).and_then(|x| x.split(':').nth(3)).map_or(false, |x| x == "01");
+    if k == "4" && f4_01 && thr("4_01") > 0.0 { thr("4_01") } else { thr(k) }
+}
+
 fn short_reason(a: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static str, thr: &dyn Fn(&str) -> f64) -> &'static str {
     let r = a["resolution"].as_u64().unwrap_or(0);
     let next = (r + 1).max(2).to_string();
     if a["gene_cap"].as_bool().unwrap_or(false) {
         return t("bei diesem Gen in der Validierung nicht verlässlich genug", "not reliable enough for this gene in validation");
     }
-    if a["margin"][next.as_str()].as_f64().map(|m| m < thr(&next)).unwrap_or(false) {
+    if a["margin"][next.as_str()].as_f64().map(|m| m < eff_thr(a, &next, thr)).unwrap_or(false) {
         return t("Reads unterscheiden nicht klar vom nächsten Allel", "reads do not clearly tell it from the next allele");
     }
     let sites = a["new_sites"].as_array().cloned().unwrap_or_default();
@@ -309,17 +315,21 @@ fn ligand_tip(l: &str, t: &dyn Fn(&'static str, &'static str) -> &'static str) -
 fn allele_tech(g: &Value, a: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static str, thr: &dyn Fn(&str) -> f64) -> String {
     let res = a["resolution"].as_u64().unwrap_or(0);
     let mut l = vec![format!("{} {} · {}: {} ({} {})", t("Allel", "Allele"), a["allele"].as_str().unwrap_or(""), t("gesichert", "certain"), a["safe_call"].as_str().unwrap_or(""), res, if res == 1 { t("Feld", "field") } else { t("Felder", "fields") })];
-    let f4_01 = a["allele"].as_str().and_then(|x| x.split('*').nth(1)).and_then(|x| x.split(':').nth(3)).map_or(false, |x| x == "01");
-    for k in ["2", "3", "4"] {
-        let th = if k == "4" && f4_01 { 1.0 } else { thr(k) };
-        let alt = a["alternative"][k].as_str().filter(|x| !x.is_empty()).unwrap_or("–");
-        let line = match a["margin"][k].as_f64() {
-            Some(m) => format!("{} {k}: {} {m:.1} {} {} ({} {th:.0}) {}", t("Feld", "Field"), t("Vorsprung", "lead"), t("vor", "over"), alt, t("Schwelle", "threshold"), if m >= th { "✓" } else { "✗" }),
-            None => format!("{} {k}: {}", t("Feld", "Field"), t("kein Konkurrent", "no competitor")),
+    let nf = a["allele"].as_str().and_then(|x| x.split('*').nth(1)).map(|x| x.split(':').count()).unwrap_or(4);
+    let f4_01 = eff_thr(a, "4", thr) != thr("4");
+    for (i, k) in ["2", "3", "4"].iter().enumerate() {
+        if i + 2 > nf { break; }
+        let th = eff_thr(a, k, thr);
+        let alt = a["alternative"][*k].as_str().filter(|x| !x.is_empty()).unwrap_or("–");
+        let held = (i as u64 + 2) <= res;
+        let line = match a["margin"][*k].as_f64() {
+            Some(m) => format!("{} {k}: {} {m:.1} {} {} ({} {th:.0}) {}", t("Feld", "Field"), t("Vorsprung", "lead"), t("vor", "over"), alt, t("Schwelle", "threshold"),
+                if held { "✓" } else if m >= th { t("· Vorsprung reicht, Feld nicht gesichert (siehe Grund)", "· lead enough, field not certain (see reason)") } else { "✗" }),
+            None => format!("{} {k}: {}{}", t("Feld", "Field"), t("kein Konkurrent", "no competitor"), if held { " ✓" } else { t(" · Feld nicht gesichert (siehe Grund)", " · field not certain (see reason)") }),
         };
         l.push(line);
     }
-    if f4_01 { l.push(t("Viertes Feld 01 (zuerst beschriebenes Allel): Schwelle 1 statt 4", "Fourth field 01 (first-described allele): threshold 1 instead of 4").to_string()); }
+    if f4_01 && nf >= 4 { l.push(t("Viertes Feld 01 (zuerst beschriebenes Allel): Schwelle 1 statt 4", "Fourth field 01 (first-described allele): threshold 1 instead of 4").to_string()); }
     if a["gene_cap"].as_bool().unwrap_or(false) { l.push(t("Feldzahl durch das Gen begrenzt (in der Prüfung nicht verlässlich genug)", "Number of fields capped by the gene (not reliable enough in validation)").to_string()); }
     l.push(format!("G: {} · P: {}", a["g_group"].as_str().unwrap_or("–"), a["p_group"].as_str().unwrap_or("–")));
     l.push(format!("{}: {}", t("Grund der Feldzahl", "Why this many fields"), field_reason("", a, t, thr)));
@@ -329,9 +339,11 @@ fn allele_tech(g: &Value, a: &Value, t: &dyn Fn(&'static str, &'static str) -> &
         if let Some(b) = ch.strip_prefix("blind") {
             l.push(format!("{} {}: {} {}", t("Ungeprüfte Strecke ab Position", "Unchecked stretch from position"), x["pos"], b, t("ohne eindeutig zuordenbare Reads", "without uniquely placed reads")));
         } else {
-            let reg = x["region"].as_str().filter(|r| *r != "-").unwrap_or("");
+            let reg = x["region"].as_str().filter(|r| *r != "-").map(|r| r.replace("exon", t("Exon", "exon")).replace("intron", t("Intron", "intron"))).unwrap_or_default();
             let eff = x["effect"].as_str().filter(|e| *e != "-").map(|e| effect_text(e, t)).unwrap_or_default();
-            l.push(format!("{} {}: {ch} · {} {}/{} · {reg} {eff}{}", t("Position", "Position"), x["pos"], t("Reads", "reads"), x["reads"], x["depth"], if x["either_allele"].as_bool().unwrap_or(false) { t(" · keiner Kopie sicher zuzuordnen", " · not assignable to one copy") } else { "" }));
+            let base = ch.split('(').next().unwrap_or(ch);
+            let uns = if ch.contains("unsupported") { t(" · Datenbank-Base von keinem Read gestützt", " · database base backed by no read") } else { "" };
+            l.push(format!("{} {}: {base} · {} {}/{} · {reg} {eff}{uns}{}", t("Position", "Position"), x["pos"], t("Reads", "reads"), x["reads"], x["depth"], if x["either_allele"].as_bool().unwrap_or(false) { t(" · keiner Kopie sicher zuzuordnen", " · not assignable to one copy") } else { "" }));
         }
     }
     if sites.len() > 8 { l.push(format!("… {} {}", sites.len() - 8, t("weitere Stellen in den Details", "more sites in the details"))); }
@@ -867,6 +879,7 @@ fn gene_details(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static st
     for (i, a) in als.iter().take(copies.min(2) as usize).enumerate() {
         let full = a["allele"].as_str().unwrap_or("");
         let res = a["resolution"].as_u64().unwrap_or(0);
+        let nf = full.split('*').nth(1).map(|x| x.split(':').count() as u64).unwrap_or(4);
         let labels: Vec<String> = (1..=4usize).map(|k| {
             let m = if k == 1 { None } else { a["margin"][k.to_string().as_str()].as_f64() };
             let st = if (k as u64) <= res { t("✓ gesichert", "✓ supported") } else { t("? nicht gesichert", "? not supported") };
@@ -875,7 +888,7 @@ fn gene_details(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static st
                 return format!("{} · {st}: {}", field_meaning(t, k), short_reason(a, t, thr));
             }
             match m {
-                Some(m) if (k as u64) <= res => format!("{} · {st} ({} {m:.1}, {} {:.0})", field_meaning(t, k), t("Vorsprung", "lead"), t("Schwelle", "threshold"), thr(&k.to_string())),
+                Some(m) if (k as u64) <= res => format!("{} · {st} ({} {m:.1}, {} {:.0})", field_meaning(t, k), t("Vorsprung", "lead"), t("Schwelle", "threshold"), eff_thr(a, &k.to_string(), thr)),
                 _ => format!("{} · {st}", field_meaning(t, k)),
             }
         }).collect();
@@ -892,11 +905,16 @@ fn gene_details(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static st
             a["expression"].as_str().map(|x| format!(" · {}", esc(x))).unwrap_or_default(),
             a["renamed_from"].as_str().map(|x| format!(" · {} {}", t("benannt aus", "named from"), esc(x))).unwrap_or_default()
         ));
-        o.push_str(&format!("<table class=\"dt\"><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr>", t("Feld", "Field"), t("Vorsprung", "Lead"), t("Schwelle", "Threshold"), t("nächster Konkurrent", "nearest competitor")));
-        for k in ["2", "3", "4"] {
+        o.push_str(&format!("<table class=\"dt\"><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr>",
+            tip(t("Feld", "Field"), t("Stelle im Allelnamen: 2 = Protein, 3 = stille Änderung im Exon, 4 = Intron oder Randbereich.", "Position in the allele name: 2 = protein, 3 = silent change in an exon, 4 = intron or flanking region.")),
+            tip(t("Vorsprung", "Lead"), t("Log-Likelihood-Abstand zum besten Allel, das sich in diesem Feld unterscheidet. Grün: Feld gesichert. Gelb: Feld nicht gesichert, entweder weil der Vorsprung zu klein ist oder aus dem Grund unter der Tabelle.", "Log-likelihood gap to the best allele that differs in this field. Green: field supported. Yellow: field not supported, either because the lead is too small or for the reason below the table.")),
+            tip(t("Schwelle", "Threshold"), t("Mindestvorsprung, ab dem ein Feld als gesichert gilt; auf 80 Proben mit Langread-Wahrheit festgelegt.", "Minimum lead for a field to count as supported; set on 80 samples with long-read truth.")),
+            tip(t("nächster Konkurrent", "nearest competitor"), t("Das beste Allel, das sich in diesem Feld vom gewählten unterscheidet.", "The best allele that differs from the chosen one in this field."))));
+        for (i, k) in ["2", "3", "4"].into_iter().enumerate() {
+            if i as u64 + 2 > nf { break; }
             let m = &a["margin"][k];
-            let th = thr(k);
-            let pass = m.as_f64().map(|x| x >= th).unwrap_or(true);
+            let th = eff_thr(a, k, thr);
+            let pass = (i as u64 + 2) <= res && m.as_f64().map(|x| x >= th).unwrap_or(true);
             o.push_str(&format!(
                 "<tr><td>{k}</td><td class=\"{}\">{}</td><td>{th:.0}</td><td>{}</td></tr>",
                 if pass { "ok" } else { "warn" },
@@ -956,10 +974,14 @@ fn field_reason(_gene: &str, a: &Value, t: &dyn Fn(&'static str, &'static str) -
     if r == 0 {
         return format!("{} {}", t("auch die Allelgruppe ist nicht gesichert: ein Allel einer anderen Gruppe erklärt die Reads fast gleich gut", "the allele group is not supported either: an allele of another group explains the reads almost as well"), esc(a["alternative"]["2"].as_str().unwrap_or("")));
     }
+    if a["gene_cap"].as_bool().unwrap_or(false) {
+        return format!("{} {r} {}", t("bei diesem Gen werden höchstens", "for this gene at most"), t("Felder angegeben: das nächste Feld war in der Prüfung nicht verlässlich genug", "fields are given: the next field was not reliable enough in validation"));
+    }
     let next = (r + 1).max(2).to_string();
     if let Some(m) = a["margin"][next.as_str()].as_f64() {
-        if m < thr(&next) {
-            return format!("{} {next}: {m:.1} < {:.0}", t("Vorsprung vor dem nächsten Konkurrenten unter der Schwelle im Feld", "lead over the nearest competitor below the threshold at field"), thr(&next));
+        let th = eff_thr(a, &next, thr);
+        if m < th {
+            return format!("{} {next}: {m:.1} < {th:.0}", t("Vorsprung vor dem nächsten Konkurrenten unter der Schwelle im Feld", "lead over the nearest competitor below the threshold at field"));
         }
     }
     let sites = a["new_sites"].as_array().cloned().unwrap_or_default();

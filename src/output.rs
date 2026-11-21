@@ -245,7 +245,7 @@ pub fn write(
     }
     let rep = serde_json::json!({
         "tool": "hla-wgs", "version": env!("CARGO_PKG_VERSION"), "schema": "genome.hla.v1",
-        "thresholds": {"2": T[0], "3": T[1], "4": T[2]}, "genes": js,
+        "thresholds": {"2": T[0], "3": T[1], "4": T[2], "4_01": if std::env::var("HLA_F401").map_or(true, |v| v != "0") { serde_json::json!(1.0) } else { serde_json::Value::Null }}, "genes": js,
         "database_release": DB_RELEASE.get(),
         "input": INPUTS.get(),
         "analysis_time": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
