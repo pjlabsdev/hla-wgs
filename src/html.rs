@@ -173,13 +173,11 @@ fn legend(t: &dyn Fn(&'static str, &'static str) -> &'static str, example: &(Str
 }
 
 /// threshold of a field for this allele: the fourth field 01 has its own (JSON "4_01") when the run used it.
-/// JSON files of 1.1 runs before that key existed: a supported fourth field 01 below the threshold of 4 shows the run used 1.
+/// For JSON files of 1.1 runs before that key existed, the run-wide rule is inferred when the page is made.
 fn eff_thr(a: &Value, k: &str, thr: &dyn Fn(&str) -> f64) -> f64 {
     let f4_01 = a["allele"].as_str().and_then(|x| x.split('*').nth(1)).and_then(|x| x.split(':').nth(3)).map_or(false, |x| x == "01");
     if k != "4" || !f4_01 { return thr(k); }
-    if thr("4_01") > 0.0 { return thr("4_01"); }
-    let held = a["resolution"].as_u64().unwrap_or(0) >= 4;
-    if held && a["margin"]["4"].as_f64().map_or(false, |m| m < thr("4")) { 1.0 } else { thr("4") }
+    if thr("4_01") > 0.0 { thr("4_01") } else { thr("4") }
 }
 
 /// the reason why a field is not supported, in a few words (the full text is in the details)
@@ -573,7 +571,19 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
 
     let (mut n_alleles, mut n4, mut n_new) = (0, 0, 0);
     let mut details = String::new();
-    let thr = |k: &str| rep["thresholds"][k].as_f64().unwrap_or(0.0);
+    // JSON of 1.1 runs before the key "4_01" existed: the run used the threshold of 1 for a fourth field 01
+    // if any allele holds such a field with a lead below the general threshold
+    let f401_seen = rep["genes"].as_array().map_or(false, |gs| {
+        gs.iter().flat_map(|g| g["alleles"].as_array().cloned().unwrap_or_default()).any(|a| {
+            let f4 = a["allele"].as_str().and_then(|x| x.split('*').nth(1)).and_then(|x| x.split(':').nth(3)).map_or(false, |x| x == "01");
+            f4 && a["resolution"].as_u64().unwrap_or(0) >= 4 && a["margin"]["4"].as_f64().map_or(false, |m| m < rep["thresholds"]["4"].as_f64().unwrap_or(4.0))
+        })
+    });
+    let thr = |k: &str| match rep["thresholds"][k].as_f64() {
+        Some(v) => v,
+        None if k == "4_01" && f401_seen && rep["thresholds"].get("4_01").is_none() => 1.0,
+        None => 0.0,
+    };
     let f1 = |v: &Value| v.as_f64().map(|x| format!("{x:.1}")).unwrap_or_else(|| "–".to_string());
     let mut rows = String::new();
     let mut rrows = String::new();
