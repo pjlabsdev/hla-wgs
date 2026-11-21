@@ -63,7 +63,7 @@ td.g{font-weight:500;white-space:nowrap}
 .call{font-weight:500;white-space:nowrap}
 .full{display:block;color:var(--soft-fg);font-size:12px}
 .d{white-space:nowrap;line-height:1.6}
-th:nth-child(4),td:nth-child(4){width:76px}
+table.tf th:nth-child(4),table.tf td:nth-child(4){width:96px}
 .f{display:inline-block;width:8px;height:8px;border-radius:50%;border:1px solid var(--line);margin-right:4px}
 .f.on{background:var(--okdot);border-color:var(--okdot)}
 .note{color:var(--soft-fg);font-size:12px;line-height:1.55}
@@ -101,6 +101,19 @@ svg.fdia .lb{font:400 12px 'IBM Plex Mono',ui-monospace,monospace;fill:var(--mut
 .alert{margin:22px 0 0;padding:12px 16px;border-radius:var(--r);background:color-mix(in srgb,var(--acc) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);font-size:12px;line-height:1.55}.alert.soft{background:var(--surface);border-color:var(--hair)}
 @media print{.bar,nav.tabs{display:none}section.tab-r,section.tab-d{display:block!important}section.tab-d{break-before:page}}
 body[data-tab=r] section.tab-d,body[data-tab=d] section.tab-r{display:none}
+.ruo{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--acc-t);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);border-radius:999px;display:inline-block;padding:3px 12px;margin:0 0 22px}
+.head{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:22px;background:var(--surface);border:1px solid var(--hair);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.head div{padding:12px 16px;border-right:1px solid var(--hair);border-bottom:1px solid var(--hair);min-width:0}.head div:nth-child(4n){border-right:0}.head div:nth-last-child(-n+4){border-bottom:0}
+.head span{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft-fg)}.head b{display:block;font-weight:500;font-size:13px;margin-top:3px;overflow-wrap:anywhere}
+table.clin td{padding-top:12px;padding-bottom:12px}table.clin td:nth-child(2),table.clin td:nth-child(3){width:40%}table.clin .call{font-size:15px}
+.rw{font-size:11px;color:var(--soft-fg);margin-left:2px}
+.gl{display:flex;align-items:center;gap:14px;padding:14px 20px}.gl code{flex:1;font:400 12px/1.6 'IBM Plex Mono',ui-monospace,monospace;overflow-wrap:anywhere;color:var(--mut)}
+.copy{font:inherit;font-size:12px;font-weight:500;background:var(--soft);border:1px solid var(--hair);border-radius:999px;padding:5px 14px;color:var(--fg);cursor:pointer}
+details.more{margin-top:14px}details.more table{margin-bottom:6px}
+.prose{padding:8px 20px}.prose p{margin:10px 0;color:var(--mut);font-size:13px;line-height:1.65}
+@page{size:A4;margin:16mm 14mm 18mm;@bottom-right{content:counter(page) ' / ' counter(pages);font:400 9px 'IBM Plex Mono',monospace;color:#6E6C63}@bottom-left{content:'hla-wgs · RUO';font:400 9px 'IBM Plex Mono',monospace;color:#6E6C63}}
+@media print{.copy{display:none}.head{grid-template-columns:repeat(4,1fr)}}
+@media (max-width:720px){.head{grid-template-columns:repeat(2,1fr)}.head div:nth-child(4n){border-right:1px solid var(--hair)}.head div:nth-child(2n){border-right:0}.head div:nth-last-child(-n+4){border-bottom:1px solid var(--hair)}.head div:nth-last-child(-n+2){border-bottom:0}}
 footer{margin-top:48px;border-top:1px solid var(--line);padding-top:18px;color:var(--soft-fg);font-size:12px}
 footer p{margin:6px 0}
 .cite{color:var(--fg)}
@@ -237,6 +250,165 @@ fn field_diagram(full: &str, res: u64, labels: &[String]) -> String {
     o
 }
 
+/// the loci of a clinical HLA typing (transplantation, platelet and donor matching), in report order
+const CLINICAL: [&str; 11] = ["A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1"];
+
+/// resolution in the words of an HLA laboratory
+fn res_word(res: u64, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> &'static str {
+    match res {
+        0 => t("nicht bestimmt", "not determined"),
+        1 => t("Allelgruppe (1 Feld)", "allele group (1 field)"),
+        2 => t("Protein (2 Felder)", "protein (2 fields)"),
+        3 => t("kodierende Sequenz (3 Felder)", "coding sequence (3 fields)"),
+        _ => t("Allel (4 Felder)", "allele (4 fields)"),
+    }
+}
+
+/// a supported call cut to at most two fields, the form clinics work with
+fn two_field(safe: &str) -> String {
+    let (g, rest) = safe.split_once('*').unwrap_or((safe, ""));
+    if rest.is_empty() {
+        return format!("HLA-{g}");
+    }
+    let f: Vec<&str> = rest.split(':').take(2).collect();
+    format!("HLA-{g}*{}", f.join(":"))
+}
+
+/// short report number from the result itself: the same result gives the same number
+fn report_id(rep: &Value) -> String {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for b in rep["genes"].to_string().bytes().chain(rep["input"].to_string().bytes()) {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    format!("HLA-{:08X}", (h >> 32) as u32)
+}
+
+/// Genotype List String (GL String, the exchange format of typing results): "+" joins the two copies
+/// of a gene, "^" the genes; only supported fields are written
+fn gl_string(genes: &[Value]) -> String {
+    let mut loci = vec![];
+    for name in CLINICAL {
+        let Some(g) = genes.iter().find(|g| g["gene"] == name) else { continue };
+        if !g["called"].as_bool().unwrap_or(false) || g["copies"].as_u64() == Some(0) {
+            continue;
+        }
+        let copies = g["copies"].as_u64().unwrap_or(2).min(2) as usize;
+        let als: Vec<String> = g["alleles"].as_array().map(|v| v.iter().take(copies).filter_map(|a| a["safe_call"].as_str().filter(|s| s.contains('*')).map(|s| format!("HLA-{s}"))).collect()).unwrap_or_default();
+        if !als.is_empty() {
+            loci.push(als.join("+"));
+        }
+    }
+    loci.join("^")
+}
+
+/// what a new allele differs in, from the annotated sites: count, nearest allele, effect on the protein
+fn new_allele_note(a: &Value, i: usize, either: &std::collections::BTreeSet<i64>, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> Option<String> {
+    let sites: Vec<&Value> = a["new_sites"].as_array().map(|v| v.iter().filter(|x| {
+        let c = x["change"].as_str().unwrap_or("");
+        !c.starts_with("blind") && !either.contains(&x["pos"].as_i64().unwrap_or(-1))
+    }).collect()).unwrap_or_default();
+    if sites.is_empty() {
+        return None;
+    }
+    let eff: Vec<&str> = sites.iter().map(|x| x["effect"].as_str().unwrap_or("-")).collect();
+    let coding = eff.iter().filter(|e| !matches!(**e, "-" | "non-coding" | "synonymous") && !e.starts_with("synonymous")).count();
+    let impact = if coding > 0 {
+        format!("{coding} {}", t("davon mit Folge für das Protein", "of them changing the protein"))
+    } else if eff.iter().all(|e| *e != "-") {
+        t("Protein unverändert", "protein unchanged").to_string()
+    } else {
+        t("Wirkung siehe Details", "effect in the details").to_string()
+    };
+    Some(format!(
+        "<span class=\"warn\">{} {}: {} · {} {} {} · {impact}</span>",
+        t("Allel", "Allele"),
+        i + 1,
+        t("neues Allel", "new allele"),
+        sites.len(),
+        t(if sites.len() == 1 { "Abweichung zu" } else { "Abweichungen zu" }, if sites.len() == 1 { "difference from" } else { "differences from" }),
+        esc(a["allele"].as_str().unwrap_or(""))
+    ))
+}
+
+/// CPIC recommendation for a carrier, in one sentence, with the guideline
+fn pgx_rec(allele: &str, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> (&'static str, &'static str, &'static str) {
+    match allele {
+        "B*57:01" => (t("Abacavir nicht anwenden (Überempfindlichkeitsreaktion).", "Do not use abacavir (hypersensitivity reaction)."), "CPIC 2014", "https://pmc.ncbi.nlm.nih.gov/articles/PMC3994233"),
+        "B*15:02" => (t("Carbamazepin und Oxcarbazepin bei Erstgabe nicht anwenden, Phenytoin und Fosphenytoin nicht neu beginnen (SJS/TEN).", "Do not start carbamazepine or oxcarbazepine, do not start phenytoin or fosphenytoin (SJS/TEN)."), "CPIC 2017, 2020", "https://pmc.ncbi.nlm.nih.gov/articles/PMC5847474"),
+        "A*31:01" => (t("Carbamazepin bei Erstgabe möglichst durch eine Alternative ersetzen; ohne Alternative engmaschig überwachen (SJS/TEN, DRESS).", "Prefer an alternative to carbamazepine when starting; without one, monitor closely (SJS/TEN, DRESS)."), "CPIC 2017", "https://pmc.ncbi.nlm.nih.gov/articles/PMC5847474"),
+        "B*58:01" => (t("Allopurinol nicht anwenden (SJS/TEN, DRESS).", "Do not use allopurinol (SJS/TEN, DRESS)."), "CPIC 2015", "https://pmc.ncbi.nlm.nih.gov/articles/PMC4675696"),
+        _ => ("", "CPIC", "https://cpicpgx.org/guidelines/"),
+    }
+}
+
+/// the clinical summary: the eleven loci at two fields with group, antigen and receptor ligand
+fn clinical(genes: &[Value], t: &dyn Fn(&'static str, &'static str) -> &'static str) -> String {
+    let empty = vec![];
+    let mut rows = String::new();
+    let drb345 = genes.iter().any(|g| matches!(g["gene"].as_str(), Some("DRB3" | "DRB4" | "DRB5")) && g["called"].as_bool().unwrap_or(false) && g["copies"].as_u64().unwrap_or(2) > 0);
+    for name in CLINICAL {
+        if name == "DRB3" && !drb345 {
+            rows.push_str(&format!("<tr><td class=\"g\">HLA-DRB3/4/5</td><td class=\"note\" colspan=\"2\">{}</td></tr>\n", t("keines vorhanden", "none present")));
+        }
+        let Some(g) = genes.iter().find(|g| g["gene"] == name) else { continue };
+        let copies = g["copies"].as_u64().unwrap_or(2);
+        let present = g["called"].as_bool().unwrap_or(false) && copies > 0;
+        if matches!(name, "DRB3" | "DRB4" | "DRB5") {
+            if !present {
+                continue;
+            }
+        }
+        let als = g["alleles"].as_array().unwrap_or(&empty);
+        let mut cells = vec![];
+        for k in 0..2usize {
+            if !present || k >= copies as usize {
+                cells.push(format!("<td class=\"note\">{}</td>", if !present && k == 0 { t("nicht vorhanden", "absent") } else if copies == 1 && k == 1 { t("– (eine Kopie)", "– (one copy)") } else { "–" }));
+                continue;
+            }
+            let Some(a) = als.get(k) else { cells.push("<td>–</td>".into()); continue };
+            let res = a["resolution"].as_u64().unwrap_or(0);
+            let safe = a["safe_call"].as_str().unwrap_or("");
+            let mut sub: Vec<String> = vec![];
+            if res >= 2 {
+                if let Some(x) = a["g_group"].as_str() { sub.push(format!("G {}", esc(x.split('*').nth(1).unwrap_or(x)))); }
+            }
+            if let Some(x) = a["serology"].as_str() {
+                let assumed = a["serology_assumed"].as_bool().unwrap_or(false);
+                sub.push(format!("<span title=\"{}\">{}{}</span>", t("serologisches Antigen (WHO)", "serological antigen (WHO)"), esc(x), if assumed { "*" } else { "" }));
+            }
+            if let Some(x) = a["ligand"].as_str() { sub.push(format!("<span title=\"{}\">{}</span>", t("Ligand der NK-Zell-Rezeptoren (KIR)", "ligand of the natural killer cell receptors (KIR)"), esc(x))); }
+            let expr = a["expression"].as_str().map(|_| {
+                let last = a["allele"].as_str().unwrap_or("").chars().last().unwrap_or(' ');
+                format!(" <span class=\"pos\" title=\"{}\">{}</span>", t("Expressionsvariante", "expression variant"), match last { 'N' => t("Null-Allel", "null allele"), 'L' => t("geringe Expression", "low expression"), 'S' => t("nur sezerniert", "secreted only"), 'Q' => t("Expression fraglich", "questionable expression"), _ => t("abweichende Expression", "aberrant expression") })
+            }).unwrap_or_default();
+            let call = if res == 0 { format!("<span class=\"note\">{}</span>", t("nicht bestimmt", "not determined")) } else { format!("<span class=\"call\">{}</span>", esc(&two_field(safe))) };
+            cells.push(format!("<td>{call}{expr}<span class=\"full\">{}</span><span class=\"full\">{}</span></td>", sub.join(" · "), res_word(res, t)));
+        }
+        rows.push_str(&format!("<tr><td class=\"g\">HLA-{}</td>{}</tr>\n", esc(name), cells.join("")));
+    }
+    format!(
+        "<div class=\"panel\"><table class=\"clin\"><thead><tr><th>{}</th><th>{} 1</th><th>{} 2</th></tr></thead><tbody>\n{rows}</tbody></table></div>\n<p class=\"note\">{}</p>\n",
+        t("Locus", "Locus"), t("Allel", "Allele"), t("Allel", "Allele"),
+        t("Zwei Felder, wie in Klinik und Spenderauswahl üblich; nur von den Reads gestützte Felder. Darunter: G-Gruppe (gleiche Sequenz der Antigen-Bindungsstelle), serologisches Antigen nach WHO (* = angenommen oder durch Experten zugeordnet, nicht serologisch getestet), Ligand der NK-Zell-Rezeptoren und die erreichte Auflösung. Die volle Auflösung steht weiter unten.",
+          "Two fields, as used in clinics and donor selection; only fields the reads support. Below: G group (same sequence of the antigen-binding site), serological antigen after WHO (* = assumed or assigned by experts, not tested serologically), ligand of the natural killer cell receptors and the resolution reached. The full resolution follows further down.")
+    )
+}
+
+/// method and limits in a few lines, with the validation numbers of this version
+fn methods(t: &dyn Fn(&'static str, &'static str) -> &'static str) -> String {
+    format!(
+        "<h2>{}</h2>\n<div class=\"panel prose\"><p>{}</p><p>{}</p><p>{}</p></div>\n",
+        t("Methode und Grenzen", "Method and limits"),
+        t("Reads aus der Gesamtgenom-Sequenzierung werden gegen alle Allele der IPD-IMGT/HLA-Datenbank verglichen. Für jedes Gen wählt das Programm das Allelpaar, das die Reads am besten erklärt, und gibt je Allel nur die Felder an, bei denen der Vorsprung vor dem nächsten Konkurrenten eine feste, an Assemblies geprüfte Schwelle erreicht. Abweichungen, die die Reads einheitlich zeigen, werden als mögliches neues Allel gemeldet.",
+          "Reads from whole-genome sequencing are compared with all alleles of the IPD-IMGT/HLA database. For each gene the program chooses the allele pair that explains the reads best and reports, per allele, only the fields where the lead over the nearest competitor reaches a fixed threshold validated on assemblies. Differences the reads show consistently are reported as a possible new allele."),
+        t("Prüfung an 80 Genomen mit vollständig assemblierten Haplotypen (HPRC, 30x): zwei Felder 2486 von 2489 Allelen richtig, gesicherte vier Felder 1731 von 1752 exakt. Prüfung an 59 weiteren, beim Entwickeln nicht verwendeten Genomen (HGSVC3): zwei Felder 1833 von 1833 richtig.",
+          "Validation on 80 genomes with fully assembled haplotypes (HPRC, 30x): two fields right for 2486 of 2489 alleles, supported four fields exact for 1731 of 1752. Validation on 59 further genomes not used during development (HGSVC3): two fields right for 1833 of 1833."),
+        t("Grenzen kurzer Reads: Welche Allele verschiedener Gene auf demselben Chromosom liegen (Haplotyp), lässt sich nicht bestimmen. Die Länge langer Einzelbasen-Läufe und Wiederholungen ist nicht messbar; Strecken ohne eindeutig zuordenbare Reads bleiben ungeprüft. Ob ein Allel exprimiert wird, folgt nur aus dem Namen in der Datenbank. Neue Allele sollten mit langen Reads oder Sanger-Sequenzierung bestätigt werden.",
+          "Limits of short reads: which alleles of different genes lie on the same chromosome (haplotype) cannot be determined. The length of long single-base runs and repeats cannot be measured; stretches without uniquely placed reads stay unchecked. Whether an allele is expressed follows only from its name in the database. New alleles should be confirmed with long reads or Sanger sequencing.")
+    )
+}
+
 fn class_of(g: &str) -> u8 {
     match g {
         "A" | "B" | "C" => 0,
@@ -255,7 +427,7 @@ pub fn render(rep: &Value, sample: &str) -> String {
     let de = german();
     let first = if de { "de" } else { "en" };
     format!(
-        "<!DOCTYPE html>\n<html lang=\"{first}\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>hla-wgs · {}</title>\n<style>{css}</style></head><body data-lang=\"{first}\" data-tab=\"r\">\n<header class=\"bar\"><div class=\"bar-in\"><div class=\"brand\">PJ Labs <i>·</i> hla-wgs</div><nav class=\"lang seg\"><button type=\"button\" data-set=\"de\">Deutsch</button><button type=\"button\" data-set=\"en\">English</button></nav></div></header>\n<main lang=\"de\" class=\"l-de\">\n{}</main>\n<main lang=\"en\" class=\"l-en\">\n{}</main>\n<script>\nfunction aria(){{document.querySelectorAll('nav.lang button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.set===document.body.dataset.lang));document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tab===document.body.dataset.tab))}}\nfunction setL(l){{document.body.dataset.lang=l;document.documentElement.lang=l;aria();try{{localStorage.setItem('hla-wgs-lang',l)}}catch(e){{}}}}\ntry{{const s=localStorage.getItem('hla-wgs-lang');if(s==='de'||s==='en')setL(s)}}catch(e){{}}\ndocument.querySelectorAll('nav.lang button').forEach(b=>b.addEventListener('click',()=>setL(b.dataset.set)));\ndocument.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{{document.body.dataset.tab=b.dataset.tab;aria();scrollTo(0,0)}}));\naria();\naddEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));\n</script></body></html>\n",
+        "<!DOCTYPE html>\n<html lang=\"{first}\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>hla-wgs · {}</title>\n<style>{css}</style></head><body data-lang=\"{first}\" data-tab=\"r\">\n<header class=\"bar\"><div class=\"bar-in\"><div class=\"brand\">PJ Labs <i>·</i> hla-wgs</div><nav class=\"lang seg\"><button type=\"button\" data-set=\"de\">Deutsch</button><button type=\"button\" data-set=\"en\">English</button></nav></div></header>\n<main lang=\"de\" class=\"l-de\">\n{}</main>\n<main lang=\"en\" class=\"l-en\">\n{}</main>\n<script>\nfunction aria(){{document.querySelectorAll('nav.lang button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.set===document.body.dataset.lang));document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tab===document.body.dataset.tab))}}\nfunction setL(l){{document.body.dataset.lang=l;document.documentElement.lang=l;aria();try{{localStorage.setItem('hla-wgs-lang',l)}}catch(e){{}}}}\ntry{{const s=localStorage.getItem('hla-wgs-lang');if(s==='de'||s==='en')setL(s)}}catch(e){{}}\ndocument.querySelectorAll('nav.lang button').forEach(b=>b.addEventListener('click',()=>setL(b.dataset.set)));\ndocument.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{{document.body.dataset.tab=b.dataset.tab;aria();scrollTo(0,0)}}));\ndocument.querySelectorAll('button.copy').forEach(b=>b.addEventListener('click',()=>{{const c=document.getElementById(b.dataset.copy);if(c&&navigator.clipboard)navigator.clipboard.writeText(c.textContent).then(()=>{{const o=b.textContent;b.textContent='✓';setTimeout(()=>b.textContent=o,1200)}})}}));\naria();\naddEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));\n</script></body></html>\n",
         esc(sample),
         render_one(rep, sample, true),
         render_one(rep, sample, false)
@@ -265,7 +437,7 @@ pub fn render(rep: &Value, sample: &str) -> String {
 fn render_one(rep: &Value, sample: &str, de: bool) -> String {
     let t = |d: &'static str, e: &'static str| if de { d } else { e };
     let version = rep["version"].as_str().unwrap_or("");
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let now = rep["analysis_time"].as_u64().unwrap_or_else(|| std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0));
     let (y, m, d) = date(now);
     let day = if de { format!("{d:02}.{m:02}.{y}") } else { format!("{y}-{m:02}-{d:02}") };
     let empty = vec![];
@@ -276,6 +448,7 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
     let thr = |k: &str| rep["thresholds"][k].as_f64().unwrap_or(0.0);
     let f1 = |v: &Value| v.as_f64().map(|x| format!("{x:.1}")).unwrap_or_else(|| "–".to_string());
     let mut rows = String::new();
+    let mut rrows = String::new();
     let mut last = 9u8;
     let names = [
         t("Klasse I", "Class I"),
@@ -290,7 +463,8 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         let name = g["gene"].as_str().unwrap_or("");
         let c = class_of(name);
         if c != last {
-            rows.push_str(&format!("<tr class=\"cls\"><td colspan=\"5\">{}</td></tr>\n", names[c as usize]));
+            let tgt = if c >= 2 { &mut rrows } else { &mut rows };
+            tgt.push_str(&format!("<tr class=\"cls\"><td colspan=\"5\">{}</td></tr>\n", names[c as usize]));
             last = c;
         }
         let copies = g["copies"].as_u64().unwrap_or(2);
@@ -327,19 +501,13 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
                 for k in 1..=4 {
                     dots.push_str(if k <= res { "<i class=\"f on\"></i>" } else { "<i class=\"f\"></i>" });
                 }
-                dots.push_str("</div>");
+                dots.push_str(&format!(" <span class=\"rw\">{res}/4</span></div>"));
                 if let Some(x) = a["expression"].as_str() {
-                    notes.push(format!("{}: {}", esc(full), esc(x)));
+                    notes.push(format!("<span class=\"pos\">{}: {}</span>", esc(full), esc(x)));
                 }
-                let sites = sites_of(a).iter().filter(|x| !x.1.starts_with("blind") && !either.contains(&x.0)).count();
-                if sites > 0 {
+                if let Some(n) = new_allele_note(a, i, &either, &t) {
                     gene_new = true;
-                    notes.push(format!(
-                        "<span class=\"warn\">{} {}: {sites} {}</span>",
-                        t("Allel", "allele"),
-                        i + 1,
-                        t("Abweichung(en) vom Datenbank-Allel, mögliches neues Allel", "difference(s) from the database allele, possibly a new allele")
-                    ));
+                    notes.push(n);
                 }
                 if let Some(x) = a["renamed_from"].as_str() {
                     notes.push(format!("{} {}", t("mit Varianten benannt, Ausgang", "named with its variants, from"), esc(x)));
@@ -371,7 +539,7 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
             }
         }
         details.push_str(&gene_details(g, &t, &thr, &f1));
-        rows.push_str(&format!(
+        (if c >= 2 { &mut rrows } else { &mut rows }).push_str(&format!(
             "<tr><td class=\"g\">{}</td>{}{}<td>{dots}</td><td class=\"note hide\">{}</td></tr>\n",
             esc(name),
             cells[0],
@@ -386,18 +554,24 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         let n = p["copies"].as_u64().unwrap_or(0);
         let certain = p["certain"].as_bool().unwrap_or(false);
         let state = match (n, certain) {
-            (0, true) => t("nicht nachgewiesen", "not found").to_string(),
+            (0, true) => t("negativ", "negative").to_string(),
             (0, false) => format!("<span class=\"warn\">{}</span>", t("nicht sicher beurteilbar", "cannot be judged with certainty")),
             (n, c) => {
                 carriers += 1;
-                format!("<span class=\"pos\">{} ({n}×){}</span>", t("Träger", "carrier"), if c { "" } else { t(", unsicher", ", uncertain") })
+                format!("<span class=\"pos\">{} ({}){}</span>", t("positiv", "positive"), if n >= 2 { t("homozygot", "homozygous") } else { t("heterozygot", "heterozygous") }, if c { "" } else { t(", unsicher", ", uncertain") })
             }
         };
+        let al = p["allele"].as_str().unwrap_or("");
+        let (rec, gl, url) = pgx_rec(al, &t);
+        let advice = match (n, certain) {
+            (0, true) => t("keine Einschränkung aus dieser Leitlinie", "no restriction from this guideline").to_string(),
+            (0, false) => t("Bestätigung durch ein HLA-Labor nötig", "confirmation by an HLA laboratory needed").to_string(),
+            _ => format!("<span class=\"pos\">{}</span>", esc(rec)),
+        };
         pgx.push_str(&format!(
-            "<tr><td class=\"g\">HLA-{}</td><td>{state}</td><td>{}</td><td class=\"note hide\">{}</td></tr>\n",
-            esc(p["allele"].as_str().unwrap_or("")),
-            esc(p["drugs"].as_str().unwrap_or("")),
-            esc(p["source"].as_str().unwrap_or(""))
+            "<tr><td class=\"g\">HLA-{}</td><td>{state}</td><td>{}</td><td>{advice}</td><td class=\"note hide\"><a href=\"{url}\">{gl}</a></td></tr>\n",
+            esc(al),
+            esc(p["drugs"].as_str().unwrap_or(""))
         ));
     }
 
@@ -410,12 +584,39 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         "{}",
         ""
     ));
+    h.push_str(&format!("<div class=\"ruo\">{}</div>\n", t(
+        "Nur für Forschung (RUO). Kein medizinischer Befund und kein Medizinprodukt.",
+        "Research use only (RUO). Not a medical report and not a medical device."
+    )));
     h.push_str(&format!(
-        "<div class=\"eyebrow\">{}</div><h1>{}</h1>\n<div class=\"sub\">hla-wgs {} · {day}</div>\n",
+        "<div class=\"eyebrow\">{}</div><h1>{}</h1>\n",
         t("HLA-Typisierung aus dem Genom", "HLA typing from the genome"),
-        esc(sample),
-        esc(version)
+        esc(sample)
     ));
+    // report head as in a laboratory: what was analysed, with what, and how well
+    let depth = rep["depth_estimate"].as_f64();
+    let mask = rep["repeat_mask"].as_bool().unwrap_or(true);
+    let clin_ok = CLINICAL.iter().filter(|c| !matches!(**c, "DRB3" | "DRB4" | "DRB5")).all(|c| genes.iter().any(|g| g["gene"] == *c && g["called"].as_bool().unwrap_or(false)));
+    let mut limits: Vec<&str> = vec![];
+    if depth.map_or(false, |d| d < 18.0) { limits.push(t("geringe Tiefe", "low depth")); }
+    if !mask { limits.push(t("ohne Wiederholungsmaske", "without repeat mask")); }
+    if !rep["groups_loaded"].as_bool().unwrap_or(true) { limits.push(t("ohne G/P-Gruppen", "without G/P groups")); }
+    if !clin_ok { limits.push(t("klinischer Locus ohne Ergebnis", "clinical locus without result")); }
+    let qc = if limits.is_empty() { format!("<span class=\"ok\">{}</span>", t("bestanden", "passed")) } else { format!("<span class=\"warn\">{}: {}</span>", t("eingeschränkt", "limited"), limits.join(", ")) };
+    let input = rep["input"].as_array().map(|v| v.iter().filter_map(|x| x.as_str()).map(esc).collect::<Vec<_>>().join(", ")).filter(|x| !x.is_empty()).unwrap_or_else(|| "–".into());
+    let kv = [
+        (t("Probe", "Sample"), esc(sample)),
+        (t("Berichtsnummer", "Report number"), report_id(rep)),
+        (t("Eingabe", "Input"), input),
+        (t("Analyse", "Analysis"), day.clone()),
+        (t("Programm", "Software"), format!("hla-wgs {}", esc(version))),
+        (t("Datenbank", "Database"), rep["database_release"].as_str().map(|r| format!("IPD-IMGT/HLA {}", esc(r))).unwrap_or_else(|| "IPD-IMGT/HLA".into())),
+        (t("Tiefe über HLA", "Depth over HLA"), depth.map(|d| format!("≈ {d:.0}x")).unwrap_or_else(|| "–".into())),
+        (t("Qualität", "Quality"), qc),
+    ];
+    h.push_str("<div class=\"head\">");
+    for (k, v) in kv { h.push_str(&format!("<div><span>{k}</span><b>{v}</b></div>")); }
+    h.push_str("</div>\n");
     if rep["repeat_mask"].as_bool() == Some(false) {
         h.push_str(&format!("<div class=\"alert\">{}</div>\n", t(
             "Ohne Wiederholungsmaske gerechnet: Reads aus ähnlichen Stellen des Genoms können mitgezählt werden. Das Ergebnis ist weniger zuverlässig als in der Prüfung (zu viele Felder bei MICA/MICB, scheinbare Abweichungen bei DRB1/DRB4). Maske einrichten (hla-wgs build-mask) und neu starten.",
@@ -451,9 +652,31 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         t("Gene mit Abweichungen von der Datenbank", "genes with differences from the database"),
         t("pharmakogenetische Treffer", "pharmacogenetic findings")
     ));
+    h.push_str(&format!("<h2>{}</h2>\n{}", t("Klinische Kurzfassung", "Clinical summary"), clinical(genes, &t)));
+    let gl = gl_string(genes);
+    if !gl.is_empty() {
+        h.push_str(&format!(
+            "<h2>{}</h2>\n<div class=\"panel gl\"><code id=\"gl-{}\">{}</code><button type=\"button\" class=\"copy\" data-copy=\"gl-{}\">{}</button></div>\n<p class=\"note\">{}</p>\n",
+            t("GL-String", "GL String"), if de { "de" } else { "en" }, esc(&gl), if de { "de" } else { "en" }, t("Kopieren", "Copy"),
+            t("Genotype List String, das Austauschformat für HLA-Typisierungen (Loci mit ^, beide Kopien mit + verbunden); nur gestützte Felder.", "Genotype List String, the exchange format for HLA typings (loci joined by ^, both copies by +); supported fields only.")
+        ));
+    }
+    if !pgx.is_empty() {
+        h.push_str(&format!(
+            "<h2>{}</h2>\n<div class=\"panel\"><table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th><th class=\"hide\">{}</th></tr></thead><tbody>\n{pgx}</tbody></table></div>\n<p class=\"note\">{}</p>\n",
+            t("Pharmakogenetik", "Pharmacogenetics"),
+            t("Allel", "Allele"),
+            t("Befund", "Finding"),
+            t("Wirkstoffe", "Drugs"),
+            t("Empfehlung der Leitlinie", "Guideline recommendation"),
+            t("Leitlinie", "Guideline"),
+            t("Empfehlungen des Clinical Pharmacogenetics Implementation Consortium (CPIC), gekürzt; sie gelten für den Beginn einer Behandlung. Eine Arzneimittel-Entscheidung braucht ärztliche Beurteilung und einen bestätigten Befund.",
+              "Recommendations of the Clinical Pharmacogenetics Implementation Consortium (CPIC), shortened; they apply when starting a treatment. A drug decision needs medical judgement and a confirmed result.")
+        ));
+    }
     h.push_str(&format!(
-        "<h2>{}</h2>\n{}<div class=\"panel\"><table><thead><tr><th>{}</th><th>{} 1</th><th>{} 2</th><th>{}</th><th class=\"hide\">{}</th></tr></thead><tbody>\n{rows}</tbody></table></div>\n<p class=\"note\">{}</p>\n",
-        t("Ergebnis", "Result"),
+        "<h2>{}</h2>\n{}<div class=\"panel\"><table class=\"tf\"><thead><tr><th>{}</th><th>{} 1</th><th>{} 2</th><th>{}</th><th class=\"hide\">{}</th></tr></thead><tbody>\n{rows}</tbody></table></div>\n<p class=\"note\">{}</p>\n",
+        t("Volle Auflösung", "Full resolution"),
         legend(&t, &example, &thr),
         t("Gen", "Gene"),
         t("Allel", "Allele"),
@@ -461,20 +684,18 @@ fn render_one(rep: &Value, sample: &str, de: bool) -> String {
         t("Felder", "Fields"),
         t("Hinweis", "Note"),
         t(
-            "Farbig sind die Felder, die die Reads sichern (der sichere Ruf); grau sind Felder des nächstliegenden Datenbank-Allels, die nicht gesichert sind. Die Punkte zählen die gesicherten Felder.",
-            "Coloured are the fields the reads support (the safe call); grey are fields of the nearest database allele that are not supported. The dots count the supported fields."
+            "Farbig sind die Felder, die die Reads sichern (der sichere Ruf); grau sind Felder des nächstliegenden Datenbank-Allels, die nicht gesichert sind. Die Punkte und die Zahl daneben zählen die gesicherten Felder.",
+            "Coloured are the fields the reads support (the safe call); grey are fields of the nearest database allele that are not supported. The dots and the number beside them count the supported fields."
         )
     ));
-    if !pgx.is_empty() {
+    if !rrows.is_empty() {
         h.push_str(&format!(
-            "<h2>{}</h2>\n<div class=\"panel\"><table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th class=\"hide\">{}</th></tr></thead><tbody>\n{pgx}</tbody></table></div>\n",
-            t("Pharmakogenetische Allele", "Pharmacogenetic alleles"),
-            t("Allel", "Allele"),
-            t("Befund", "Finding"),
-            t("Wirkstoffe", "Drugs"),
-            t("Quelle", "Source")
+            "<details class=\"more\"><summary><b>{}</b> <span class=\"note\">{}</span></summary><table class=\"tf\"><tbody>\n{rrows}</tbody></table></details>\n",
+            t("Weitere Gene", "Further genes"),
+            t("nicht klassische HLA-Gene, Pseudogene, MICA/MICB, TAP, HFE: für die Forschung", "non-classical HLA genes, pseudogenes, MICA/MICB, TAP, HFE: for research")
         ));
     }
+    h.push_str(&methods(&t));
     h.push_str(&format!(
         "</section>\n<section class=\"tab-d\">\n<h2>{}</h2>\n<p class=\"note\">{}</p>\n{details}</section>\n",
         t("Details je Gen", "Details per gene"),
@@ -652,5 +873,19 @@ mod tests {
         let h = super::render(&rep, "a<b");
         assert!(h.contains("a&lt;b") && h.contains(super::DOI) && h.contains(super::ARTICLE));
         assert!(h.contains("1 / 2"));
+    }
+    #[test]
+    fn clinical_summary_and_gl_string() {
+        let g = |n: &str, a: &str, b: &str| serde_json::json!({"gene": n, "called": true, "copies": 2, "alleles": [
+            {"allele": a, "safe_call": a, "resolution": 4, "serology": "B60 (B40)", "ligand": "Bw6", "new_sites": []},
+            {"allele": b, "safe_call": b.rsplitn(2, ':').nth(1).unwrap(), "resolution": 3, "new_sites": []}]});
+        let genes = vec![g("A", "A*02:01:01:01", "A*01:01:01:01"), g("B", "B*40:01:02:01", "B*08:01:01:01"),
+            serde_json::json!({"gene": "DRB4", "called": true, "copies": 0, "alleles": []})];
+        assert_eq!(super::gl_string(&genes), "HLA-A*02:01:01:01+HLA-A*01:01:01^HLA-B*40:01:02:01+HLA-B*08:01:01");
+        assert_eq!(super::two_field("B*40:01:02"), "HLA-B*40:01");
+        let t = |d: &'static str, _e: &'static str| d;
+        let c = super::clinical(&genes, &t);
+        assert!(c.contains("HLA-B*40:01") && c.contains("B60 (B40)") && c.contains("Bw6") && c.contains("keines vorhanden"));
+        assert!(!c.contains("HLA-DRB4<"));
     }
 }

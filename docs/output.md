@@ -138,7 +138,17 @@ directory, every allele carries `g_group` and `p_group` (`null` when the allele 
 group), and the top level has `"groups_loaded": true`. `expression` explains a suffix letter of the
 allele name. `pharmacogenetic_alleles` lists B\*57:01, B\*15:02, A\*31:01 and B\*58:01 with the number
 of copies called and `certain` (all calls concerned are certain at two fields or more). Research use
-only. `depth_estimate` is a rough depth over the HLA genes (read pairs of ten genes always present in two copies, scaled to their median at 30x in the validation); below 18 the page says that fewer fields are supported and the fourth field is somewhat less often exact. `database_release` is the IPD-IMGT/HLA release of the database (`null` for a database built
+only.
+
+With `rel_dna_ser.txt` and `rel_ser_ser.txt` (folder `wmda`) in the database directory, every allele
+supported to two fields or more carries `serology`: the WHO serological antigen, a split with its
+broad antigen in brackets (`B60 (B40)`), `–` for a null allele; `serology_assumed` is `true` when the
+assignment is assumed or by experts rather than tested; the top level has `serology_loaded`. HLA-DRB3,
+-DRB4 and -DRB5 give DR52, DR53 and DR51; HLA-DQA1, -DPA1 and -DPB1 have none. `ligand` is the ligand of
+the natural killer cell receptors, read from the protein (residues 77 to 83 of the mature chain):
+`Bw4-80I` or `Bw4-80T` (HLA-A and -B), `Bw6` (HLA-B), `C1` or `C2` (HLA-C, residue 80).
+`input` names the input files (without folders), `analysis_time` is the time of the run (seconds
+since 1970, UTC). `depth_estimate` is a rough depth over the HLA genes (read pairs of ten genes always present in two copies, scaled to their median at 30x in the validation); below 18 the page says that fewer fields are supported and the fourth field is somewhat less often exact. `database_release` is the IPD-IMGT/HLA release of the database (`null` for a database built
 before 1.1).
 
 ## Environment switches

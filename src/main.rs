@@ -86,6 +86,15 @@ fn main() {
         Some("build-db") => return builddb::run(&a[2..]),
         Some("build-mask") => return mask::run(&a[2..]),
         Some("long") => return long::run(&a[2..]),
+        // the result page again from PREFIX.json, e.g. after an update of the page
+        Some("html") => {
+            let Some(j) = a.get(2) else { util::die("usage: hla-wgs html PREFIX.json") };
+            let rep: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(j).unwrap_or_else(|e| util::die(&format!("cannot read {j}: {e}")))).unwrap_or_else(|e| util::die(&format!("{j} is not a result file: {e}")));
+            let prefix = j.trim_end_matches(".json");
+            let sample = std::path::Path::new(prefix).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            std::fs::write(format!("{prefix}.html"), html::render(&rep, &sample)).unwrap_or_else(|e| util::die(&format!("cannot write {prefix}.html: {e}")));
+            return;
+        }
         Some("--version") | Some("-V") => return println!("hla-wgs {}", env!("CARGO_PKG_VERSION")),
         Some("--db-format") => return println!("{}", builddb::DB_FORMAT),
         _ => {}
@@ -132,6 +141,9 @@ fn main() {
         (panel::Input::Fastq(a[3].clone(), a[4].clone()), a[5].clone(), 6)
     };
     preflight(&a[1], &a[2], &input, &out);
+    // file names only (no folders) for the result page
+    let base = |x: &String| std::path::Path::new(x).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let _ = output::INPUTS.set(if aligned { vec![base(&a[3])] } else { vec![base(&a[3]), base(&a[4])] });
     let threads: usize = a.get(ti).and_then(|x| x.parse().ok()).unwrap_or(4);
     rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().ok();
     let t0 = Instant::now();

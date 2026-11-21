@@ -133,7 +133,10 @@ keep their intervals; for new or changed alleles, the positions whose 21-mers li
 intervals of the older panel are marked and joined by the same rules.
 
 Optional: copy `wmda/hla_nom_g.txt` and `wmda/hla_nom_p.txt` of the same release into `hladb/` to get
-G and P groups in the JSON output.
+G and P groups in the JSON output, and `wmda/rel_dna_ser.txt` with `wmda/rel_ser_ser.txt` for the
+serological antigens (the start file fetches all four).
+
+`hla-wgs html PREFIX.json` writes the result page again from the JSON, for example after an update.
 
 `data/freq_1000g_2field.json` holds two-field allele frequencies of A, B, C, DRB1 and DQB1 counted
 from the public 1000 Genomes laboratory typing (`data/build_freq.py`). They serve as a weak prior

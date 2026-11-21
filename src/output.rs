@@ -9,6 +9,8 @@ const T: [f64; 3] = [6.0, 6.0, 4.0];
 
 /// IPD-IMGT/HLA release of the database (file DBDIR/release, written by build-db)
 pub static DB_RELEASE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+/// names of the input files, without folders
+pub static INPUTS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
 
 /// Highest resolution that validation against assembly truth supports per gene. DMB and TAP2 stay
 /// at three fields: on 80 HPRC samples their fourth field equalled the assembly in only 88 of 106
@@ -212,6 +214,13 @@ pub fn write(
                 "allele": shown, "safe_call": safe, "resolution": res_, "gene_cap": gene_cap,
                 "g_group": grp.g(shown), "p_group": grp.p(shown),
                 "expression": crate::groups::expression(shown),
+                // serology and receptor ligand follow from the protein: only with two supported fields
+                "serology": if res_ >= 2 { grp.serology().antigen(shown).map(|x| x.0) } else { None },
+                "serology_assumed": if res_ >= 2 { grp.serology().antigen(shown).map(|x| x.1) } else { None },
+                "ligand": if res_ >= 2 { al.iter().find(|a| a.name == *shown).and_then(|a| {
+                    let ex: Option<Vec<u8>> = (1..=3).map(|k| a.exon(k).map(|e| e.to_vec())).collect::<Option<Vec<_>>>().map(|v| v.concat());
+                    ex.and_then(|c| crate::groups::ligand(g, &c))
+                }) } else { None },
                 "renamed_from": if renamed { serde_json::json!(fin) } else { serde_json::Value::Null },
                 "margin": {"2": mj(m[0]), "3": mj(m[1]), "4": mj(m[2])},
                 "alternative": {"2": alt[0], "3": alt[1], "4": alt[2]},
@@ -234,7 +243,10 @@ pub fn write(
         "tool": "hla-wgs", "version": env!("CARGO_PKG_VERSION"), "schema": "genome.hla.v1",
         "thresholds": {"2": T[0], "3": T[1], "4": T[2]}, "genes": js,
         "database_release": DB_RELEASE.get(),
+        "input": INPUTS.get(),
+        "analysis_time": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
         "groups_loaded": grp.loaded,
+        "serology_loaded": grp.serology().loaded,
         "repeat_mask": crate::panel::MASK_LOADED.load(std::sync::atomic::Ordering::Relaxed),
         "depth_estimate": depth_estimate(res),
         "pharmacogenetic_alleles": crate::groups::PGX.iter().map(|(al, drugs)| {

@@ -212,6 +212,17 @@ if [ ! -f "$DB/hla_nom_g.txt" ] || [ ! -f "$DB/hla_nom_p.txt" ]; then
     result fail "$(tr_ "G- und P-Gruppen" "G and P groups")" "$(tr_ "weiter ohne" "continuing without")" "$(secs "$T0")"
   fi
 fi
+# serological equivalents (WMDA files of the same release): antigens on the result page
+if [ ! -f "$DB/rel_dna_ser.txt" ] || [ ! -f "$DB/rel_ser_ser.txt" ]; then
+  T0=$(now)
+  WMDA_URL="https://github.com/ANHIG/IMGTHLA/raw/$(relbranch "$REL")/wmda"
+  if curl -fsL -o "$DB/rel_dna_ser.txt" "$WMDA_URL/rel_dna_ser.txt" && curl -fsL -o "$DB/rel_ser_ser.txt" "$WMDA_URL/rel_ser_ser.txt"; then
+    result ok "$(tr_ "Serologische Antigene" "Serological antigens")" "rel_dna_ser" "$(secs "$T0")"
+  else
+    rm -f "$DB/rel_dna_ser.txt" "$DB/rel_ser_ser.txt"
+    result fail "$(tr_ "Serologische Antigene" "Serological antigens")" "$(tr_ "weiter ohne" "continuing without")" "$(secs "$T0")"
+  fi
+fi
 # repeat mask: shipped for the 3.66 panel; for another release it is carried over from the 3.66
 # reference (set up first if it is missing); building it from a GRCh38 FASTA remains possible
 if [ ! -f "$DB/panel.fa.mask.bed" ]; then
