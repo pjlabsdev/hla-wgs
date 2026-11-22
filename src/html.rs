@@ -2,7 +2,7 @@
 //! same values as `PREFIX.json` and is built from it; language by `HLA_WGS_LANG` (de/en) or `LANG`.
 use serde_json::Value;
 
-pub const DOI: &str = "10.5281/zenodo.24367470";
+pub const DOI: &str = "10.5281/zenodo.24367469";
 pub const ARTICLE: &str = "https://pjlabs.dev/forschung/hla-wgs";
 pub const SOURCE: &str = "https://github.com/pjlabsdev/hla-wgs";
 

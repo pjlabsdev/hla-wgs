@@ -1,4 +1,5 @@
 mod align;
+mod aln;
 mod bamin;
 mod builddb;
 mod db;
@@ -151,6 +152,7 @@ fn main() {
     let (p, db) = rayon::join(|| panel::run(&a[2], &input, threads), || db::Db::load(&a[1]));
     let reads = &p.reads;
     log(format!("panel mapped reads: {}", reads.seq.iter().filter(|r| r[0].is_some() || r[1].is_some()).count()));
+    if std::env::var("HLA_ALNSTAT").is_ok() { eprintln!("[aln panel] {}", aln::stat()); }
     if std::env::var("DUMP0").is_ok() {
         let mut gg: Vec<_> = p.assign.iter().collect();
         gg.sort();
@@ -305,6 +307,7 @@ fn main() {
     let grp = groups::Groups::load(std::path::Path::new(&a[1]).parent().unwrap_or(std::path::Path::new(".")));
     output::write(&out, &genes, &ctx, &res, &depth, &drb, &nov, &known, &grp, &log);
     log("total".to_string());
+    if std::env::var("HLA_ALNSTAT").is_ok() { eprintln!("[aln] {}", aln::stat()); }
 }
 
 /// joint DRB model: copies of DRB3/4/5 = uniquely explained depth per bp relative to one DRB1 copy

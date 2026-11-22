@@ -1,6 +1,6 @@
 [package]
 name = "hla-wgs"
-version = "1.1.0-dev"
+version = "1.1.0"
 edition = "2024"
 description = "HLA typing from whole-genome sequencing reads with a per-allele statement of what is certain"
 license = "MIT"
@@ -9,7 +9,6 @@ repository = "https://github.com/pjlabsdev/hla-wgs"
 [dependencies]
 ahash = "0.8.12"
 flate2 = "1.1.11"
-minimap2 = "0.1.31"
 noodles = { version = "0.119", features = ["bam", "cram", "sam", "bgzf", "core", "fasta", "csi"] }
 rayon = "1.12.0"
 serde = { version = "1.0.229", features = ["derive"] }

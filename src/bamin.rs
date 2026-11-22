@@ -44,7 +44,7 @@ fn revcomp_into(s: &[u8]) -> Vec<u8> {
 }
 
 struct Pairer {
-    open: AHashMap<Vec<u8>, [Option<Vec<u8>>; 2]>,
+    open: AHashMap<Vec<u8>, [Option<(Vec<u8>, Vec<u8>)>; 2]>,
     b1: Vec<Fq>,
     b2: Vec<Fq>,
     tx: SyncSender<(Vec<Fq>, Vec<Fq>)>,
@@ -53,20 +53,28 @@ struct Pairer {
 }
 
 impl Pairer {
-    fn add(&mut self, name: &[u8], flags: Flags, seq: Vec<u8>) {
+    fn add(&mut self, name: &[u8], flags: Flags, seq: Vec<u8>, qual: &[u8]) {
         self.records += 1;
         if flags.intersects(Flags::SECONDARY.union(Flags::SUPPLEMENTARY)) || !flags.is_segmented() {
             return;
         }
         let mate = if flags.is_first_segment() { 0 } else if flags.is_last_segment() { 1 } else { return };
-        let seq = if flags.is_reverse_complemented() { revcomp_into(&seq) } else { seq };
+        // 0xFF marks a record without qualities
+        let mut qual: Vec<u8> = if qual.len() == seq.len() && qual.first() != Some(&0xFF) { qual.to_vec() } else { vec![] };
+        let seq = if flags.is_reverse_complemented() {
+            qual.reverse();
+            revcomp_into(&seq)
+        } else {
+            seq
+        };
         let e = self.open.entry(name.to_vec()).or_insert([None, None]);
-        e[mate] = Some(seq);
+        e[mate] = Some((seq, qual));
         if e[0].is_some() && e[1].is_some() {
             let [a, b] = self.open.remove(name).unwrap();
             let nm = String::from_utf8_lossy(name).into_owned();
-            self.b1.push(Fq { name: nm.clone(), seq: a.unwrap() });
-            self.b2.push(Fq { name: nm, seq: b.unwrap() });
+            let ((s1, q1), (s2, q2)) = (a.unwrap(), b.unwrap());
+            self.b1.push(Fq { name: nm.clone(), seq: s1, qual: q1 });
+            self.b2.push(Fq { name: nm, seq: s2, qual: q2 });
             self.pairs += 1;
             if self.b1.len() >= 50_000 {
                 self.flush();
@@ -149,7 +157,7 @@ fn pass(path: &str, reference: Option<&str>, threads: usize, skip: u64, p: &mut 
                     continue;
                 }
                 let nm = r.name().map(|n| n.to_vec()).unwrap_or_default();
-                p.add(&nm, r.flags(), r.sequence().as_ref().to_vec());
+                p.add(&nm, r.flags(), r.sequence().as_ref().to_vec(), r.quality_scores().as_ref());
             }
         }
         for r in rd.query_unmapped(&header, &index)? {
@@ -159,7 +167,7 @@ fn pass(path: &str, reference: Option<&str>, threads: usize, skip: u64, p: &mut 
                 continue;
             }
             let nm = r.name().map(|n| n.to_vec()).unwrap_or_default();
-            p.add(&nm, r.flags(), r.sequence().as_ref().to_vec());
+            p.add(&nm, r.flags(), r.sequence().as_ref().to_vec(), r.quality_scores().as_ref());
         }
     } else {
         use noodles::{bam, bgzf};
@@ -189,7 +197,7 @@ fn pass(path: &str, reference: Option<&str>, threads: usize, skip: u64, p: &mut 
                 }
                 let nm = r.name().map(|n| n.to_vec()).unwrap_or_default();
                 let seq: Vec<u8> = r.sequence().iter().collect();
-                p.add(&nm, r.flags(), seq);
+                p.add(&nm, r.flags(), seq, r.quality_scores().as_ref());
             }
         }
         for r in rd.query_unmapped(&index)? {
@@ -203,7 +211,7 @@ fn pass(path: &str, reference: Option<&str>, threads: usize, skip: u64, p: &mut 
             }
             let nm = r.name().map(|n| n.to_vec()).unwrap_or_default();
             let seq: Vec<u8> = r.sequence().iter().collect();
-            p.add(&nm, r.flags(), seq);
+            p.add(&nm, r.flags(), seq, r.quality_scores().as_ref());
         }
     }
     Ok(())

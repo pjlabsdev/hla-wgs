@@ -167,6 +167,10 @@ For experiments; the defaults are the validated configuration.
 | `HLA_UNPH` | also cut the fourth field when a sibling allele differs only at positions without phase information (fewer wrong, clearly fewer certain calls) |
 | `HLA_F401=0` | fourth field 01 needs the full lead of 4 like any other allele (`thresholds.4_01` is then null) |
 | `HLA_UNSTHIN=0` | old rule for unsupported database bases: also in stretches with fewer than half the usual reads |
+| `HLA_PAD_MIN` | a database allele more than this many bases shorter than another allele of its gene gets that allele's flank when alleles are compared (default 8; 1.0 used 20) |
+| `HLA_NOV_EDGE` | distance from a gene end within which a new site needs 90 % of the reads (default 15) |
+| `HLA_WGS_LANG` | `de` or `en`: language of the start files and of the result page |
+| `HLA_WGS_NO_UPDATE=1` | the start files do not check GitHub for a newer release |
 | `HLA_PHASE`, `HLA_BREAK` | experimental phase and break-point rules, off by default |
 
 ## PREFIX.html

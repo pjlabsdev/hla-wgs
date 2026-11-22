@@ -15,7 +15,7 @@
 use crate::db::Db;
 use crate::util::revcomp;
 use ahash::AHashMap;
-use minimap2::{Aligner, Built, Strand};
+use crate::aln::{Index, Opts};
 use rayon::prelude::*;
 use std::io::Write;
 
@@ -59,8 +59,13 @@ fn family(g: &str) -> &str {
     }
 }
 
-fn hifi(seq: &[u8]) -> Aligner<Built> {
-    Aligner::builder().map_hifi().with_cigar().with_seq(seq).expect("index")
+fn hifi(seq: &[u8]) -> Index {
+    Index::single(seq, Opts::hifi())
+}
+
+/// the last hit with the most matching bases, as Iterator::max_by_key picks it
+fn first_max(hs: impl Iterator<Item = crate::aln::Hit>) -> Option<crate::aln::Hit> {
+    hs.max_by_key(|m| m.mlen)
 }
 
 fn parse_cs(cs: &str, mut pos: usize) -> Vec<Ev> {
@@ -97,11 +102,10 @@ fn align(r: &[u8], segs: &[Seg], ids: &[usize]) -> AHashMap<usize, Aln> {
     let al = hifi(r);
     ids.par_iter()
         .filter_map(|&i| {
-            let hs = al.map(&segs[i].seq, true, false, None, None, None).ok()?;
-            let m = hs.into_iter().filter(|m| m.strand == Strand::Forward).max_by_key(|m| m.match_len)?;
-            let a = m.alignment.as_ref()?;
-            let ts = m.target_start as usize;
-            Some((i, Aln { ts, te: m.target_end as usize, qs: m.query_start as usize, qe: m.query_end as usize, ev: parse_cs(a.cs.as_deref().unwrap_or(""), ts) }))
+            let hs = al.map(&segs[i].seq);
+            let m = first_max(hs.into_iter().filter(|m| m.fwd))?;
+            let ts = m.r_st;
+            Some((i, Aln { ts, te: m.r_en, qs: m.q_st, qe: m.q_en, ev: parse_cs(&m.cs(&segs[i].seq, r), ts) }))
         })
         .collect::<Vec<_>>()
         .into_iter()
@@ -369,22 +373,22 @@ pub fn run(args: &[String]) {
     }
     log(format!("{} reads, {:.1} Mb", reads.len(), reads.iter().map(|r| r.len()).sum::<usize>() as f64 / 1e6));
     // 1. parts of reads that hold a gene
-    let panel = Aligner::builder().map_hifi().with_cigar().with_index_threads(threads).with_index(format!("{dir}/panel.fa"), None).expect("panel.fa");
+    let panel = Index::from_fasta(&format!("{dir}/panel.fa"), Opts { per_group: 5, max_align: 100, min_chain: 500.0, ..Opts::hifi() });
     let hits: Vec<Vec<(String, bool, usize, usize, usize, usize, usize)>> = reads
         .par_iter()
         .map(|s| {
-            panel
-                .map(s, false, false, None, None, None)
-                .unwrap_or_default()
+            let hs = panel.map(s);
+            // primary and supplementary: the best hit of every part of the read
+            crate::aln::primary_set(&hs)
                 .into_iter()
-                .filter(|m| m.is_primary || m.is_supplementary)
+                .map(|i| &hs[i])
                 .filter_map(|m| {
-                    let (ts, te, tl) = (m.target_start as usize, m.target_end as usize, m.target_len as usize);
+                    let (ts, te, tl) = (m.r_st, m.r_en, panel.seqs[m.seq].len());
                     if te - ts < MIN_HIT || ((te - ts) as f64) < MIN_SPAN * tl as f64 {
                         return None;
                     }
-                    let g = m.target_name.as_ref()?.split('*').next()?.to_string();
-                    Some((g, m.strand == Strand::Forward, m.query_start as usize, m.query_end as usize, ts, te, tl))
+                    let g = panel.names[m.seq].split('*').next()?.to_string();
+                    Some((g, m.fwd, m.q_st, m.q_en, ts, te, tl))
                 })
                 .collect()
         })
@@ -413,6 +417,7 @@ pub fn run(args: &[String]) {
         v.sort_by_key(|x| (x.read, x.a));
     }
     log(format!("gene parts: {}", fams.iter().map(|(f, v)| format!("{f} {}", v.len())).collect::<Vec<_>>().join(", ")));
+    if std::env::var("HLA_ALNSTAT").is_ok() { eprintln!("[aln] {}", crate::aln::stat()); }
     // 2.-4. haplotypes, consensus, naming
     let mut calls: Vec<Call> = vec![];
     for (fam, segs) in &fams {
@@ -432,7 +437,7 @@ pub fn run(args: &[String]) {
                 *lab.entry(segs[i].gene.as_str()).or_insert(0) += 1;
             }
             let genes: Vec<&String> = if fam == "I" { fgenes.iter().copied().filter(|g| 10 * lab.get(g.as_str()).copied().unwrap_or(0) >= cl.len()).collect() } else { fgenes.clone() };
-            let al = Aligner::builder().asm5().with_cigar().with_seq(&cons).expect("index");
+            let al = Index::single(&cons, Opts::asm5());
             // only alleles that share most sampled 21-mers with the consensus are aligned
             let cset: ahash::AHashSet<u64> = sketch(&cons).into_iter().collect();
             let cand: Vec<&crate::db::Allele> = genes.iter().flat_map(|g| db.ref_[g.as_str()].iter()).filter(|a| !a.imputed && !a.partial).collect();
@@ -453,10 +458,9 @@ pub fn run(args: &[String]) {
                 .par_iter()
                 .filter_map(|a| {
                     let q: &[u8] = if a.extended { a.orig.as_deref().unwrap_or(&a.genomic) } else { &a.genomic };
-                    let hs = al.map(q, false, false, None, None, None).ok()?;
-                    let m = hs.into_iter().filter(|m| m.strand == Strand::Forward).max_by_key(|m| m.match_len)?;
-                    let d = m.alignment.as_ref()?.nm as i64 + m.query_start as i64 + q.len() as i64 - m.query_end as i64;
-                    Some((d, a.name.as_str(), m.target_start as usize, m.target_end as usize))
+                    let m = first_max(al.map(q).into_iter().filter(|m| m.fwd))?;
+                    let d = m.nm as i64 + m.q_st as i64 + q.len() as i64 - m.q_en as i64;
+                    Some((d, a.name.as_str(), m.r_st, m.r_en))
                 })
                 .collect();
             best.sort();

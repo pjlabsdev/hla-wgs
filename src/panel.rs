@@ -1,8 +1,7 @@
-//! Stage 0: map the extracted read pairs to the gene panel (minimap2 sr, paired, -N 20) and
+//! Stage 0: map the extracted read pairs to the gene panel (own aligner, src/aln.rs) and
 //! assign every pair to the gene(s) with the best summed alignment score.
 use crate::util::open_reader;
 use ahash::AHashMap;
-use minimap2::Aligner;
 use rayon::prelude::*;
 use ahash::AHashSet;
 use std::io::Read;
@@ -64,14 +63,24 @@ fn load_mask(panel: &str) -> AHashMap<String, Vec<(i64, i64)>> {
 pub static MASK_LOADED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
-    let mut al = Aligner::builder()
-        .sr()
-        .with_cigar()
-        .with_index_threads(threads)
-        .with_index(panel, None)
-        .expect("panel index");
-    al.mapopt.best_n = std::env::var("MM2N").ok().and_then(|v| v.parse().ok()).unwrap_or(20);
-    // exact 21-mer prefilter: minimap2 sr seeds are exact 21-mers, so a pair without any shared
+    let envn = |k: &str, d: usize| std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d);
+    let opts = crate::aln::Opts { max_align: envn("HLA_PANEL_N", 100), chain_ratio: 0.6, per_group: envn("HLA_PANEL_G", 25), min_chain: envn("HLA_PANEL_C", 25) as f32, min_score: envn("HLA_PANEL_SE", 60) as i32, win: envn("HLA_PANEL_MW", 11), full: envn("HLA_PANEL_FULL", 80) as f32 / 100.0, ..crate::aln::Opts::sr() };
+    let t0 = std::time::Instant::now();
+    let al = crate::aln::Index::from_fasta(panel, opts);
+    eprintln!("[panel] {} sequences indexed, {:.1}s", al.seqs.len(), t0.elapsed().as_secs_f64());
+    // genes whose best alignment of a mate lies within this many points of the mate's best alignment
+    let win = envn("HLA_PANEL_W", 0) as i32;
+    let clip = envn("HLA_PANEL_CLIP", 0);
+    // a hit needs this score, unless the read runs over the start or end of the panel sequence:
+    // a mate that overhangs the allele is aligned only in part and is still a read of the gene
+    let full = envn("HLA_PANEL_S", 70) as i32;
+    let rescue_min = envn("HLA_PANEL_RS", full as usize) as i32;
+    let bonus = envn("HLA_PANEL_B", 33) as i32;
+    // off by default: on simulated low-quality and MGI reads it changed gene assignment by under 0.05 %
+    let qmin = envn("HLA_PANEL_Q", 0).min(60) as u8;
+    let rescue = std::env::var("HLA_PANEL_RESCUE").map_or(true, |v| v != "0");
+    let rescue_win = envn("HLA_PANEL_RW", 40) as i32;
+    // exact 21-mer prefilter: the aligner seeds with exact 21-mers, so a pair without any shared
     // 21-mer cannot get a hit; skipping it changes nothing but saves its seeding
     let pair_rule = std::env::var("HLA_PAIR").is_ok();
     // repeat mask: intervals of panel alleles whose 21-mers recur elsewhere in the genome. A pair counts for a
@@ -123,7 +132,7 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
             for ((x, y), k) in b1.iter().zip(b2.iter()).zip(keep) {
                 if k {
                     for (w, r) in [(&mut *w1, x), (&mut *w2, y)] {
-                        let q = vec![b'I'; r.seq.len()];
+                        let q: Vec<u8> = if r.qual.len() == r.seq.len() { r.qual.iter().map(|&c| c.min(93) + 33).collect() } else { vec![b'I'; r.seq.len()] };
                         w.write_all(b"@").and_then(|_| w.write_all(r.name.as_bytes())).and_then(|_| w.write_all(b"\n")).and_then(|_| w.write_all(&r.seq)).and_then(|_| w.write_all(b"\n+\n")).and_then(|_| w.write_all(&q)).and_then(|_| w.write_all(b"\n")).expect("read cache write");
                     }
                 }
@@ -136,16 +145,50 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
                 if !has_kmer(&x.seq, &set) && !has_kmer(&y.seq, &set) {
                     return None;
                 }
-                let (m1, m2) = al
-                    .map_pair(&x.seq, &y.seq, false, false, None, None, Some(x.name.as_bytes()))
-                    .ok()?;
+                // a mate clipped by more than `clip` bases where the gene sequence goes on is part of
+                // another sequence (paralog copy, structural change elsewhere): such hits do not count
+                let keep = |q: &[u8], hs: Vec<crate::aln::Hit>| -> Vec<crate::aln::Hit> {
+                    let hs: Vec<crate::aln::Hit> = hs
+                        .into_iter()
+                        .filter(|m| {
+                            if m.score >= full {
+                                return true;
+                            }
+                            let (cl, cr) = if m.fwd { (m.q_st, q.len() - m.q_en) } else { (q.len() - m.q_en, m.q_st) };
+                            let rl = al.seqs[m.seq].len();
+                            (cl > 0 && m.r_st <= 3) || (cr > 0 && rl - m.r_en <= 3)
+                        })
+                        .collect();
+                    if clip == 0 {
+                        return hs;
+                    }
+                    hs.into_iter()
+                        .filter(|m| {
+                            let (cl, cr) = if m.fwd { (m.q_st, q.len() - m.q_en) } else { (q.len() - m.q_en, m.q_st) };
+                            let rl = al.seqs[m.seq].len();
+                            cl.min(m.r_st) <= clip && cr.min(rl - m.r_en) <= clip
+                        })
+                        .collect()
+                };
+                // with HLA_PANEL_Q=q0, mismatches at bases below quality q0 cost less
+                let mapq = |r: &crate::util::Fq| {
+                    let mut hs = al.map(&r.seq);
+                    if qmin > 0 && !r.qual.is_empty() {
+                        for h in hs.iter_mut() {
+                            h.score = crate::aln::qual_score(h, &r.qual, opts.sc.b, qmin);
+                        }
+                        hs.sort_by(|a, b| b.score.cmp(&a.score));
+                    }
+                    hs
+                };
+                let (m1, m2) = (keep(&x.seq, mapq(x)), keep(&y.seq, mapq(y)));
                 if m1.is_empty() && m2.is_empty() {
                     return None;
                 }
                 if std::env::var("DBG0").map_or(false, |v| v == x.name) {
                     for (k, ms) in [(1, &m1), (2, &m2)] {
                         for m in ms.iter() {
-                            eprintln!("mate{} {} {} {} prim={} sup={} AS={:?}", k, m.target_name.as_ref().unwrap(), m.target_start, m.strand as i32, m.is_primary, m.is_supplementary, m.alignment.as_ref().map(|a| a.alignment_score));
+                            eprintln!("mate{} {} {} {} AS={}", k, al.names[m.seq], m.r_st, m.fwd, m.score);
                         }
                     }
                 }
@@ -153,23 +196,87 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
                 let mut room: Vec<[i64; 2]> = vec![];
                 let mut anchor: Vec<[bool; 2]> = vec![];
                 let mut sq: [Option<Vec<u8>>; 2] = [None, None];
-                // SAM order: all records of mate 1, then mate 2
-                for (mate, ms, s) in [(0usize, &m1, &x.seq), (1, &m2, &y.seq)] {
-                    // paired SAM from the minimap2 CLI carries primary and supplementary records only
-                    for m in ms.iter().filter(|m| m.is_primary || m.is_supplementary) {
-                        let tn = m.target_name.as_ref().unwrap();
-                        let gene = tn.split('*').next().unwrap();
-                        let a = m.alignment.as_ref().and_then(|a| a.alignment_score).unwrap_or(0) as i64;
+                // hits per mate: (sequence, score, r start, r end, forward)
+                let mut hs: [Vec<(usize, i32, usize, usize, bool)>; 2] = [
+                    m1.iter().map(|m| (m.seq, m.score, m.r_st, m.r_en, m.fwd)).collect(),
+                    m2.iter().map(|m| (m.seq, m.score, m.r_st, m.r_en, m.fwd)).collect(),
+                ];
+                let gene_of = |q: usize| al.names[q].split('*').next().unwrap();
+                // rescue: a mate without a hit on the gene of its partner's best hit is aligned next to the partner
+                if rescue {
+                    for mate in 0..2 {
+                        let other = 1 - mate;
+                        // the best hit of the partner in each gene it fits nearly as well as its best (at most 3 genes)
+                        let ptop = hs[other].first().map_or(0, |h| h.1);
+                        let mut tries: Vec<(usize, i32, usize, usize, bool)> = vec![];
+                        for h in hs[other].iter().filter(|h| h.1 >= ptop - rescue_win) {
+                            if tries.len() < 3 && !tries.iter().any(|t| gene_of(t.0) == gene_of(h.0)) {
+                                tries.push(*h);
+                            }
+                        }
+                        for (ps, _, prs, pre, pfwd) in tries {
+                        let g = gene_of(ps);
+                        if hs[mate].iter().any(|h| gene_of(h.0) == g) {
+                            continue;
+                        }
+                        let seq = &al.seqs[ps];
+                        let (w0, w1) = (prs.saturating_sub(800), (pre + 800).min(seq.len()));
+                        let mq = if mate == 0 { &x.seq } else { &y.seq };
+                        let qo: Vec<u8> = if pfwd { crate::aln::revcomp(mq) } else { mq.to_ascii_uppercase() };
+                        let (sc_, _, _, rs, re) = crate::aln::local_seeded(&qo, &seq[w0..w1], &opts.sc);
+                        if sc_ >= rescue_min {
+                            hs[mate].push((ps, sc_, w0 + rs, w0 + re, !pfwd));
+                        }
+                        }
+                    }
+                }
+                // best score of each gene for each mate
+                let mut gb: Vec<(&str, [i32; 2])> = vec![];
+                for mate in 0..2 {
+                    for h in &hs[mate] {
+                        let g = gene_of(h.0);
+                        match gb.iter().position(|x| x.0 == g) {
+                            Some(i) => gb[i].1[mate] = gb[i].1[mate].max(h.1),
+                            None => {
+                                let mut v = [0, 0];
+                                v[mate] = h.1;
+                                gb.push((g, v));
+                            }
+                        }
+                    }
+                }
+                let top = [0, 1].map(|m| gb.iter().map(|x| x.1[m]).max().unwrap_or(0));
+                // a proper pair on one gene earns a bonus, as in paired mapping: both mates then go to that gene
+                let pscore = gb.iter().filter(|x| x.1[0] > 0 && x.1[1] > 0).map(|x| x.1[0] + x.1[1] + bonus).max().unwrap_or(0);
+                let paired = pscore > 0 && pscore >= top[0] + top[1];
+                let pair_sum = |g: &str| gb.iter().find(|x| x.0 == g).map_or(0, |x| x.1[0] + x.1[1]);
+                for (mate, s) in [(0usize, &x.seq), (1, &y.seq)] {
+                    if hs[mate].is_empty() {
+                        continue;
+                    }
+                    let genes: Vec<&str> = if paired {
+                        gb.iter().filter(|x| x.1[0] > 0 && x.1[1] > 0 && x.1[0] + x.1[1] + bonus == pscore).map(|x| x.0).collect()
+                    } else {
+                        // among the genes this mate fits best, those its partner supports most
+                        let c: Vec<&str> = gb.iter().filter(|x| x.1[mate] > 0 && x.1[mate] >= top[mate] - win).map(|x| x.0).collect();
+                        let pb = c.iter().map(|g| pair_sum(g)).max().unwrap_or(0);
+                        c.into_iter().filter(|g| pair_sum(g) == pb).collect()
+                    };
+                    let gbest = |g: &str| gb.iter().find(|x| x.0 == g).map_or(0, |x| x.1[mate]);
+                    for &(q, sc_, rs, re, fw) in hs[mate].iter().filter(|h| genes.contains(&gene_of(h.0)) && h.1 >= gbest(gene_of(h.0)) - win) {
+                        let tn = al.names[q].as_str();
+                        let gene = gene_of(q);
+                        let a = sc_ as i64;
                         // bases left on the gene sequence in the direction of the partner mate
-                        let anch = match mask.get(tn.as_str()) {
+                        let anch = match mask.get(tn) {
                             Some(iv) => {
-                                let (s0, e0) = (m.target_start as i64, m.target_end as i64);
+                                let (s0, e0) = (rs as i64, re as i64);
                                 let cov: i64 = iv.iter().map(|&(a, b)| (e0.min(b) - s0.max(a)).max(0)).sum();
                                 e0 - s0 - cov >= MASK_ANCHOR
                             }
                             None => true,
                         };
-                        let rm = if m.strand == minimap2::Strand::Forward { (m.target_len - m.target_end) as i64 } else { m.target_start as i64 };
+                        let rm = if fw { (al.seqs[q].len() - re) as i64 } else { rs as i64 };
                         match gs.iter().position(|g| g.0 == gene) {
                             Some(i) => {
                                 if a > gs[i].1[mate] {
@@ -190,9 +297,9 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
                                 anchor.push(an);
                             }
                         }
-                        if m.is_primary && !m.is_supplementary && !s.is_empty() {
-                            sq[mate] = Some(s.clone());
-                        }
+                    }
+                    if !s.is_empty() {
+                        sq[mate] = Some(s.clone());
                     }
                 }
                 if !mask.is_empty() {
@@ -294,7 +401,7 @@ fn for_kmers(s: &[u8], mut f: impl FnMut(u64) -> bool) -> bool {
 /// left out: a pair needs 40 aligned bases outside the mask to count for a gene, so a pair whose only
 /// seeds are repeat 21-mers (Alu, L1 copies from all over the genome) would be aligned and then
 /// dropped. Without them the prefilter passes far fewer pairs of a whole-genome FASTQ.
-fn panel_kmers(panel: &str, mask: &AHashMap<String, Vec<(i64, i64)>>) -> AHashSet<u64> {
+fn panel_kmers(panel: &str, mask: &AHashMap<String, Vec<(i64, i64)>>) -> KSet {
     let mut fa = String::new();
     open_reader(panel).read_to_string(&mut fa).unwrap();
     let mut set = AHashSet::with_capacity(8 << 20);
@@ -328,9 +435,36 @@ fn panel_kmers(panel: &str, mask: &AHashMap<String, Vec<(i64, i64)>>) -> AHashSe
     let n = set.len();
     set.retain(|k| !rep.contains(k));
     eprintln!("[prefilter] {} panel 21-mers, {} inside the repeat mask left out", n, n - set.len());
-    set
+    set.shrink_to_fit();
+    let mut bits = vec![0u64; KSET_BITS / 64];
+    for &k in &set {
+        let b = kset_bit(k);
+        bits[b / 64] |= 1 << (b % 64);
+    }
+    KSet { bits, set }
 }
 
-fn has_kmer(s: &[u8], set: &AHashSet<u64>) -> bool {
-    for_kmers(s, |k| set.contains(&k))
+/// the prefilter's 21-mers with a bit array in front: almost every 21-mer of a read is not in the
+/// panel, and one look into a 2 MB bit array answers that without probing the hash table
+struct KSet {
+    bits: Vec<u64>,
+    set: AHashSet<u64>,
 }
+
+const KSET_BITS: usize = 1 << 24;
+
+fn kset_bit(k: u64) -> usize {
+    (k.wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 40) as usize
+}
+
+impl KSet {
+    fn contains(&self, k: u64) -> bool {
+        let b = kset_bit(k);
+        self.bits[b / 64] >> (b % 64) & 1 == 1 && self.set.contains(&k)
+    }
+}
+
+fn has_kmer(s: &[u8], set: &KSet) -> bool {
+    for_kmers(s, |k| set.contains(k))
+}
+

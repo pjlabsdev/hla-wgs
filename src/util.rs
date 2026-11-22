@@ -28,6 +28,8 @@ fn bad(msg: String) -> std::io::Error {
 pub struct Fq {
     pub name: String,
     pub seq: Vec<u8>,
+    /// base qualities (Phred, not offset); empty when the input has none
+    pub qual: Vec<u8>,
 }
 
 /// how often an I/O error on the input is retried (env HLA_IO_RETRIES, default 6)
@@ -83,7 +85,9 @@ pub fn read_fq_res(r: &mut dyn BufRead, n: usize) -> std::io::Result<Vec<Fq>> {
         if nm.len() > 2 && nm[nm.len() - 2] == b'/' {
             nm = &nm[..nm.len() - 2];
         }
-        out.push(Fq { name: String::from_utf8_lossy(nm).into_owned(), seq: l[1].clone() });
+        // qualities as Phred values; a missing or malformed quality line counts as no qualities
+        let qual: Vec<u8> = if l[3].len() == l[1].len() { l[3].iter().map(|&c| c.saturating_sub(33)).collect() } else { vec![] };
+        out.push(Fq { name: String::from_utf8_lossy(nm).into_owned(), seq: l[1].clone(), qual });
     }
     Ok(out)
 }

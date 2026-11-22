@@ -1,7 +1,6 @@
 //! Rust kernel of v16 (formerly the hlakern binary): reads x sequences matrix of summed mate
 //! semi-global edit distances; 999 = mate without alignment. Plus the Python-side normalisation.
 use rayon::prelude::*;
-use std::collections::HashMap;
 
 const K: usize = 15;
 const STEP: usize = 3; // query k-mer sampling step
@@ -50,7 +49,8 @@ struct Target {
 /// one k-mer index over all targets: sorted (kmer, target, pos); k-mers occurring more than
 /// 8 times within one target are dropped (repeats)
 struct Index {
-    keys: Vec<u64>,
+    /// k-mer -> range in hits
+    at: ahash::AHashMap<u64, (u32, u32)>,
     hits: Vec<(u32, u32)>,
 }
 
@@ -85,20 +85,29 @@ impl Index {
             })
             .collect();
         all.par_sort_unstable();
-        Index {
-            keys: all.iter().map(|x| x.0).collect(),
-            hits: all.iter().map(|x| (x.1, x.2)).collect(),
+        let mut at = ahash::AHashMap::with_capacity(all.len() / 2 + 1);
+        let mut a = 0;
+        while a < all.len() {
+            let mut b = a + 1;
+            while b < all.len() && all[b].0 == all[a].0 {
+                b += 1;
+            }
+            at.insert(all[a].0, (a as u32, (b - a) as u32));
+            a = b;
         }
+        Index { at, hits: all.iter().map(|x| (x.1, x.2)).collect() }
     }
     fn get(&self, k: u64) -> &[(u32, u32)] {
-        let a = self.keys.partition_point(|&x| x < k);
-        let b = self.keys.partition_point(|&x| x <= k);
-        &self.hits[a..b]
+        match self.at.get(&k) {
+            Some(&(a, n)) => &self.hits[a as usize..(a + n) as usize],
+            None => &[],
+        }
     }
 }
 
 /// per target: up to two best (strand, diagonal) anchors for one mate
 fn anchors(idx: &Index, nt: usize, fw: &[u8], rc: &[u8]) -> Vec<Vec<(u8, i64)>> {
+    // votes as (target, strand, diagonal bucket), grouped by target with a counting sort
     let mut h: Vec<(u32, u8, i64)> = vec![];
     for (st, q) in [fw, rc].iter().enumerate() {
         if q.len() < K {
@@ -114,18 +123,36 @@ fn anchors(idx: &Index, nt: usize, fw: &[u8], rc: &[u8]) -> Vec<Vec<(u8, i64)>> 
             i += STEP;
         }
     }
-    h.sort_unstable();
+    let mut start = vec![0u32; nt + 1];
+    for x in &h {
+        start[x.0 as usize + 1] += 1;
+    }
+    for t in 0..nt {
+        start[t + 1] += start[t];
+    }
+    let mut fill = start.clone();
+    let mut g: Vec<(u8, i64)> = vec![(0, 0); h.len()];
+    for x in &h {
+        let f = &mut fill[x.0 as usize];
+        g[*f as usize] = (x.1, x.2);
+        *f += 1;
+    }
     let mut out: Vec<Vec<(u8, i64)>> = vec![vec![]; nt];
-    let mut a = 0;
-    while a < h.len() {
-        let t = h[a].0;
-        let mut cnt: Vec<(u32, u8, i64)> = vec![];
-        while a < h.len() && h[a].0 == t {
+    let mut cnt: Vec<(u32, u8, i64)> = vec![];
+    for t in 0..nt {
+        let v = &mut g[start[t] as usize..start[t + 1] as usize];
+        if v.is_empty() {
+            continue;
+        }
+        v.sort_unstable();
+        cnt.clear();
+        let mut a = 0;
+        while a < v.len() {
             let mut b = a;
-            while b < h.len() && h[b] == h[a] {
+            while b < v.len() && v[b] == v[a] {
                 b += 1;
             }
-            cnt.push(((b - a) as u32, h[a].1, h[a].2));
+            cnt.push(((b - a) as u32, v[a].0, v[a].1));
             a = b;
         }
         // top two diagonals per strand (as many votes first, then lower diagonal)
@@ -134,17 +161,17 @@ fn anchors(idx: &Index, nt: usize, fw: &[u8], rc: &[u8]) -> Vec<Vec<(u8, i64)>> 
         for st in 0..2u8 {
             sel.extend(cnt.iter().filter(|c| c.1 == st).take(2).map(|c| (c.1, c.2 * 8)));
         }
-        out[t as usize] = sel;
+        out[t] = sel;
     }
     out
 }
 
-/// Myers/Hyyro bit-parallel semi-global edit distance: pattern q fully aligned,
+/// Myers/Hyyro bit-parallel semi-global edit distance (myers_peq with the pattern's peq_of): pattern q fully aligned,
 /// free start/end in text. Text symbol 4 (N / padding) matches everything.
-fn myers_semiglobal(q: &[u8], text: &[u8]) -> u32 {
+/// match vectors of a pattern per text symbol 0..4; padding rows (beyond m) match everything
+fn peq_of(q: &[u8]) -> Vec<[u64; 5]> {
     let m = q.len();
     let w = (m + 63) / 64;
-    // Peq per text symbol 0..4; padding rows (beyond m) match everything
     let mut peq = vec![[0u64; 5]; w];
     for b in 0..w {
         for c in 0..5u8 {
@@ -158,6 +185,11 @@ fn myers_semiglobal(q: &[u8], text: &[u8]) -> u32 {
             peq[b][c as usize] = v;
         }
     }
+    peq
+}
+
+fn myers_peq(peq: &[[u64; 5]], m: usize, text: &[u8]) -> u32 {
+    let w = peq.len();
     let mut pv = vec![!0u64; w];
     let mut mv = vec![0u64; w];
     let mut score: i64 = m as i64; // score at row m (bit (m-1)%64 of the last block)
@@ -212,8 +244,10 @@ fn myers_semiglobal(q: &[u8], text: &[u8]) -> u32 {
 fn mate_cost(
     t: &Target,
     q: [&[u8]; 2],
+    peq: &[Vec<[u64; 5]>; 2],
     anc: &[(u8, i64)],
-    cache: &mut HashMap<(u8, Vec<u8>), u32>,
+    cache: &mut ahash::AHashMap<(u8, Vec<u8>), u32>,
+    win: &mut Vec<u8>,
 ) -> u16 {
     let mut best: Option<u32> = None;
     let l = t.seq.len() as i64;
@@ -222,15 +256,22 @@ fn mate_cost(
         let s = d - BAND as i64;
         let e = d + qq.len() as i64 + BAND as i64 + 8;
         // text window; positions outside the target are wildcards (free overhang)
-        let mut win = Vec::with_capacity((e - s) as usize);
-        for p in s..e {
-            win.push(if p < 0 || p >= l { 4 } else { t.seq[p as usize] });
+        win.clear();
+        if s >= 0 && e <= l {
+            win.extend_from_slice(&t.seq[s as usize..e as usize]);
+        } else {
+            for p in s..e {
+                win.push(if p < 0 || p >= l { 4 } else { t.seq[p as usize] });
+            }
         }
-        let key = (st, win);
+        let key = (st, std::mem::take(win));
         let c = match cache.get(&key) {
-            Some(&c) => c,
+            Some(&c) => {
+                *win = key.1;
+                c
+            }
             None => {
-                let c = myers_semiglobal(qq, &key.1);
+                let c = myers_peq(&peq[st as usize], qq.len(), &key.1);
                 cache.insert(key, c);
                 c
             }
@@ -262,9 +303,11 @@ pub fn raw(reads: &[[&[u8]; 2]], seqs: &[&[u8]]) -> Vec<u16> {
                 let m: Vec<u8> = m.iter().map(|&c| code(c)).collect();
                 let rc = revcomp(&m);
                 let anc = anchors(&idx, nt, &m, &rc);
-                let mut cache: HashMap<(u8, Vec<u8>), u32> = HashMap::new();
+                let peq = [peq_of(&m), peq_of(&rc)];
+                let mut cache: ahash::AHashMap<(u8, Vec<u8>), u32> = ahash::AHashMap::new();
+                let mut win = vec![];
                 for (j, t) in targets.iter().enumerate() {
-                    let c = mate_cost(t, [m.as_slice(), rc.as_slice()], &anc[j], &mut cache);
+                    let c = mate_cost(t, [m.as_slice(), rc.as_slice()], &peq, &anc[j], &mut cache, &mut win);
                     row[j] = row[j].saturating_add(c);
                 }
             }

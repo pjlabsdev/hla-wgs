@@ -1,6 +1,6 @@
 # hla-wgs
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24367470.svg)](https://doi.org/10.5281/zenodo.24367470)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24367469.svg)](https://doi.org/10.5281/zenodo.24367469)
 
 **HLA typing from short-read whole-genome sequencing, with a statement of what is certain for
 every allele.** One Rust program, no external aligner or interpreter at run time. It types 18 genes
@@ -85,20 +85,46 @@ include laboratory types of some of these samples.
 
 The full report is in [`docs/paper/hla-wgs-report.pdf`](docs/paper/hla-wgs-report.pdf).
 
-## Install
+## Download and start
+
+Ready-to-run packages are attached to every [release](https://github.com/pjlabsdev/hla-wgs/releases/latest):
+
+| System | Package | Start |
+|---|---|---|
+| macOS 11+ (Apple silicon and Intel) | [hla-wgs-macos.zip](https://github.com/pjlabsdev/hla-wgs/releases/latest/download/hla-wgs-macos.zip) | double-click `hla-wgs-start.command` |
+| Windows 10/11, 64 bit | [hla-wgs-windows-x86_64.zip](https://github.com/pjlabsdev/hla-wgs/releases/latest/download/hla-wgs-windows-x86_64.zip) | double-click `hla-wgs-start.bat` |
+| Linux x86_64 (glibc 2.35+) | [hla-wgs-linux-x86_64.zip](https://github.com/pjlabsdev/hla-wgs/releases/latest/download/hla-wgs-linux-x86_64.zip) | `./hla-wgs-start.sh` in a terminal |
+
+Unpack the ZIP, start the start file and drag the input file (FASTQ R1, BAM or CRAM) into the
+window. The first start downloads IPD-IMGT/HLA and builds the reference next to the start file
+(once, a few minutes). At every start it checks for a newer release and offers the update
+(`HLA_WGS_NO_UPDATE=1` switches this off). The start files and the result page speak English, or
+German on a German system (`HLA_WGS_LANG=de|en`). On macOS, if the first start is refused, right-click
+the start file, choose Open and confirm once.
+
+**Deutsch:** Fertige Pakete für macOS, Windows und Linux hängen an jedem Release (Tabelle oben).
+ZIP entpacken, Startdatei doppelklicken (Linux: `./hla-wgs-start.sh`) und die Eingabedatei (FASTQ R1,
+BAM oder CRAM) ins Fenster ziehen. Der erste Start lädt IPD-IMGT/HLA und baut die Referenz neben der
+Startdatei (einmalig, einige Minuten). Bei jedem Start prüft die Startdatei, ob es eine neuere
+Version gibt, und bietet das Update an (`HLA_WGS_NO_UPDATE=1` schaltet das ab). Startdatei und
+Ergebnisseite sind auf einem deutschen System deutsch (`HLA_WGS_LANG=de|en`). Die Anleitung liegt
+als `README.txt` auf Englisch und Deutsch im Paket.
+
+## Build from source
 
 ```bash
 git clone https://github.com/pjlabsdev/hla-wgs && cd hla-wgs
-cargo build --release          # Rust 1.85 or newer; a C compiler is needed for minimap2
+cargo build --release          # Rust 1.85 or newer; nothing else (no C compiler, no other tools)
 ./target/release/hla-wgs --version
 ```
 
-Runs on Linux and macOS (x86-64 and ARM).
+Runs on Linux, macOS and Windows (x86-64 and ARM).
 
 ## Start file
 
 `start/hla-wgs-start.command` is a double-clickable start file (on macOS it opens in Terminal; on
-Linux run it with `bash`). It asks for the input; drag the BAM, CRAM or FASTQ file into the window,
+Linux run it with `bash`; on Windows use `start/hla-wgs-start.bat`, which runs
+`start/hla-wgs-start.ps1` in PowerShell). It asks for the input; drag the BAM, CRAM or FASTQ file into the window,
 which inserts its path, or type the path, then press Enter. If the reference is missing it sets it up
 once in `ref/` next to the start file (download of hla.dat 3.66, `build-db`, the WMDA G/P files and
 the repeat mask `data/panel_mask_3.66.bed`; `HLA_WGS_DB` points to another one), then runs
@@ -184,8 +210,12 @@ DPB1  1     DPB1*01:01:01:02  DPB1*01:01:01     3           29.8     29.8     29
 
 ## How it works
 
-1. Reads are mapped to a panel of one full-length sequence per allele group (minimap2 library);
-   reads anchored only in masked repeats are dropped.
+A technical picture of every step, from the database download to the result page, is in
+[`docs/ablauf.html`](docs/ablauf.html) (German).
+
+
+1. Reads are mapped to a panel of one full-length sequence per allele group with the program's own
+   aligner ([`docs/aligner.md`](docs/aligner.md)); reads anchored only in masked repeats are dropped.
 2. Per gene, a k-mer likelihood with expectation maximisation selects candidate alleles.
 3. Candidates are compared pairwise on an edit-distance matrix of all reads, which gives the best
    pair and, for each field, the margin to the best competitor.
@@ -217,6 +247,7 @@ CC BY-ND 3.0; this repository contains no sequences from it, only allele names i
 ## Citation
 
 Jungwirth P. hla-wgs: HLA typing from whole-genome sequencing with a per-allele statement of what is
-certain. Version 1.0.0, 2026. https://doi.org/10.5281/zenodo.24367470
+certain. Version 1.1.0, 2026. https://doi.org/10.5281/zenodo.24367469 (all versions; 1.0.0:
+https://doi.org/10.5281/zenodo.24367470)
 
 See also [CITATION.cff](CITATION.cff).

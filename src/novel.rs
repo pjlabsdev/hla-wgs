@@ -1,10 +1,11 @@
 //! Residual variants: positions where the reads consistently disagree with the called allele.
 //! A called allele with such a site is the nearest database allele of a new allele, so its
 //! fourth field (or more, if the site is exonic) is not an exact statement.
+/// how far from a gene end a new site needs near-unanimous reads
+static NOV_EDGE: std::sync::LazyLock<usize> = std::sync::LazyLock::new(|| std::env::var("HLA_NOV_EDGE").ok().and_then(|v| v.parse().ok()).unwrap_or(15));
 use crate::align::{aligner, Preset};
 use crate::stageb::Ctx;
 use ahash::AHashMap;
-use minimap2::Strand;
 
 pub struct Site {
     pub pos: usize,
@@ -61,17 +62,16 @@ fn parse_cs(cs: &str, mut pos: usize) -> Vec<(usize, String)> {
     out
 }
 
-fn best(al: &minimap2::Aligner<minimap2::Built>, q: &[u8], t: &[u8]) -> Option<Aln> {
-    let hs = al.map(q, true, false, None, None, None).ok()?;
-    let m = hs.into_iter().filter(|m| m.is_primary).max_by_key(|m| m.match_len)?;
-    let a = m.alignment.as_ref()?;
-    let fwd = m.strand == Strand::Forward;
+fn best(al: &crate::aln::Index, q: &[u8], t: &[u8]) -> Option<Aln> {
+    let hs = al.map(q);
+    let m = hs.into_iter().find(|m| m.primary)?;
+    let fwd = m.fwd;
     // query in target orientation
     let qo: Vec<u8> = if fwd { q.to_vec() } else { revcomp(q) };
-    let (mut qs, mut qe) = if fwd { (m.query_start as usize, m.query_end as usize) } else { (q.len() - m.query_end as usize, q.len() - m.query_start as usize) };
-    let (mut ts, mut te) = (m.target_start as usize, m.target_end as usize);
-    let mut diffs = parse_cs(a.cs.as_deref().unwrap_or(""), ts);
-    let mut nm = a.nm as i64;
+    let (mut qs, mut qe) = if fwd { (m.q_st, m.q_en) } else { (q.len() - m.q_en, q.len() - m.q_st) };
+    let (mut ts, mut te) = (m.r_st, m.r_en);
+    let mut diffs = parse_cs(&m.cs(q, t), ts);
+    let mut nm = m.nm as i64;
     // one longer insertion or deletion is one event, not twenty edits: otherwise its reads are thrown out as junk
     if std::env::var("HLA_NOBIG").is_err() {
         for (_, w) in &diffs {
@@ -321,7 +321,7 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
                 continue;
             }
             // the first and last bases of a gene attract reads of related genes: ask for near-unanimous reads
-            if (*p < own_s + 15 || *p + 15 > own_e) && (n as f64) < 0.9 * (ds + dsh) as f64 {
+            if (*p < own_s + *NOV_EDGE || *p + *NOV_EDGE > own_e) && (n as f64) < 0.9 * (ds + dsh) as f64 {
                 continue;
             }
             // length changes of single-base runs: short reads stutter there, so ask for clear support
@@ -344,6 +344,7 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
             let Some((d, (cs, csh))) = replen[k][ri].iter().filter(|(d, _)| **d != 0).max_by_key(|(d, (a, b))| (a + b, -d.abs())).map(|(d, c)| (*d, *c)) else { continue };
             let n = cs + csh;
             if n < 4 || (n as f64) < 0.6 * ns as f64 + 0.3 * nsh as f64 || ns + nsh > 2 * med { continue; }
+            if (rs < own_s + *NOV_EDGE || re + *NOV_EDGE > own_e) && (n as f64) < 0.9 * (ns + nsh) as f64 { continue; }
             if v.iter().any(|s| s.pos + 1 >= rs && s.pos <= re) { continue; }
             v.push(Site { pos: rs, what: format!("rep{:+}", d), alt: n as usize, depth: (ns + nsh) as usize, exon: ex.iter().any(|&(s, e)| rs < e && s < re), either: !hom && cs == 0 });
         }

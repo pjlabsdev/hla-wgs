@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hla-wgs Ablauf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* VOICE: nüchtern, technisch, wie ein Datenblatt eines Laborgeräts
+   IDEA: Ablaufschema eines Messgeräts: Einrichtung einmalig, dann der Weg jeder Probe
+   PICTURE: großes Schaltbild mit drei Bahnen (Einrichtung, Lauf, Ausgabe), darunter der Aligner im Detail
+   COLOUR and TYPE: PJ Labs: IBM Plex Mono 400/500, Gold als einziger Akzent, Weiß/Tiefschwarz
+   LAYOUT: Schema über volle Breite, darunter Tabellen und Erklärungen in einer Spalte */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0e0e0e);--ink:light-dark(#141414,#ececec);--mut:light-dark(#5f5f5f,#a3a3a3);--line:light-dark(#d6d6d6,#333);--box:light-dark(#f6f6f4,#171717);--acc:light-dark(#a88600,#d7af00);--accbg:light-dark(#fbf4d9,#2a2408)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 "IBM Plex Mono",ui-monospace,Menlo,monospace;font-weight:400;overflow-x:clip}
+b,strong,h1,h2,h3{font-weight:500}
+.band{padding:clamp(24px,4vw,56px) max(5vw,16px);max-width:1320px;margin:0 auto}
+h1{font-size:clamp(26px,3.4vw,40px);line-height:1.1;margin:0 0 10px;text-wrap:balance}
+h2{font-size:21px;line-height:1.25;margin:44px 0 12px;text-wrap:balance}
+h3{font-size:16px;margin:24px 0 6px}
+p{max-width:78ch;margin:0 0 12px}
+.lead{color:var(--mut);max-width:80ch}
+.acc{color:var(--acc)}
+figure{margin:24px 0 0}
+figcaption{color:var(--mut);font-size:13px;margin-top:10px;max-width:90ch}
+.schema{width:100%;height:auto;display:block;color:var(--ink)}
+.wide{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.wide svg{min-width:860px}
+table{border-collapse:collapse;width:100%;font-size:14px;margin-top:8px}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{font-weight:500;color:var(--mut)}
+td.n{text-align:right;white-space:nowrap}
+code{font-family:inherit;background:var(--box);padding:1px 5px;border-radius:3px;overflow-wrap:anywhere}
+.steps{list-style:none;padding:0;margin:8px 0 0;counter-reset:s}
+.steps li{display:grid;grid-template-columns:13em minmax(0,1fr);gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
+.steps li>span:first-child{color:var(--acc);font-weight:500}
+.note{border-left:3px solid var(--acc);background:var(--accbg);padding:10px 14px;margin:18px 0;max-width:90ch}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:28px}
+.scroll{overflow-x:auto}
+nav.scroll{display:flex;gap:18px;white-space:nowrap;font-size:14px;margin-top:18px}
+nav a{color:var(--acc);text-decoration:none}
+nav a:hover{text-decoration:underline}
+html{scroll-padding-top:20px}
+@media(max-width:600px){.steps li{grid-template-columns:1fr;gap:2px}table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--mut)}.stack td:empty{display:none}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<div class="band">
+<h1>hla-wgs: vom Download der Datenbank bis zum Befund</h1>
+<p class="lead">Was das Programm im Einzelnen tut. Die Einrichtung läuft einmal, beim ersten Start; danach geht jede Probe denselben Weg durch Lesen, Ausrichten, Zuordnen und Typisieren von 26 Genen. Alles läuft in einem einzigen Rust-Programm, ohne weitere Werkzeuge.</p>
+<nav class="scroll"><a href="#schema">Gesamtschema</a><a href="#einrichtung">Einrichtung</a><a href="#lauf">Lauf je Probe</a><a href="#aligner">Eigener Aligner</a><a href="#ausgabe">Ausgabe</a></nav>
+
+<figure id="schema">
+<div class="wide">
+<svg class="schema" viewBox="0 0 1240 760" role="img" aria-label="Ablaufschema: einmalige Einrichtung der Datenbank aus IPD-IMGT/HLA, danach je Probe Lesen, Vorfilter, Panel-Ausrichtung, Genzuordnung und Typisierung je Gen bis zu den Ausgabedateien">
+<defs>
+<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c9a000"/></marker>
+</defs>
+<g font-family="IBM Plex Mono, monospace" font-size="12" fill="currentColor">
+<!-- lane labels -->
+<text x="20" y="34" font-size="13" font-weight="500" fill="#c9a000">EINMAL: EINRICHTUNG</text>
+<line x1="20" y1="44" x2="1220" y2="44" stroke="currentColor" stroke-opacity=".25"/>
+<text x="20" y="300" font-size="13" font-weight="500" fill="#c9a000">JE PROBE: LAUF</text>
+<line x1="20" y1="310" x2="1220" y2="310" stroke="currentColor" stroke-opacity=".25"/>
+<text x="20" y="642" font-size="13" font-weight="500" fill="#c9a000">AUSGABE</text>
+<line x1="20" y1="652" x2="1220" y2="652" stroke="currentColor" stroke-opacity=".25"/>
+
+<!-- setup lane -->
+<g stroke="currentColor" fill="none" stroke-width="1.2">
+<rect x="20" y="70" width="150" height="74" rx="5"/>
+<rect x="215" y="70" width="190" height="74" rx="5"/>
+<rect x="450" y="70" width="150" height="74" rx="5"/>
+<rect x="645" y="62" width="250" height="90" rx="5" stroke="#c9a000" stroke-width="2"/>
+<rect x="955" y="62" width="265" height="200" rx="5" stroke-width="2"/>
+<rect x="215" y="180" width="190" height="34" rx="5" stroke-dasharray="4 3"/>
+<rect x="215" y="222" width="190" height="34" rx="5" stroke-dasharray="4 3"/>
+<rect x="450" y="180" width="150" height="34" rx="5" stroke-dasharray="4 3"/>
+<rect x="450" y="222" width="150" height="34" rx="5" stroke-dasharray="4 3"/>
+</g>
+<text x="32" y="94" font-weight="500">Startdatei</text>
+<text x="32" y="112" font-size="11" opacity=".7">hla-wgs-start</text>
+<text x="32" y="128" font-size="11" opacity=".7">.command</text>
+<text x="227" y="94" font-weight="500">Download</text>
+<text x="227" y="112" font-size="11" opacity=".7">hla.dat.zip, 45 MB</text>
+<text x="227" y="128" font-size="11" opacity=".7">IPD-IMGT/HLA 3.66</text>
+<text x="462" y="94" font-weight="500">Entpacken</text>
+<text x="462" y="112" font-size="11" opacity=".7">hla.dat</text>
+<text x="462" y="128" font-size="11" opacity=".7">353 MB</text>
+<text x="657" y="86" font-weight="500">hla-wgs build-db</text>
+<text x="657" y="104" font-size="11" opacity=".7">Allele, Exons, Introns lesen</text>
+<text x="657" y="119" font-size="11" opacity=".7">kurze Allele mit Flanken ergänzen</text>
+<text x="657" y="134" font-size="11" opacity=".7">Panel: 1195 Gruppen-Sequenzen</text>
+<text x="657" y="148" font-size="11" opacity=".7">hla.dat danach gelöscht</text>
+<text x="967" y="86" font-weight="500">Referenz ref/hladb</text>
+<text x="967" y="108" font-size="11" opacity=".7">hladb.json.gz  alle Allele</text>
+<text x="967" y="124" font-size="11" opacity=".7">panel.fa       Ausrichtziel</text>
+<text x="967" y="140" font-size="11" opacity=".7">panel.fa.mask.bed  Maske</text>
+<text x="967" y="156" font-size="11" opacity=".7">hla_nom_g/p.txt  G/P</text>
+<text x="967" y="172" font-size="11" opacity=".7">rel_dna_ser.txt  Serologie</text>
+<text x="967" y="188" font-size="11" opacity=".7">format, release</text>
+<text x="967" y="214" font-size="11" opacity=".7">ab dem 2. Start vorhanden,</text>
+<text x="967" y="230" font-size="11" opacity=".7">wird nur bei neuem Format</text>
+<text x="967" y="246" font-size="11" opacity=".7">neu gebaut</text>
+<text x="227" y="201" font-size="11">Häufigkeiten 1000G</text>
+<text x="227" y="243" font-size="11">Wiederholungsmaske</text>
+<text x="462" y="201" font-size="11">G/P-Gruppen WMDA</text>
+<text x="462" y="243" font-size="11">Serologie WMDA</text>
+<g stroke="currentColor" stroke-width="1.2" fill="none">
+<line x1="170" y1="107" x2="213" y2="107" marker-end="url(#ar)"/>
+<line x1="405" y1="107" x2="448" y2="107" marker-end="url(#ar)"/>
+<line x1="600" y1="107" x2="643" y2="107" marker-end="url(#ar)"/>
+<line x1="895" y1="107" x2="953" y2="107" marker-end="url(#ar)"/>
+<polyline points="405,197 425,197 425,166 770,166 770,154" marker-end="url(#ar)" stroke-opacity=".6"/>
+<polyline points="600,197 930,197 953,197" marker-end="url(#ar)" stroke-opacity=".6"/>
+<polyline points="600,239 953,239" marker-end="url(#ar)" stroke-opacity=".6"/>
+<polyline points="405,239 430,239 430,262 940,262 940,226 953,226" marker-end="url(#ar)" stroke-opacity=".6"/>
+</g>
+
+
+<!-- run lane -->
+<g stroke="currentColor" fill="none" stroke-width="1.2">
+<rect x="20" y="335" width="150" height="86" rx="5"/>
+<rect x="205" y="335" width="160" height="86" rx="5"/>
+<rect x="400" y="327" width="230" height="102" rx="5" stroke="#c9a000" stroke-width="2"/>
+<rect x="665" y="335" width="190" height="86" rx="5"/>
+<rect x="890" y="327" width="330" height="270" rx="5" stroke-width="2"/>
+</g>
+<text x="32" y="358" font-weight="500">Eingabe</text>
+<text x="32" y="376" font-size="11" opacity=".7">BAM, CRAM oder</text>
+<text x="32" y="391" font-size="11" opacity=".7">FASTQ R1+R2</text>
+<text x="32" y="406" font-size="11" opacity=".7">(HiFi: long)</text>
+<text x="217" y="358" font-weight="500">Lesen</text>
+<text x="217" y="376" font-size="11" opacity=".7">BAM/CRAM: nur MHC</text>
+<text x="217" y="391" font-size="11" opacity=".7">21-mer-Vorfilter</text>
+<text x="217" y="406" font-size="11" opacity=".7">ohne Masken-k-mere</text>
+<text x="412" y="350" font-weight="500" fill="#c9a000">Panel-Ausrichtung</text>
+<text x="412" y="368" font-size="11" opacity=".75">eigener Aligner, Rust</text>
+<text x="412" y="384" font-size="11" opacity=".75">Minimizer, Verkettung,</text>
+<text x="412" y="399" font-size="11" opacity=".75">Affine-Gap-Ausrichtung</text>
+<text x="412" y="414" font-size="11" opacity=".75">Mate-Rescue, Paarbonus</text>
+<text x="677" y="358" font-weight="500">Genzuordnung</text>
+<text x="677" y="376" font-size="11" opacity=".7">Paar zum besten Gen</text>
+<text x="677" y="391" font-size="11" opacity=".7">Maske: nur Alu/L1 → raus</text>
+<text x="677" y="406" font-size="11" opacity=".7">Pseudogene als Köder</text>
+<text x="902" y="350" font-weight="500">Je Gen, 26 Gene parallel</text>
+<g font-size="11">
+<text x="902" y="376">Stufe A  31-mere der Exons, EM</text>
+<text x="902" y="391" opacity=".7">         → bis ~100 Kandidaten</text>
+<text x="902" y="413">Stufe B  jedes Read-Paar gegen jeden</text>
+<text x="902" y="428" opacity=".7">         Kandidaten (Bit-Editdistanz),</text>
+<text x="902" y="443" opacity=".7">         Mischmodell + Prioren → Paar</text>
+<text x="902" y="465">Pass 2   alle Allele der besten</text>
+<text x="902" y="480" opacity=".7">         3-Feld-Gruppen bis 400</text>
+<text x="902" y="502">Exon-Verfeinerung, Phasencheck</text>
+<text x="902" y="524">Neue Stellen  Reads gegen Allel</text>
+<text x="902" y="539" opacity=".7">         → neues Allel, Wirkung</text>
+<text x="902" y="561">Sicherheit je Feld  Vorsprung</text>
+<text x="902" y="576" opacity=".7">         gegen Schwelle → 2, 3 oder 4 Felder</text>
+</g>
+<g stroke="currentColor" stroke-width="1.2" fill="none">
+<line x1="170" y1="378" x2="203" y2="378" marker-end="url(#ar)"/>
+<line x1="365" y1="378" x2="398" y2="378" marker-end="url(#ar)"/>
+<line x1="630" y1="378" x2="663" y2="378" marker-end="url(#ar)"/>
+<line x1="855" y1="378" x2="888" y2="378" marker-end="url(#ar)"/>
+</g>
+<!-- database feeds run -->
+<g stroke="#c9a000" stroke-width="1.4" fill="none" stroke-dasharray="5 4">
+<polyline points="1000,262 1000,290 515,290 515,325" marker-end="url(#ag)"/>
+<polyline points="1150,262 1150,325" marker-end="url(#ag)"/>
+</g>
+<text x="522" y="284" font-size="11" fill="#c9a000">panel.fa + Maske</text>
+<text x="1158" y="300" font-size="11" fill="#c9a000">alle Allele</text>
+
+<text x="400" y="460" font-size="11" opacity=".7">Testprobe HG00438, 4 Threads:</text>
+<text x="400" y="476" font-size="11" opacity=".7">32.433 Read-Paare zu HLA-Genen</text>
+<text x="400" y="492" font-size="11" opacity=".7">gesamt etwa 22 s</text>
+
+<!-- outputs -->
+<g stroke="currentColor" fill="none" stroke-width="1.2">
+<rect x="20" y="672" width="186" height="64" rx="5"/>
+<rect x="222" y="672" width="186" height="64" rx="5"/>
+<rect x="424" y="672" width="186" height="64" rx="5"/>
+<rect x="626" y="672" width="186" height="64" rx="5" stroke="#c9a000" stroke-width="2"/>
+<rect x="828" y="672" width="186" height="64" rx="5"/>
+<rect x="1030" y="672" width="190" height="64" rx="5"/>
+</g>
+<text x="32" y="696" font-weight="500">PREFIX.tsv</text><text x="32" y="714" font-size="11" opacity=".7">Allele + sichere Felder</text>
+<text x="234" y="696" font-weight="500">.conf.tsv</text><text x="234" y="714" font-size="11" opacity=".7">Vorsprung je Feld</text>
+<text x="436" y="696" font-weight="500">.json</text><text x="436" y="714" font-size="11" opacity=".7">alles, für Genome</text>
+<text x="638" y="696" font-weight="500">.html</text><text x="638" y="714" font-size="11" opacity=".7">Laborbefund DE/EN</text>
+<text x="840" y="696" font-weight="500">.novel.tsv</text><text x="840" y="714" font-size="11" opacity=".7">neue Allele</text>
+<text x="1042" y="696" font-weight="500">.log</text><text x="1042" y="714" font-size="11" opacity=".7">jeder Schritt mit Zeit</text>
+<g stroke="currentColor" stroke-width="1.2" fill="none">
+<polyline points="1055,597 1055,620 620,620 620,648" marker-end="url(#ar)"/>
+</g>
+</g>
+</svg>
+</div>
+<figcaption>Gold umrandet: die beiden Programmteile, die die Daten erzeugen (Datenbankbau und Panel-Ausrichtung), und der Befund. Gestrichelt gold: was der Lauf aus der Referenz liest. Die Startdatei ruft für jeden Schritt dasselbe Programm hla-wgs auf.</figcaption>
+</figure>
+
+<h2 id="einrichtung">Einrichtung, einmal beim ersten Start</h2>
+<p>Die Startdatei prüft, ob <code>ref/hladb</code> vollständig ist und zur Programmversion passt (Formatnummer). Fehlt etwas, holt sie es; ist alles da, beginnt sofort der Lauf. Die IMGT-Daten stehen unter CC BY-ND und werden deshalb nicht mitgeliefert, sondern auf dem Rechner des Nutzers gebaut.</p>
+<table class="stack">
+<thead><tr><th>Datei</th><th>Quelle</th><th>Größe</th><th>Wozu</th></tr></thead>
+<tbody>
+<tr><td><code>hla.dat</code></td><td>IPD-IMGT/HLA auf GitHub, Release 3.66 (wählbar mit <code>HLA_WGS_RELEASE</code>)</td><td class="n">45 MB ZIP, entpackt 353 MB</td><td>alle bekannten Allele mit Exons und Introns; nur für den Bau nötig, danach gelöscht. Eine vorhandene Datei kann hineingezogen werden.</td></tr>
+<tr><td><code>freq_1000g_2field.json</code></td><td>Repo pjlabsdev/hla-wgs</td><td class="n">13 KB</td><td>Allelhäufigkeiten als schwache Vorwahl (Priors) bei Gleichstand</td></tr>
+<tr><td><code>panel_mask_3.66.bed</code></td><td>Repo pjlabsdev/hla-wgs</td><td class="n">68 KB</td><td>Stellen der Allele, die anderswo im Genom wiederkehren (Alu, L1); Reads nur daraus zählen nicht</td></tr>
+<tr><td><code>hla_nom_g.txt</code>, <code>hla_nom_p.txt</code></td><td>WMDA-Dateien desselben Release</td><td class="n">1 MB</td><td>G- und P-Gruppen im Befund</td></tr>
+<tr><td><code>rel_dna_ser.txt</code>, <code>rel_ser_ser.txt</code></td><td>WMDA-Dateien desselben Release</td><td class="n">1 MB</td><td>serologische Antigene im Befund</td></tr>
+</tbody></table>
+<h3>Was build-db baut</h3>
+<p>Aus hla.dat liest <code>hla-wgs build-db</code> jedes Allel der 26 typisierten Gene und der verwandten Gene und Pseudogene (zusammen 47) mit seinen Exons. Viele Allele sind nur als Exons bekannt; sie bekommen die Introns und Flanken des nächstverwandten vollständigen Allels, damit jedes Allel einer Gruppe dieselbe Länge abdeckt. Dazu richtet build-db Allele gegeneinander aus. Daraus entstehen <code>hladb.json.gz</code> (alle Allele) und <code>panel.fa</code> mit 1195 Sequenzen, einer je Allelgruppe, gegen die später die Reads ausgerichtet werden. In der Cloud dauerte der Bau 110 s.</p>
+
+<h2 id="lauf">Lauf je Probe</h2>
+<ul class="steps">
+<li><span>Lesen</span><span>BAM und CRAM werden über den Index nur im MHC-Bereich, in dessen ALT- und HLA-Contigs und bei den unplatzierten Reads gelesen, CRAM mit der Referenz-FASTA. Bei FASTQ liest das Programm das ganze Genom und behält nur Paare, die einen 21-mer des Panels außerhalb der Maske tragen.</span></li>
+<li><span>Panel-Ausrichtung</span><span>Jedes Paar wird gegen die 1195 Panel-Sequenzen ausgerichtet, mit dem eigenen Aligner (Abschnitt unten). Fehlt einem Mate ein Treffer im Gen seines Partners, wird er gezielt neben dem Partner gesucht (Rescue); ein passendes Paar im selben Gen bekommt einen Bonus wie bei minimap2.</span></li>
+<li><span>Genzuordnung</span><span>Ein Paar zählt für das Gen, das es am besten erklärt; bei Gleichstand für alle beteiligten Gene. Ein Paar, das nur in maskierten Wiederholungen ausgerichtet ist, zählt für kein Gen. Bei A, DQA1, DQB1, DPA1 und DPB1 kommen die Paare der verwandten Gene (HLA-Y, -H, -J; DQA2, DQB2, DPA2, DPB2) mit in die Bewertung, und deren Allele treten als Köder an: ein Paar, das das verwandte Gen besser erklärt, stützt kein Allel des Gens.</span></li>
+<li><span>Stufe A</span><span>Je Gen: die 31-mere der Exons der Reads gegen alle Allele, Erwartungsmaximierung über Äquivalenzklassen, daraus die Allelgruppen und bis zu rund 100 Kandidaten.</span></li>
+<li><span>Stufe B</span><span>Jedes Read-Paar gegen jeden Kandidaten mit bitparalleler Editdistanz (Myers). Ein Mischmodell mit Priors wählt das Allelpaar, das alle Reads zusammen am besten erklärt. Pass 2 wiederholt das mit allen Allelen der besten Drei-Feld-Gruppen.</span></li>
+<li><span>Exon-Verfeinerung</span><span>Reads über den Exons entscheiden zwischen Allelen, die sich nur dort unterscheiden; ein Phasencheck prüft, ob ein anderes Paar dieselben Varianten anders verteilt.</span></li>
+<li><span>Neue Stellen</span><span>Wo die Reads stetig vom gewählten Allel abweichen, liegt ein neues Allel vor: Stelle, Region, Wirkung aufs Protein und welche Kopie sie trägt. Homopolymere und kurze Tandemwiederholungen werden gesondert behandelt.</span></li>
+<li><span>Sicherheit je Feld</span><span>Für jedes Feld der Vorsprung vor dem nächsten Konkurrenten gegen eine Schwelle; gemeldet werden nur die Felder, die die Reads tragen. DMB und TAP2 höchstens drei Felder.</span></li>
+</ul>
+
+<h2 id="aligner">Der eigene Aligner</h2>
+<div class="grid2">
+<figure style="margin:0">
+<svg class="schema" viewBox="0 0 560 340" role="img" aria-label="Aligner in vier Schritten: Minimizer-Suche im k-mer-Index, Verkettung je Sequenz, Ausrichtung der Lücken mit Affine-Gap-Kosten, Gedächtnis für wiederkehrende Ausrichtungen">
+<defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+<g font-family="IBM Plex Mono, monospace" font-size="12" fill="currentColor">
+<!-- reference and read -->
+<text x="10" y="24" font-size="11" opacity=".7">Allel (Panel)</text>
+<rect x="10" y="32" width="540" height="12" rx="2" fill="currentColor" fill-opacity=".12"/>
+<text x="10" y="336" font-size="11" opacity=".7">Read, 150 Basen</text>
+<rect x="90" y="306" width="380" height="12" rx="2" fill="currentColor" fill-opacity=".12"/>
+<!-- anchors -->
+<g fill="#c9a000">
+<rect x="100" y="288" width="36" height="6"/><rect x="152" y="288" width="36" height="6"/><rect x="215" y="288" width="36" height="6"/>
+<rect x="318" y="288" width="36" height="6"/><rect x="372" y="288" width="36" height="6"/><rect x="424" y="288" width="36" height="6"/>
+<rect x="160" y="46" width="36" height="6"/><rect x="212" y="46" width="36" height="6"/><rect x="275" y="46" width="36" height="6"/>
+<rect x="384" y="46" width="36" height="6"/><rect x="438" y="46" width="36" height="6"/><rect x="490" y="46" width="36" height="6"/>
+</g>
+<g stroke="#c9a000" stroke-width="1" opacity=".8">
+<line x1="118" y1="288" x2="178" y2="52"/><line x1="170" y1="288" x2="230" y2="52"/><line x1="233" y1="288" x2="293" y2="52"/>
+<line x1="336" y1="288" x2="402" y2="52"/><line x1="390" y1="288" x2="456" y2="52"/><line x1="442" y1="288" x2="508" y2="52"/>
+</g>
+<!-- labels -->
+<rect x="10" y="80" width="250" height="56" rx="5" fill="var(--bg)" stroke="currentColor" stroke-opacity=".4"/>
+<text x="20" y="100" font-weight="500">1 Minimizer</text>
+<text x="20" y="117" font-size="11" opacity=".75">je 11 k-mere der kleinste Hash,</text>
+<text x="20" y="130" font-size="11" opacity=".75">exakt im k-mer-Index gesucht</text>
+<rect x="300" y="80" width="250" height="56" rx="5" fill="var(--bg)" stroke="currentColor" stroke-opacity=".4"/>
+<text x="310" y="100" font-weight="500">2 Verkettung</text>
+<text x="310" y="117" font-size="11" opacity=".75">Anker auf einer Diagonale,</text>
+<text x="310" y="130" font-size="11" opacity=".75">Lücken kosten wie bei minimap2</text>
+<rect x="10" y="178" width="250" height="70" rx="5" fill="var(--bg)" stroke="currentColor" stroke-opacity=".4"/>
+<text x="20" y="198" font-weight="500">3 Lücken ausrichten</text>
+<text x="20" y="215" font-size="11" opacity=".75">zweiteilige Affine-Gap-DP,</text>
+<text x="20" y="228" font-size="11" opacity=".75">große Lücken an eindeutigen</text>
+<text x="20" y="241" font-size="11" opacity=".75">13-meren geteilt; Z-Drop</text>
+<rect x="300" y="178" width="250" height="70" rx="5" fill="var(--bg)" stroke="#c9a000" stroke-width="1.6"/>
+<text x="310" y="198" font-weight="500" fill="#c9a000">4 Gedächtnis</text>
+<text x="310" y="215" font-size="11" opacity=".75">Allele teilen lange Strecken:</text>
+<text x="310" y="228" font-size="11" opacity=".75">gleiche Ausrichtung nach Inhalt</text>
+<text x="310" y="241" font-size="11" opacity=".75">einmal rechnen, dann nachschlagen</text>
+</g>
+</svg>
+<figcaption>Der Read wird nicht Base für Base gegen jedes Allel gerechnet: exakte Anker legen die Lage fest, gerechnet wird nur zwischen ihnen und an den Enden.</figcaption>
+</figure>
+<div>
+<p>Bis Version 1.1 richtete minimap2 (C) die Reads aus. Ab 1.1 übernimmt das ein eigener Aligner in Rust (<code>src/aln.rs</code>), der auf die HLA-Aufgabe zugeschnitten ist: viele sehr ähnliche Sequenzen derselben Genfamilie.</p>
+<p>Wo er schneller ist: Wird eine schwierige Stelle zwischen zwei Allelen einmal gerechnet, kennt er sie für alle Allele, die dieselbe Strecke teilen. Minimizer verringern die Anker, und ein Read, der nicht fast genau passt, wird sicherheitshalber mit allen k-meren neu gesucht.</p>
+<table>
+<thead><tr><th>Messung</th><th class="n">minimap2</th><th class="n">eigener</th></tr></thead>
+<tbody>
+<tr><td>Zeit je Probe (8 HPRC-Proben, 4 Threads)</td><td class="n">31,5 s</td><td class="n">22,2 s</td></tr>
+<tr><td>80 HPRC: 2 Felder richtig</td><td class="n">2486/2489</td><td class="n">2485/2489</td></tr>
+<tr><td>80 HPRC: sichere 4 Felder exakt</td><td class="n">1778/1801</td><td class="n">1779/1798</td></tr>
+<tr><td>80 HPRC: gemeldete Stellen wahr</td><td class="n">1382/1522</td><td class="n">1385/1530</td></tr>
+<tr><td>59 HGSVC3: 2 Felder richtig</td><td class="n">1833/1833</td><td class="n">1833/1833</td></tr>
+<tr><td>59 HGSVC3: sichere 4 Felder exakt</td><td class="n">1337/1354</td><td class="n">1333/1349</td></tr>
+<tr><td>59 HGSVC3: gemeldete Stellen wahr</td><td class="n">743/876</td><td class="n">739/876</td></tr>
+</tbody></table>
+<p class="note">Stand 22.11.2026, Version 1.1.0. Gleiche Reads und gleiche Datenbank (IPD-IMGT/HLA 3.66), nur der Aligner wurde getauscht. Einzelheiten in <code>docs/aligner.md</code>.</p>
+</div>
+</div>
+
+<h2 id="ausgabe">Ausgabe</h2>
+<table class="stack">
+<thead><tr><th>Datei</th><th>Inhalt</th></tr></thead>
+<tbody>
+<tr><td><code>PREFIX.tsv</code></td><td>je Gen zwei Allele, die sicheren Felder, Tiefe und Read-Zahl</td></tr>
+<tr><td><code>PREFIX.conf.tsv</code></td><td>Vorsprung je Feld, Schwelle und nächster Konkurrent</td></tr>
+<tr><td><code>PREFIX.json</code></td><td>alles zusammen, mit Serologie, Liganden, Datenbank-Release und Tiefe; Grundlage für die Genome-App</td></tr>
+<tr><td><code>PREFIX.html</code></td><td>Laborbefund auf Deutsch und Englisch: 11 klinische Loci, GL-String, Pharmakogenetik, Druck A4 mit Seitenzahlen</td></tr>
+<tr><td><code>PREFIX.novel.tsv</code></td><td>Kandidaten für neue Allele mit Region, Wirkung und stützenden Reads</td></tr>
+<tr><td><code>PREFIX.log</code></td><td>jeder Schritt mit Zeitstempel</td></tr>
+</tbody></table>
+<p style="margin-top:18px;color:var(--mut);font-size:13px">hla-wgs · PJ Labs · DOI 10.5281/zenodo.24367470 · nur für Forschungszwecke</p>
+</div>
+</body>
+</html>

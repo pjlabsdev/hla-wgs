@@ -14,6 +14,8 @@ use std::sync::Mutex;
 pub const LAM: f64 = 3.0;
 pub const BG_EDITS: f64 = 3.0;
 pub const TIE: f64 = 0.05;
+/// an allele at least this much shorter than a relative is padded with the relative's flanks
+static PAD_MIN: std::sync::LazyLock<usize> = std::sync::LazyLock::new(|| std::env::var("HLA_PAD_MIN").ok().and_then(|v| v.parse().ok()).unwrap_or(8));
 const NEAR: f64 = 60.0;
 const ALT2: usize = 3;
 
@@ -40,6 +42,10 @@ pub struct Ctx<'a> {
     pub pri: Priors<'a>,
     pad: Mutex<AHashMap<(String, usize, usize), Vec<u8>>>,
     donor: Mutex<AHashMap<(String, usize, Vec<usize>), usize>>,
+    /// differences of allele i against a longer allele j (gene, i, j), aligned once per run
+    pair_nm: Mutex<AHashMap<(String, usize, usize), Option<i64>>>,
+    /// where allele i lies in a donor sequence (gene, i, hash of the donor sequence), aligned once per run
+    fit: Mutex<AHashMap<(String, usize, u64), Option<(usize, usize)>>>,
     decoy: Mutex<AHashMap<String, AHashMap<usize, f64>>>,
 }
 
@@ -58,7 +64,7 @@ pub struct StageB {
 
 impl<'a> Ctx<'a> {
     pub fn new(db: &'a Db, reads: &'a Reads) -> Self {
-        Ctx { db, reads, pri: Priors::new(db), pad: Mutex::new(AHashMap::new()), donor: Mutex::new(AHashMap::new()), decoy: Mutex::new(AHashMap::new()) }
+        Ctx { db, reads, pri: Priors::new(db), pad: Mutex::new(AHashMap::new()), donor: Mutex::new(AHashMap::new()), pair_nm: Mutex::new(AHashMap::new()), fit: Mutex::new(AHashMap::new()), decoy: Mutex::new(AHashMap::new()) }
     }
 
     pub fn al(&self, g: &str) -> &'a [Allele] {
@@ -92,19 +98,26 @@ impl<'a> Ctx<'a> {
         let mut out = al[i].genomic.clone();
         if donor != i {
             let d: Vec<u8> = if depth < 6 && std::env::var("HLA_PAD1").is_err() { self.padded(g, donor, pool, depth + 1) } else { al[donor].genomic.clone() };
-            if d.len() > s_.len() + 20 {
-                let a = aligner(&d, Preset::Asm10);
-                let hs = map(&a, s_);
-                if let Some(h) = best_mlen(&hs) {
-                    let ls = s_.len() as i64;
-                    if h.fwd && h.q_st < 30 && ls - h.q_en < 30 {
-                        let a0 = (h.r_st - h.q_st).max(0) as usize;
-                        let b0 = ((d.len() as i64).min(h.r_en + (ls - h.q_en))) as usize;
-                        let mut o = d[..a0].to_vec();
-                        o.extend_from_slice(s_);
-                        o.extend_from_slice(&d[b0.min(d.len())..]);
-                        out = o;
-                    }
+            if d.len() > s_.len() + *PAD_MIN {
+                let mut dh = std::collections::hash_map::DefaultHasher::new();
+                d.hash(&mut dh);
+                let fk = (g.to_string(), i, dh.finish());
+                let cached = self.fit.lock().unwrap().get(&fk).copied();
+                let fit = cached.unwrap_or_else(|| {
+                    let a = aligner(&d, Preset::Asm10);
+                    let hs = map(&a, s_);
+                    let f = best_mlen(&hs).and_then(|h| {
+                        let ls = s_.len() as i64;
+                        (h.fwd && h.q_st < 30 && ls - h.q_en < 30).then(|| ((h.r_st - h.q_st).max(0) as usize, ((d.len() as i64).min(h.r_en + (ls - h.q_en))) as usize))
+                    });
+                    self.fit.lock().unwrap().insert(fk, f);
+                    f
+                });
+                if let Some((a0, b0)) = fit {
+                    let mut o = d[..a0].to_vec();
+                    o.extend_from_slice(s_);
+                    o.extend_from_slice(&d[b0.min(d.len())..]);
+                    out = o;
                 }
             }
         }
@@ -120,16 +133,25 @@ impl<'a> Ctx<'a> {
         let al = self.al(g);
         let s_ = self.orig_seq(g, i);
         let mut best = (i64::MAX, i);
-        let longer: Vec<usize> = pool.iter().copied().filter(|&j| !al[j].extended && al[j].genomic.len() > s_.len() + 20).collect();
+        let longer: Vec<usize> = pool.iter().copied().filter(|&j| !al[j].extended && al[j].genomic.len() > s_.len() + *PAD_MIN).collect();
         let mut a = None;
         for j in longer {
             let ck = (g.to_string(), al[i].name.clone(), al[j].name.clone());
             let nm = match self.db.donor_nm.get(&ck) {
                 Some(v) => *v,
                 None => {
-                    let a = a.get_or_insert_with(|| aligner(s_, Preset::Asm10));
-                    let hs = map(a, &al[j].genomic);
-                    best_mlen(&hs).map(|h| h.nm + (s_.len() as i64 - (h.r_en - h.r_st)))
+                    let pk = (g.to_string(), i, j);
+                    let cached = self.pair_nm.lock().unwrap().get(&pk).copied();
+                    match cached {
+                        Some(v) => v,
+                        None => {
+                            let a = a.get_or_insert_with(|| aligner(s_, Preset::Asm10));
+                            let hs = map(a, &al[j].genomic);
+                            let v = best_mlen(&hs).map(|h| h.nm + (s_.len() as i64 - (h.r_en - h.r_st)));
+                            self.pair_nm.lock().unwrap().insert(pk, v);
+                            v
+                        }
+                    }
                 }
             };
             if let Some(nm) = nm {
@@ -226,9 +248,11 @@ impl<'a> Ctx<'a> {
                     let n = seqs[x].len().min(seqs[y].len());
                     eprintln!("HLACMPEND\t{}\t{}", String::from_utf8_lossy(&seqs[x][seqs[x].len() - 80..]), String::from_utf8_lossy(&seqs[y][seqs[y].len() - 80..]));
                     eprintln!("HLACMPSTART\t{}\t{}\t{}", String::from_utf8_lossy(&seqs[x][..60]), String::from_utf8_lossy(&seqs[y][..60]), n);
+                    let z = std::env::var("HLA_CMPZ").ok().and_then(|n| pos(&n));
+                    eprintln!("HLACMPPRI\t{}\t{}", self.allele_prior(g, &al[cand[x]]), self.allele_prior(g, &al[cand[y]]));
                     for ((row, q), k) in e.iter().zip(used.iter()).zip(keep.iter()) {
                         if row[x] != row[y] {
-                            eprintln!("HLACMP\t{}\t{}\t{}\t{}\t{}\t{}", g, self.reads.names[*q], row[x], row[y], k, cand.len());
+                            eprintln!("HLACMP\t{}\t{}\t{}\t{}\t{}\t{}\t{}", g, self.reads.names[*q], row[x], row[y], k, cand.len(), z.map_or(-1.0, |z| row[z]));
                         }
                     }
                 } else {
