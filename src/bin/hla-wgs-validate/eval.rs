@@ -449,7 +449,8 @@ pub fn eval24(src: &str) {
         for g in gl {
             let v: Vec<Option<BTreeSet<String>>> = [g.to_string(), format!("{g}.1")].iter().map(|c| {
                 let x = r.get(col(c)).copied().unwrap_or("");
-                if x.is_empty() || x == "NA" { None } else { Some(x.split('/').map(|a| a.split(':').take(2).collect::<Vec<_>>().join(":")).collect()) }
+                // 0000: not typed; 14XX: first field only, not comparable at two fields
+                if x.is_empty() || x == "NA" || x == "0000" || x.ends_with("XX") { None } else { Some(x.split('/').map(|a| a.split(':').take(2).collect::<Vec<_>>().join(":")).collect()) }
             }).collect();
             m.insert(g.to_string(), v);
         }
