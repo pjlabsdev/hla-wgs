@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Faster typing, same results: the k-mer index of the edit-distance kernel (built about a hundred times per sample) is sorted as packed 64-bit values with a radix sort. HG00438 on one core: 46.5 s instead of 52 s; output byte-identical on the 80 validation samples.
 - Faster, same results: the flanks that shorter candidate alleles borrow from longer ones are computed in parallel and kept in `pad_cache.tsv.gz` next to the reference, so from the second run on a reference these alignments are not repeated (HG00438 on one core: 74 s first run, 55 s later runs). Genes with the most reads are typed first, so that a slow gene does not end a run alone. Eight HPRC samples with 4 threads: 133 s instead of 179 s. Output on the 80 validation samples is byte-identical, except that two new sites at the same position are now always listed in the same order (before it could change between runs).
 - `hla-wgs unzip` checks the length and CRC-32 of every entry (a damaged `hla.dat.zip` is refused instead of building a wrong reference) and refuses names with a drive letter or a leading backslash on Windows.
 - The validation and the software report no longer need Python: `hla-wgs-validate` (built with `cargo build --release`) replaces the evaluation, truth, simulation and report scripts with byte-identical output, including `hla-wgs-validate paper` for `docs/paper/hla-wgs-report.html`. The shell scripts call it; the Python files are removed.
