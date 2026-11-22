@@ -72,7 +72,10 @@ jobs:
           chmod +x pkg/hla-wgs/hla-wgs pkg/hla-wgs/*.command pkg/hla-wgs/*.sh 2>/dev/null || true
       - name: ZIP (macOS, Linux)
         if: runner.os != 'Windows'
-        run: cd pkg && zip -r -X "../${{ matrix.zip }}" hla-wgs
+        run: |
+          cd pkg && zip -r -X "../${{ matrix.zip }}" hla-wgs
+          # the same as tar.gz for systems without unzip
+          tar czf "../$(basename "${{ matrix.zip }}" .zip).tar.gz" hla-wgs
       - name: ZIP (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -83,5 +86,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "$TAG" "${{ matrix.zip }}" --clobber --repo "${{ github.repository }}"
+          if [ "${{ runner.os }}" != Windows ]; then gh release upload "$TAG" "$(basename "${{ matrix.zip }}" .zip).tar.gz" --clobber --repo "${{ github.repository }}"; fi
           # the terminal installer once per release
           if [ "${{ runner.os }}" = Linux ]; then gh release upload "$TAG" start/install.sh --clobber --repo "${{ github.repository }}"; fi
