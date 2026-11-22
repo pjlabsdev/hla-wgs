@@ -1,7 +1,7 @@
 # Depth study
 
 How the result changes with less sequencing depth. The 30x read pairs were thinned by a hash of
-the read name (`validation/hprc/thin_pairs.py`, fractions 0.667, 0.5 and 0.333), so both mates of a
+the read name (`hla-wgs-validate thin-pairs`, fractions 0.667, 0.5 and 0.333), so both mates of a
 pair stay together and the same pairs are kept in every run. Program: 1.1 development version with
 the depth-dependent minimum of reads for a new site; database IPD-IMGT/HLA 3.66.
 

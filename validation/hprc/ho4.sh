@@ -5,8 +5,8 @@ cd ${HLA_WORK:-$PWD}; s=$1; B=hla-wgs
 bash scripts/fetch_r2.sh $s
 for f in truth/$s.*.mhc.fa; do
   [ -s $f ] || { echo "$s no_asm" >> newg/ho4.fail; exit 0; }
-  [ -s ${f%.mhc.fa}.exonx.tsv ] || nice python3 scripts/truth_exonx.py $f > /dev/null 2>&1
-  [ -s ${f%.mhc.fa}.exony.tsv ] || nice python3 scripts/truth_exony.py $f > /dev/null 2>&1
+  [ -s ${f%.mhc.fa}.exonx.tsv ] || nice hla-wgs-validate truth-exon x $f > /dev/null 2>&1
+  [ -s ${f%.mhc.fa}.exony.tsv ] || nice hla-wgs-validate truth-exon y $f > /dev/null 2>&1
 done
 if [ ! -s newg_ho/$s.json ]; then
   for t in 1 2; do scripts/extract_sr.sh $s && break; sleep 20; done

@@ -19,7 +19,7 @@ Where the full names differ:
   C\*17:01:01:30, DQB1\*02:02:01:21, DRB4\*01:03:01:19, DPB1\*13:01:01:17, DRB5\*01:01:01:11,
   DQA1\*03:02:01:04, DRB3\*02:02:01:39). The assembly equals our allele without a difference.
 - HG01891 DPB1 and HG02572 DQA1: checked against the assembly with
-  `validation/hprc/allele_vs_assembly.py`. Our allele (DPB1\*01:01:01:33, DQA1\*05:01:01:16) has no
+  `hla-wgs-validate allele-vs-assembly`. Our allele (DPB1\*01:01:01:33, DQA1\*05:01:01:16) has no
   difference, the allele named by Lai et al. has one.
 - New alleles: both tables name a nearest database allele, and they choose differently when a
   short database entry and a full-length one are equally near. Ours takes the entry with the fewest
