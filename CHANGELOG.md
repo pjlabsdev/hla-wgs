@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1 (2026-11-22)
+
+- Start file (macOS, Linux): it stopped at once when `LANG` was not set (possible on Linux and in a macOS Terminal without locale variables). On Linux it now uses the `C.UTF-8` character set instead of `en_US.UTF-8`, which most Linux systems lack.
+- The start files pass the language they chose to the result page in both directions (`HLA_WGS_LANG=en` as well as `de`).
+- Packaging: the release workflow checks the program by its exact name.
+
 ## 1.1.0 (2026-11-22)
 
 - Own aligner: the reads are now aligned by the program itself (`src/aln.rs`, Rust) instead of the minimap2 library. hla-wgs is one Rust program without C code; building needs no C compiler. Same accuracy on the validation sets (see `docs/aligner.md`): 80 HPRC samples two fields 2485 of 2489, three fields 2481, certain four-field calls 1779 of 1798 exact (minimap2 1778 of 1801); 59 HGSVC3 samples two fields 1833 of 1833, three fields 1830, certain four-field calls 1333 of 1349 exact (minimap2 1337 of 1354), i.e. one wrong certain call fewer. Faster: 22 s instead of 32 s per sample (CPU 79 s instead of 116 s; 8 HPRC samples, 4 threads, two rounds), same peak memory (1.4 GB).

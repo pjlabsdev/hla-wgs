@@ -1,6 +1,6 @@
 [package]
 name = "hla-wgs"
-version = "1.1.0"
+version = "1.1.1"
 edition = "2024"
 description = "HLA typing from whole-genome sequencing reads with a per-allele statement of what is certain"
 license = "MIT"
