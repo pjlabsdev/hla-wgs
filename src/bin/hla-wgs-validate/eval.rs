@@ -517,7 +517,7 @@ pub fn eval24(src: &str) {
     let mut safe = [0i64, 0];
     let mut errs: Vec<String> = vec![];
     let mut done: Vec<String> = vec![];
-    let od = format!("{h}/lab/out24");
+    let od = env_or("HLA_OUT", &format!("{h}/lab/out24"));
     let mut files: Vec<String> = std::fs::read_dir(&od).map(|d| d.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().to_string()).filter(|n| n.ends_with(".tsv")).collect()).unwrap_or_default();
     files.sort_by(|a, b| format!("{od}/{a}").cmp(&format!("{od}/{b}")));
     let mut with_t1k = 0;

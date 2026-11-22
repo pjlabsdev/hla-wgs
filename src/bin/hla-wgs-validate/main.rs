@@ -25,7 +25,7 @@ evaluation (run in the work folder with db/, truth/ and the result folders):
   eval6 DIR [v]                   exact evaluation of the 18 genes against both haplotypes
   eval8 DIR [v]                   the same for the eight added genes (DMA ... TAP2)
   eval8-exons DIR [GENES] [v]     exon-level check of calls certain to three or more fields
-  eval24 [2014|2018|any]          1000 Genomes laboratory types against hla-wgs and T1K (HLA_WORK)
+  eval24 [2014|2018|any]          1000 Genomes laboratory types against hla-wgs and T1K (HLA_WORK; calls in HLA_OUT, default lab/out24)
   trio23 [DIR]                    consistency of the two GIAB trios
   sim-eval TRUTH.tsv ASSIGN.tsv   gene assignment of simulated read pairs
 truth from assemblies:
