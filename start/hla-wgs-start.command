@@ -80,12 +80,44 @@ step() {
   fi
 }
 
+# HTTP with curl, or wget where curl is missing (a fresh Linux system often has only wget):
+# http URL OUT [SECONDS] [HEADER]; OUT - writes to stdout
+http() {
+  local url="$1" out="$2" t="${3:-}" h="${4:-}"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL ${t:+--max-time "$t"} ${h:+-H "$h"} -o "$out" "$url"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q ${t:+-T "$t" -t 1} ${h:+--header="$h"} -O "$out" "$url" || { [ "$out" != - ] && rm -f "$out"; return 1; }
+  else
+    return 1
+  fi
+}
+have_http() { command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1; }
+# size in bytes announced by the server (0 when unknown)
+http_size() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSLI "$1" 2>/dev/null
+  else
+    wget -q -S --spider "$1" 2>&1
+  fi | awk 'tolower($1)=="content-length:"{v=$2} END{gsub("\r","",v); print v+0}'
+}
+# unpack a ZIP with unzip, or with hla-wgs itself where unzip is missing
+unzip_to() {
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -o -q "$1" -d "$2"
+  elif [ -n "${BIN:-}" ]; then
+    "$BIN" unzip "$1" "$2"
+  else
+    return 1
+  fi
+}
+
 # download with progress bar: download URL TARGET
 download() {
   T0=$(now)
   if [ "$TTY" = 1 ]; then
-    local total; total=$(curl -fsSLI "$1" 2>/dev/null | awk 'tolower($1)=="content-length:"{v=$2} END{gsub("\r","",v); print v+0}')
-    curl -fsSL -o "$2" "$1" 2>/dev/null & PID=$!; local i=0 size
+    local total; total=$(http_size "$1")
+    http "$1" "$2" 2>/dev/null & PID=$!; local i=0 size
     cursor l
     while kill -0 "$PID" 2>/dev/null; do
       size=$(stat -f %z "$2" 2>/dev/null || stat -c %s "$2" 2>/dev/null || echo 0)
@@ -98,7 +130,7 @@ download() {
     done
     wait "$PID"; local rc=$?; PID=""; clearline; return $rc
   else
-    curl -fsSL -o "$2" "$1"
+    http "$1" "$2"
   fi
 }
 
@@ -155,7 +187,9 @@ divider
 fetch_program() {
   local asset tmp f
   asset="$(asset_name)"
-  [ -n "$asset" ] && command -v curl >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1 || return 1
+  [ -n "$asset" ] && have_http || return 1
+  # without unzip the same package as .tar.gz (tar is always there)
+  command -v unzip >/dev/null 2>&1 || asset="${asset%.zip}.tar.gz"
   printf '  %s%s%s\n' "$MUT" "$(tr_ "Das fertige Programm für dieses System kann von GitHub geladen werden ($asset, etwa 3 MB)." "The ready program for this system can be downloaded from GitHub ($asset, about 3 MB).")" "$RST"
   ask "Jetzt herunterladen? [J/n]" "Download it now? [Y/n]"
   local yn; IFS= read -r yn || return 1
@@ -164,7 +198,8 @@ fetch_program() {
   printf '\n'
   download "https://github.com/$REPO/releases/latest/download/$asset" "$tmp/$asset" || { result fail "Download" "$asset" "$(secs "$T0")"; rm -rf "$tmp"; return 1; }
   result ok "Download" "$asset" "$(secs "$T0")"
-  unzip -o -q "$tmp/$asset" -d "$tmp/x" 2>/dev/null
+  mkdir -p "$tmp/x"
+  case "$asset" in *.tar.gz) tar xzf "$tmp/$asset" -C "$tmp/x" 2>/dev/null ;; *) unzip -o -q "$tmp/$asset" -d "$tmp/x" 2>/dev/null ;; esac
   f="$(find "$tmp/x" -maxdepth 2 -type f -name hla-wgs | head -1)"
   if [ -z "$f" ] || ! cp "$f" "$HERE/hla-wgs"; then result fail "$(tr_ "Entpacken" "Unpacking")" "" ""; rm -rf "$tmp"; return 1; fi
   rm -rf "$tmp"
@@ -193,10 +228,10 @@ newer() {
 }
 check_update() {
   [ "${HLA_WGS_NO_UPDATE:-0}" = 1 ] && return 0
-  command -v curl >/dev/null 2>&1 || return 0
+  have_http || return 0
   local cur latest asset tmp dir
   cur="$("$BIN" --version 2>/dev/null | awk '{ print $2 }')"
-  latest="$(curl -fsL --max-time 5 -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)"
+  latest="$(http "https://api.github.com/repos/$REPO/releases/latest" - 5 'Accept: application/vnd.github+json' 2>/dev/null | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)"
   latest="${latest#v}"
   if [ -z "$latest" ] || [ -z "$cur" ] || ! newer "$latest" "$cur"; then return 0; fi
   asset="$(asset_name)"
@@ -214,7 +249,7 @@ check_update() {
   download "https://github.com/$REPO/releases/download/v$latest/$asset" "$tmp/$asset" || { result fail "Download" "$asset" "$(secs "$T0")"; rm -rf "$tmp"; return 0; }
   result ok "Download" "$asset" "$(secs "$T0")"
   T0=$(now)
-  if ! unzip -o -q "$tmp/$asset" -d "$tmp/x"; then result fail "$(tr_ "Entpacken" "Unpacking")" "" "$(secs "$T0")"; rm -rf "$tmp"; return 0; fi
+  if ! unzip_to "$tmp/$asset" "$tmp/x"; then result fail "$(tr_ "Entpacken" "Unpacking")" "" "$(secs "$T0")"; rm -rf "$tmp"; return 0; fi
   dir="$(find "$tmp/x" -maxdepth 2 -type f \( -name hla-wgs -o -name hla-wgs.exe \) | head -1)"
   [ -n "$dir" ] || { result fail "$(tr_ "Entpacken" "Unpacking")" "$(tr_ "Programm fehlt im Paket" "program missing in the package")" ""; rm -rf "$tmp"; return 0; }
   dir="$(dirname "$dir")"
@@ -262,7 +297,7 @@ build_ref() {  # build_ref DIR RELEASE ASK: download hla.dat of the release (ASK
   if [ -z "$dat" ]; then
     download "https://github.com/ANHIG/IMGTHLA/raw/$(relbranch "$rel")/hla.dat.zip" "$work/hla.dat.zip" || { result fail "Download" "IPD-IMGT/HLA $rel" "$(secs "$T0")"; finish 1; }
     result ok "Download" "$(awk -v s="$(stat -f %z "$work/hla.dat.zip" 2>/dev/null || stat -c %s "$work/hla.dat.zip" 2>/dev/null || echo 0)" 'BEGIN{printf "%.1f MB", s/1048576}')" "$(secs "$T0")"
-    step "$(tr_ "Entpacken" "Unpacking")" unzip -o -q "$work/hla.dat.zip" -d "$work" || { result fail "$(tr_ "Entpacken" "Unpacking")" "" "$(secs "$T0")"; finish 1; }
+    step "$(tr_ "Entpacken" "Unpacking")" unzip_to "$work/hla.dat.zip" "$work" || { result fail "$(tr_ "Entpacken" "Unpacking")" "" "$(secs "$T0")"; finish 1; }
     result ok "$(tr_ "Entpacken" "Unpacking")" "hla.dat" "$(secs "$T0")"
     dat="$work/hla.dat"
   fi
@@ -270,7 +305,7 @@ build_ref() {  # build_ref DIR RELEASE ASK: download hla.dat of the release (ASK
   [ -f "$freq" ] || freq="$HERE/../data/freq_1000g_2field.json"
   if [ ! -f "$freq" ]; then
     freq="$work/freq_1000g_2field.json"
-    [ -f "$freq" ] || curl -fsL -o "$freq" "$FREQ_URL" || { result fail "$(tr_ "Häufigkeitstabelle" "Frequency table")" "" ""; finish 1; }
+    [ -f "$freq" ] || http "$FREQ_URL" "$freq" || { result fail "$(tr_ "Häufigkeitstabelle" "Frequency table")" "" ""; finish 1; }
   fi
   step "$(tr_ "Datenbank bauen" "Building the database")" "$BIN" build-db "$dat" "$freq" "$db" || { result fail "$(tr_ "Datenbank" "Database")" "" "$(secs "$T0")"; cat "$WORKLOG"; finish 1; }
   result ok "$(tr_ "Datenbank" "Database")" "build-db" "$(secs "$T0")"
@@ -282,7 +317,7 @@ shipped_mask() {  # repeat mask of the 3.66 panel (allele names and intervals on
   for c in "$HERE/panel_mask_3.66.bed" "$HERE/../data/panel_mask_3.66.bed"; do
     if [ -s "$c" ]; then cp "$c" "$1/panel.fa.mask.bed"; break; fi
   done
-  [ -s "$1/panel.fa.mask.bed" ] || curl -fsL -o "$1/panel.fa.mask.bed" "$MASK_URL" || rm -f "$1/panel.fa.mask.bed"
+  [ -s "$1/panel.fa.mask.bed" ] || http "$MASK_URL" "$1/panel.fa.mask.bed" || rm -f "$1/panel.fa.mask.bed"
   [ -s "$1/panel.fa.mask.bed" ]
 }
 
@@ -305,7 +340,7 @@ fi
 if [ ! -f "$DB/hla_nom_g.txt" ] || [ ! -f "$DB/hla_nom_p.txt" ]; then
   T0=$(now)
   WMDA_URL="https://github.com/ANHIG/IMGTHLA/raw/$(relbranch "$REL")/wmda"
-  if curl -fsL -o "$DB/hla_nom_g.txt" "$WMDA_URL/hla_nom_g.txt" && curl -fsL -o "$DB/hla_nom_p.txt" "$WMDA_URL/hla_nom_p.txt"; then
+  if http "$WMDA_URL/hla_nom_g.txt" "$DB/hla_nom_g.txt" && http "$WMDA_URL/hla_nom_p.txt" "$DB/hla_nom_p.txt"; then
     result ok "$(tr_ "G- und P-Gruppen" "G and P groups")" "hla_nom_g/p" "$(secs "$T0")"
   else
     rm -f "$DB/hla_nom_g.txt" "$DB/hla_nom_p.txt"
@@ -316,7 +351,7 @@ fi
 if [ ! -f "$DB/rel_dna_ser.txt" ] || [ ! -f "$DB/rel_ser_ser.txt" ]; then
   T0=$(now)
   WMDA_URL="https://github.com/ANHIG/IMGTHLA/raw/$(relbranch "$REL")/wmda"
-  if curl -fsL -o "$DB/rel_dna_ser.txt" "$WMDA_URL/rel_dna_ser.txt" && curl -fsL -o "$DB/rel_ser_ser.txt" "$WMDA_URL/rel_ser_ser.txt"; then
+  if http "$WMDA_URL/rel_dna_ser.txt" "$DB/rel_dna_ser.txt" && http "$WMDA_URL/rel_ser_ser.txt" "$DB/rel_ser_ser.txt"; then
     result ok "$(tr_ "Serologische Antigene" "Serological antigens")" "rel_dna_ser" "$(secs "$T0")"
   else
     rm -f "$DB/rel_dna_ser.txt" "$DB/rel_ser_ser.txt"

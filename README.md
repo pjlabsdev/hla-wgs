@@ -102,6 +102,10 @@ warning because nothing was downloaded by the browser):
 curl -fsSL https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash
 ```
 
+Without curl (some fresh Linux installations): `wget -qO- https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash`.
+Nothing else needs to be installed: no Python, no compiler, no `unzip` (each package is also
+attached as `.tar.gz`). Linux needs glibc 2.35 or later (Ubuntu 22.04, Debian 12, Fedora 36 and newer).
+
 Or take one of these packages, not the "Source code" ZIP that GitHub adds to every release (it holds
 no program; started from there, the start file offers to download the program). Unpack the ZIP, start the start file and drag the input file (FASTQ R1, BAM or CRAM) into the
 window. The first start downloads IPD-IMGT/HLA and builds the reference next to the start file

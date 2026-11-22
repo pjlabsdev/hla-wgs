@@ -1,6 +1,8 @@
 #!/bin/bash
 # hla-wgs installer for macOS and Linux. In a terminal:
 #   curl -fsSL https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash
+# or, where curl is missing:
+#   wget -qO- https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash
 # Downloads the ready package of the latest release into ~/hla-wgs (or HLA_WGS_HOME), keeps an
 # existing reference (ref/) and results, and starts it. Files fetched this way carry no quarantine
 # mark, so macOS opens the start file later with a double-click and without a warning.
@@ -18,14 +20,21 @@ case "$(uname -s)" in
       *) say "Für $(uname -m) gibt es kein fertiges Paket; bitte aus dem Quelltext bauen (cargo build --release)." "No ready package for $(uname -m); please build from source (cargo build --release)."; exit 1 ;; esac ;;
   *) say "Unter Windows bitte hla-wgs-windows-x86_64.zip von https://github.com/$REPO/releases/latest laden." "On Windows please download hla-wgs-windows-x86_64.zip from https://github.com/$REPO/releases/latest."; exit 1 ;;
 esac
-for t in curl unzip; do command -v "$t" >/dev/null 2>&1 || { say "$t fehlt." "$t is missing."; exit 1; }; done
+have() { command -v "$1" >/dev/null 2>&1; }
+# curl or wget for the download; without unzip the tar.gz package of the same release
+if have curl; then get() { curl -fSL --progress-bar -o "$2" "$1"; }
+elif have wget; then get() { wget -q --show-progress -O "$2" "$1" || wget -q -O "$2" "$1"; }
+else say "curl oder wget fehlt." "curl or wget is missing."; exit 1; fi
+have unzip || ASSET="${ASSET%.zip}.tar.gz"
+have tar || { say "tar fehlt." "tar is missing."; exit 1; }
 
 printf '\n'
 say "hla-wgs wird installiert nach $DEST" "Installing hla-wgs to $DEST"
 TMP="$(mktemp -d -t hla-wgs-install.XXXXXX)"
 trap 'rm -rf "$TMP"' EXIT
-curl -fSL --progress-bar -o "$TMP/$ASSET" "https://github.com/$REPO/releases/latest/download/$ASSET"
-unzip -q "$TMP/$ASSET" -d "$TMP/x"
+get "https://github.com/$REPO/releases/latest/download/$ASSET" "$TMP/$ASSET"
+mkdir -p "$TMP/x"
+case "$ASSET" in *.zip) unzip -q "$TMP/$ASSET" -d "$TMP/x" ;; *) tar xzf "$TMP/$ASSET" -C "$TMP/x" ;; esac
 SRC="$TMP/x/hla-wgs"
 [ -x "$SRC/hla-wgs" ] || { say "Das Paket enthält kein Programm." "The package holds no program."; exit 1; }
 mkdir -p "$DEST"
