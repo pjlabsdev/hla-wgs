@@ -1,5 +1,5 @@
-//! single-sequence minimap2 alignments as used through mappy in the prototype
-use minimap2::{Aligner, Strand};
+//! single-sequence alignments with the own aligner (src/aln.rs)
+use crate::aln::{Index, Opts};
 
 pub struct Hit {
     pub fwd: bool,
@@ -16,32 +16,21 @@ pub enum Preset {
     Asm10,
 }
 
-pub fn aligner(seq: &[u8], p: Preset) -> Aligner<minimap2::Built> {
-    let b = Aligner::builder();
-    let b = match p {
-        Preset::Sr => b.sr(),
-        Preset::Asm10 => b.asm10(),
-    };
-    b.with_cigar().with_seq(seq).expect("index")
+pub fn aligner(seq: &[u8], p: Preset) -> Index {
+    Index::single(seq, match p {
+        Preset::Sr => Opts::sr_single(),
+        Preset::Asm10 => Opts::asm10(),
+    })
 }
 
-pub fn map(al: &Aligner<minimap2::Built>, q: &[u8]) -> Vec<Hit> {
-    al.map(q, false, false, None, None, None)
-        .unwrap_or_default()
+pub fn map(al: &Index, q: &[u8]) -> Vec<Hit> {
+    al.map(q)
         .into_iter()
-        .map(|m| Hit {
-            fwd: m.strand == Strand::Forward,
-            q_st: m.query_start as i64,
-            q_en: m.query_end as i64,
-            r_st: m.target_start as i64,
-            r_en: m.target_end as i64,
-            mlen: m.match_len as i64,
-            nm: m.alignment.as_ref().map(|a| a.nm as i64).unwrap_or(0),
-        })
+        .map(|m| Hit { fwd: m.fwd, q_st: m.q_st as i64, q_en: m.q_en as i64, r_st: m.r_st as i64, r_en: m.r_en as i64, mlen: m.mlen as i64, nm: m.nm as i64 })
         .collect()
 }
 
-/// Python max(hs, key=mlen): first hit with the largest mlen
+/// first hit with the largest number of matching bases
 pub fn best_mlen(hs: &[Hit]) -> Option<&Hit> {
     let mut b: Option<&Hit> = None;
     for h in hs {

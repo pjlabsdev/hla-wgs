@@ -1,0 +1,45 @@
+gene	slot	allele	differences	exact	reads	spanning	unsure_sites	equal_alternatives	note
+DMA	1	DMA*01:01:01:34	1	no	28	23	0	-	-
+DMA	2	DMA*01:01:01:03	0	yes	22	19	0	-	-
+DMB	1	DMB*01:01:01:01	0	yes, with unsure sites	26	15	1	-	-
+DMB	2	DMB*01:03:01:03	0	yes	26	15	0	-	-
+DOA	1	DOA*01:01:02:02	0	yes	25	18	0	-	-
+DOA	2	DOA*01:01:03:01	0	yes	19	17	0	-	-
+DOB	1	DOB*01:01:01:01	0	yes	36	27	0	-	-
+DOB	2	DOB*01:01:01:24	0	yes	28	22	0	-	-
+DPA1	1	DPA1*01:03:01:22	1	no	22	11	0	-	-
+DPA1	2	DPA1*01:03:01:15	0	yes	21	10	0	-	-
+DPA2	1	DPA2*01:01:01:02	0	yes	23	16	0	-	-
+DPA2	2	DPA2*01:01:01:01	0	yes, with unsure sites	11	9	2	-	-
+DPB1	1	DPB1*04:02:01:02	0	yes	24	12	0	-	-
+DPB1	2	DPB1*04:01:01:01	0	yes, with unsure sites	14	3	2	-	-
+DPB2	1	DPB2*03:01:01:01	2	no	30	6	3	-	-
+DPB2	2	DPB2*03:01:01:02	3	no	20	3	2	-	-
+DQA1	1	DQA1*01:01:01:01	0	yes	32	23	0	-	-
+DQA1	2	DQA1*03:01:01:01	0	yes	23	18	0	DQA1*03:100N	-
+DQA2	1	DQA2*01:01:01:04	0	yes	25	16	0	-	-
+DQA2	2	DQA2*01:01:04:01	0	yes	25	14	0	-	-
+DQB1	1	DQB1*03:02:01:01	0	yes	28	17	0	-	-
+DQB1	2	DQB1*05:01:01:03	0	yes, with unsure sites	16	9	1	-	-
+DQB2	1	DQB2*01:07:01:04	0	yes	35	24	0	-	-
+DQB2	2	DQB2*01:02:01:01	0	yes	23	14	0	-	-
+DRA	1	DRA*01:01:01:65	0	yes	23	14	0	-	-
+DRA	2	DRA*01:01:01:03	0	yes	21	15	0	-	-
+DRB1	1	DRB1*01:01:01:01	0	yes	26	13	0	-	-
+DRB1	2	DRB1*04:03:01:04	8	no	20	5	1	DRB1*04:11:01:02	-
+DRB1	3	DRB1*04:11:01:01	5	no	18	7	2	-	minor
+DRB4	1	DRB4*01:03:01:19	0	yes, with unsure sites	14	5	4	-	-
+DRB4	2	DRB4*01:208	30	no	12	1	189	-	-
+MICA	1	MICA*011:01:01	0	yes	33	14	0	-	-
+MICA	2	MICA*008:01:15	1	no	28	10	0	MICA*008:04:01,MICA*008:04:04,MICA*008:04:06,MICA*008:04:07,MICA*008:04:34	-
+MICB	1	MICB*005:02:22	1	no	25	13	3	-	-
+MICB	2	MICB*002:01:33	1	no	19	12	2	MICB*002:01:38	-
+P	1	P*02:01:01:01	0	yes	17	15	0	-	-
+R	1	R*01:01:01:02	0	yes	28	23	0	-	-
+R	2	R*01:01:01:01	0	yes	25	21	0	-	-
+T	1	T*03:01:01:02	0	yes	37	32	0	-	-
+TAP1	1	TAP1*01:01:01:05	1	no	24	13	1	-	-
+TAP1	2	TAP1*01:05	36	no	23	14	0	-	-
+TAP2	1	TAP2*02:01:03:03	0	yes	27	16	0	-	-
+TAP2	2	TAP2*01:03:02:07	0	yes	26	12	0	-	-
+W	1	W*01:01:01:04	9	no	29	28	0	-	-

@@ -3,7 +3,7 @@
 import sys,collections,itertools,os,re
 D=sys.argv[1]
 T=collections.defaultdict(dict)
-for l in open('truth/truth4.tsv'):
+for l in open(os.environ.get('T4OUT','truth/truth4.tsv')):
     r=l.rstrip('\n').split('\t')
     if r[2]=='_done' or r[3]=='-': continue
     T[(r[0],r[2])][r[1]]=r[4].split(',')

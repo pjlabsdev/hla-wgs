@@ -9,7 +9,7 @@ for g in db['genes']:
         seq[a['name']]=a.get('orig') if a.get('extended') and a.get('orig') else a['genomic']
 rc=lambda s:s[::-1].translate(str.maketrans('ACGTacgt','TGCAtgca'))
 dmin=collections.defaultdict(dict)
-for l in open('truth/truth4.tsv'):
+for l in open(os.environ.get('T4OUT','truth/truth4.tsv')):
     r=l.rstrip('\n').split('\t')
     if r[2]=='_done' or r[3]=='-': continue
     dmin[(r[0],r[2])][r[1]]=(int(r[3]),r[4].split(','))
@@ -35,7 +35,7 @@ for s in sorted(set(k[0] for k in dmin)):
     for l in open(f"{D}/{s}.conf.tsv").read().splitlines()[1:]:
         r=l.split("\t"); det=set()
         if len(r)>12 and r[12]!='-':
-            det={int(x.split(':')[0]) for x in ('' if r[12].startswith('known:') else r[12]).split(',') if x and 'blind' not in x and 'unphased' not in x}
+            det={int(x.split(':')[0]) for x in ('' if r[12].startswith('known:') else r[12]).split(',') if x and 'blind' not in x and 'unphased' not in x and 'repunverified' not in x}
         conf[r[0]].append((r[2],int(r[4]),det,int(r[11]) if len(r)>11 and r[11]!='-' else 0,r[12] if len(r)>12 else '-'))
     names=sorted({x[0] for v in conf.values() for x in v})
     hits={}

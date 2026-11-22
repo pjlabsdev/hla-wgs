@@ -13,6 +13,9 @@ are fetched.
 | `lab/` | 1000 Genomes laboratory typing (Gourraud et al. 2014; Abi-Rached et al. 2018): `run24.sh`, `eval24.py`. The frequency prior was counted from the same laboratory data, so the samples are split in two folds (`folds.tsv`) and each sample is typed with the prior of the other fold |
 | `results/dev80/` | `truth4.tsv` and `truth4diff.tsv`: truth for the 80 HPRC samples used during development |
 | `results/check30/` | the same for 30 further samples (`hprc/samples_check30.txt`, run with `hprc/ho4.sh`) that were not used for the four-field rules; they had been the first held-out round of the two-field typer |
+| `results/check30_v1.1/` | the same 30 samples typed again with the 1.1 development version, with a comparison to 1.0.0 |
+| `results/hgsvc3_v1.1/` | 59 unseen HGSVC3 samples (assembly truth), 1.1 development version |
+| `results/dev80_v1.1/` | the 80 development samples with the 1.1 development version, including the eight added genes |
 | `results/heldout_vs_t1k/` | `strata.tsv`: hla-wgs and T1K against assembly truth by population and gene, 150 held-out samples of rounds 1 to 3 (round 4 added 34 samples: two fields 543/543 against 541/543, copy number 102/102 against 64/102) |
 | `results/giab/`, `results/lab/` | calls of the trio members and of the 45 laboratory-typed samples |
 

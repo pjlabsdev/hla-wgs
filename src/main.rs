@@ -1,12 +1,16 @@
 mod align;
+mod aln;
 mod bamin;
 mod builddb;
 mod db;
+mod groups;
 mod kern;
 mod prior;
 mod refine;
 mod stageb;
 mod names;
+mod html;
+mod long;
 mod mask;
 mod novel;
 mod panel;
@@ -19,7 +23,7 @@ use names::{three, two};
 use std::time::Instant;
 use rayon::prelude::*;
 
-pub const FOCUS: [&str; 18] = ["A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DRA", "E", "F", "G", "H", "K", "V"];
+pub const FOCUS: [&str; 26] = ["A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DRA", "E", "F", "G", "H", "K", "V", "DMA", "DMB", "DOA", "DOB", "MICA", "MICB", "TAP1", "TAP2"];
 
 pub fn related(g: &str) -> &'static [&'static str] {
     match g {
@@ -32,17 +36,90 @@ pub fn related(g: &str) -> &'static [&'static str] {
     }
 }
 
+/// everything that can be known before the first read is checked here, so that a wrong path
+/// or a read-only folder is reported at once and not after minutes of reading
+fn preflight(db: &str, panel: &str, input: &panel::Input, out: &str) {
+    let need = |p: &str, what: &str| match std::fs::metadata(p) {
+        Err(e) => util::die(&format!("{what} not found: {p} ({e})")),
+        Ok(m) if m.is_file() && m.len() == 0 => util::die(&format!("{what} is empty: {p}")),
+        Ok(m) if m.is_dir() => util::die(&format!("{what} is a folder, not a file: {p}")),
+        Ok(_) => {}
+    };
+    need(db, "database file");
+    need(panel, "database panel");
+    match input {
+        panel::Input::Fastq(r1, r2) => {
+            need(r1, "FASTQ R1");
+            need(r2, "FASTQ R2");
+        }
+        panel::Input::Aligned(p, reference) => {
+            need(p, "input file");
+            let l = p.to_ascii_lowercase();
+            let cands: Vec<String> = if l.ends_with(".cram") {
+                vec![format!("{p}.crai")]
+            } else {
+                vec![format!("{p}.bai"), format!("{p}.csi"), format!("{}.bai", &p[..p.len() - 4])]
+            };
+            if !cands.iter().any(|c| std::path::Path::new(c).is_file()) {
+                util::die(&format!("index not found for {p}: expected {} (create it with: samtools index)", cands.join(" or ")));
+            }
+            if let Some(r) = reference {
+                need(r, "reference FASTA");
+                need(&format!("{r}.fai"), "reference FASTA index");
+            }
+        }
+    }
+    let probe = format!("{out}.tsv");
+    let existed = std::path::Path::new(&probe).exists();
+    match std::fs::OpenOptions::new().append(true).create(true).open(&probe) {
+        Ok(_) => {
+            if !existed {
+                let _ = std::fs::remove_file(&probe);
+            }
+        }
+        Err(e) => util::die(&format!("cannot write results to {probe}: {e}")),
+    }
+}
+
 fn main() {
     let mut a: Vec<String> = std::env::args().collect();
     match a.get(1).map(|x| x.as_str()) {
         Some("build-db") => return builddb::run(&a[2..]),
         Some("build-mask") => return mask::run(&a[2..]),
+        Some("long") => return long::run(&a[2..]),
+        // the result page again from PREFIX.json, e.g. after an update of the page
+        Some("html") => {
+            let Some(j) = a.get(2) else { util::die("usage: hla-wgs html PREFIX.json") };
+            let rep: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(j).unwrap_or_else(|e| util::die(&format!("cannot read {j}: {e}")))).unwrap_or_else(|e| util::die(&format!("{j} is not a result file: {e}")));
+            let prefix = j.trim_end_matches(".json");
+            let sample = std::path::Path::new(prefix).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            std::fs::write(format!("{prefix}.html"), html::render(&rep, &sample)).unwrap_or_else(|e| util::die(&format!("cannot write {prefix}.html: {e}")));
+            return;
+        }
         Some("--version") | Some("-V") => return println!("hla-wgs {}", env!("CARGO_PKG_VERSION")),
+        Some("--db-format") => return println!("{}", builddb::DB_FORMAT),
         _ => {}
+    }
+    if a.len() >= 4 && !std::path::Path::new(&a[1]).exists() {
+        util::die(&format!("database not found: {} (build it with: hla-wgs build-db hla.dat freq.json DBDIR)", a[1]));
     }
     // a database directory stands for its two files
     if a.get(1).map_or(false, |d| std::path::Path::new(d).is_dir()) {
         let d = a[1].trim_end_matches('/').to_string();
+        let f: u32 = std::fs::read_to_string(format!("{d}/format")).ok().and_then(|x| x.trim().parse().ok()).unwrap_or(1);
+        // release of the database: DBDIR/release (written by build-db since 1.1), else the header of
+        // the WMDA G group file of the same release ("# version: IPD-IMGT/HLA 3.66.0")
+        let rel = std::fs::read_to_string(format!("{d}/release")).ok().map(|r| r.trim().to_string()).filter(|r| !r.is_empty()).or_else(|| {
+            std::fs::read_to_string(format!("{d}/hla_nom_g.txt")).ok().and_then(|t| {
+                t.lines().take(10).find_map(|l| l.strip_prefix("# version:").map(|v| v.trim().trim_start_matches("IPD-IMGT/HLA").trim().to_string()))
+            })
+        });
+        if let Some(r) = rel {
+            let _ = output::DB_RELEASE.set(r);
+        }
+        if f < builddb::DB_FORMAT {
+            eprintln!("[db] {d} was built by an older version (format {f}, current {}): results for DMB, DOB, MICA, MICB, TAP1 and TAP2 are better after rebuilding it with build-db", builddb::DB_FORMAT);
+        }
         a[1] = format!("{d}/hladb.json.gz");
         a.insert(2, format!("{d}/panel.fa"));
     }
@@ -53,6 +130,7 @@ fn main() {
     if a.len() < if aligned { 5 } else { 6 } {
         eprintln!("usage: hla-wgs DBDIR R1.fq.gz R2.fq.gz OUTPREFIX [threads]");
         eprintln!("       hla-wgs DBDIR INPUT.bam|INPUT.cram OUTPREFIX [threads] [REF.fa (CRAM)]");
+        eprintln!("       hla-wgs long DBDIR READS.fastq[.gz]|READS.bam OUTPREFIX [threads]   (PacBio HiFi)");
         eprintln!("       hla-wgs build-db hla.dat freq.json DBDIR");
         eprintln!("       hla-wgs build-mask DBDIR GENOME.fa [EXCLUDE.bed]");
         eprintln!("       (DBDIR may also be given as its two files: hladb.json.gz panel.fa)");
@@ -63,6 +141,10 @@ fn main() {
     } else {
         (panel::Input::Fastq(a[3].clone(), a[4].clone()), a[5].clone(), 6)
     };
+    preflight(&a[1], &a[2], &input, &out);
+    // file names only (no folders) for the result page
+    let base = |x: &String| std::path::Path::new(x).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let _ = output::INPUTS.set(if aligned { vec![base(&a[3])] } else { vec![base(&a[3]), base(&a[4])] });
     let threads: usize = a.get(ti).and_then(|x| x.parse().ok()).unwrap_or(4);
     rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().ok();
     let t0 = Instant::now();
@@ -70,6 +152,7 @@ fn main() {
     let (p, db) = rayon::join(|| panel::run(&a[2], &input, threads), || db::Db::load(&a[1]));
     let reads = &p.reads;
     log(format!("panel mapped reads: {}", reads.seq.iter().filter(|r| r[0].is_some() || r[1].is_some()).count()));
+    if std::env::var("HLA_ALNSTAT").is_ok() { eprintln!("[aln panel] {}", aln::stat()); }
     if std::env::var("DUMP0").is_ok() {
         let mut gg: Vec<_> = p.assign.iter().collect();
         gg.sort();
@@ -221,8 +304,10 @@ fn main() {
     }
 
     let drb = drb_copies(&ctx, &res, &p.assign, &log);
-    output::write(&out, &genes, &ctx, &res, &depth, &drb, &nov, &known, &log);
+    let grp = groups::Groups::load(std::path::Path::new(&a[1]).parent().unwrap_or(std::path::Path::new(".")));
+    output::write(&out, &genes, &ctx, &res, &depth, &drb, &nov, &known, &grp, &log);
     log("total".to_string());
+    if std::env::var("HLA_ALNSTAT").is_ok() { eprintln!("[aln] {}", aln::stat()); }
 }
 
 /// joint DRB model: copies of DRB3/4/5 = uniquely explained depth per bp relative to one DRB1 copy

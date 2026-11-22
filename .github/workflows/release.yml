@@ -1,0 +1,84 @@
+name: Release packages
+# Builds the program for macOS, Linux and Windows when a release is published and attaches one ZIP
+# per system to it. The names carry no version, so
+# https://github.com/pjlabsdev/hla-wgs/releases/latest/download/<name> always gives the newest one.
+# No IPD-IMGT/HLA data is packed: the start file builds the reference on the first start.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach the packages to (e.g. v1.1.0)"
+        required: true
+permissions:
+  contents: write
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            zip: hla-wgs-macos.zip
+          - os: ubuntu-22.04
+            zip: hla-wgs-linux-x86_64.zip
+          - os: windows-latest
+            zip: hla-wgs-windows-x86_64.zip
+    runs-on: ${{ matrix.os }}
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - name: Build (macOS, universal arm64 + x86_64)
+        if: runner.os == 'macOS'
+        run: |
+          cargo build --release --locked --target aarch64-apple-darwin
+          cargo build --release --locked --target x86_64-apple-darwin
+          mkdir -p pkg/hla-wgs
+          lipo -create -output pkg/hla-wgs/hla-wgs target/aarch64-apple-darwin/release/hla-wgs target/x86_64-apple-darwin/release/hla-wgs
+          cp start/hla-wgs-start.command pkg/hla-wgs/
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cargo build --release --locked
+          mkdir -p pkg/hla-wgs
+          cp target/release/hla-wgs pkg/hla-wgs/
+          cp start/hla-wgs-start.command pkg/hla-wgs/hla-wgs-start.sh
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cargo build --release --locked
+          mkdir -p pkg/hla-wgs
+          cp target/release/hla-wgs.exe pkg/hla-wgs/
+          cp start/hla-wgs-start.bat start/hla-wgs-start.ps1 pkg/hla-wgs/
+      - name: Check the program
+        shell: bash
+        run: |
+          ls pkg/hla-wgs
+          pkg/hla-wgs/hla-wgs* --version
+      - name: Add documents and data
+        shell: bash
+        run: |
+          cp LICENSE CHANGELOG.md CITATION.cff pkg/hla-wgs/
+          cp start/README.txt pkg/hla-wgs/README.txt
+          cp data/freq_1000g_2field.json data/panel_mask_3.66.bed pkg/hla-wgs/
+          chmod +x pkg/hla-wgs/hla-wgs pkg/hla-wgs/*.command pkg/hla-wgs/*.sh 2>/dev/null || true
+      - name: ZIP (macOS, Linux)
+        if: runner.os != 'Windows'
+        run: cd pkg && zip -r -X "../${{ matrix.zip }}" hla-wgs
+      - name: ZIP (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path pkg/hla-wgs -DestinationPath "${{ matrix.zip }}"
+      - name: Attach to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "${{ matrix.zip }}" --clobber --repo "${{ github.repository }}"
