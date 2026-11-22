@@ -62,7 +62,7 @@ jobs:
         shell: bash
         run: |
           ls pkg/hla-wgs
-          pkg/hla-wgs/hla-wgs* --version
+          if [ -f pkg/hla-wgs/hla-wgs.exe ]; then pkg/hla-wgs/hla-wgs.exe --version; else pkg/hla-wgs/hla-wgs --version; fi
       - name: Add documents and data
         shell: bash
         run: |
