@@ -4,7 +4,11 @@
 # Sets up the IPD-IMGT/HLA reference once if it is missing, runs hla-wgs with an animated progress
 # display and shows the result. Long reads (PacBio HiFi): HLA_WGS_LONG=1 or the argument --long.
 set -u
-case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in *UTF-8*) ;; *) export LC_CTYPE=en_US.UTF-8 ;; esac
+# a UTF-8 character set for the display; macOS has en_US.UTF-8, Linux systems mostly C.UTF-8
+case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+  *UTF-8*|*utf8*) ;;
+  *) if [ "$(uname -s)" = Darwin ]; then export LC_CTYPE=en_US.UTF-8; else export LC_CTYPE=C.UTF-8; fi ;;
+esac
 
 # release the shipped repeat mask belongs to; HLA_WGS_RELEASE selects another one
 BASE_REL="3.66"
@@ -16,7 +20,10 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 case "${HLA_WGS_LANG:-}" in
   de*) DE=1 ;;
   en*) DE=0 ;;
-  *) if [ "${LANG:-}" != "${LANG#de}" ] || [ "$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)" = "de" ]; then DE=1; else DE=0; fi ;;
+  *) case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
+       de*) DE=1 ;;
+       *) if [ "$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)" = "de" ]; then DE=1; else DE=0; fi ;;
+     esac ;;
 esac
 tr_() { if [ "$DE" = 1 ]; then printf '%s' "$1"; else printf '%s' "$2"; fi; }
 
@@ -371,7 +378,7 @@ LOG="$OUT/$S.log"
 # ── run with progress ────────────────────────────────────────────────────────
 printf '\n'
 title "hla-wgs · $S"
-[ "$DE" = 1 ] && export HLA_WGS_LANG=de   # result page PREFIX.html in German
+if [ "$DE" = 1 ]; then export HLA_WGS_LANG=de; else export HLA_WGS_LANG=en; fi   # language of the result page PREFIX.html
 START=$(now)
 if [ "$LONG" = 1 ]; then
   "$BIN" long "$DB" "$IN" "$OUT/$S" "$T" >"$LOG" 2>&1 & PID=$!; TAB="$OUT/$S.long.tsv"

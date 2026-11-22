@@ -296,7 +296,7 @@ New-Item -ItemType Directory -Path $Out -Force | Out-Null
 $Log = Join-Path $Out "$S.log"
 $Prefix = Join-Path $Out $S
 $Host.UI.RawUI.WindowTitle = "hla-wgs · $S"
-if ($DE) { $env:HLA_WGS_LANG = 'de' }   # result page PREFIX.html in German
+if ($DE) { $env:HLA_WGS_LANG = 'de' } else { $env:HLA_WGS_LANG = 'en' }   # language of the result page PREFIX.html
 
 if ($isLong) { $argv = @('long', $Db, $In, $Prefix, "$Threads"); $Tab = "$Prefix.long.tsv" }
 elseif ($In2 -ne '') { $argv = @($Db, $In, $In2, $Prefix, "$Threads"); $Tab = "$Prefix.conf.tsv" }
