@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased (1.1.0)
+## 1.1.0 (2026-11-22)
+
+- Own aligner: the reads are now aligned by the program itself (`src/aln.rs`, Rust) instead of the minimap2 library. hla-wgs is one Rust program without C code; building needs no C compiler. Same accuracy on the validation sets (see `docs/aligner.md`): 80 HPRC samples two fields 2485 of 2489, three fields 2481, certain four-field calls 1779 of 1798 exact (minimap2 1778 of 1801); 59 HGSVC3 samples two fields 1833 of 1833, three fields 1830, certain four-field calls 1333 of 1349 exact (minimap2 1337 of 1354), i.e. one wrong certain call fewer. Faster: 22 s instead of 32 s per sample (CPU 79 s instead of 116 s; 8 HPRC samples, 4 threads, two rounds), same peak memory (1.4 GB).
+- A database allele that is 9 to 20 bases shorter than its group now also gets the flank of a longer allele when alleles are compared (before only from 21 bases). Reads at the end of the longer allele otherwise overhang the shorter one for free. Found on HG00514 (A\*02:01:01:48, 18 bases shorter at the 3' end). `HLA_PAD_MIN` sets the limit.
+- Ready-to-run packages for macOS (Apple silicon and Intel), Linux x86_64 and Windows x86_64 are attached to every release (`hla-wgs-macos.zip`, `hla-wgs-linux-x86_64.zip`, `hla-wgs-windows-x86_64.zip`): program, start file, README in English and German, frequency table and repeat mask. No IPD-IMGT/HLA data is packed; the start file builds the reference on the first start.
+- Start file for Windows (`hla-wgs-start.bat`, which runs `hla-wgs-start.ps1` in PowerShell), with the same steps and display as on macOS and Linux. On Linux the start file opens the result page with `xdg-open`.
+- The start files check at every start whether a newer release exists on GitHub (5 s limit, silent without a connection) and offer to install it; the update replaces the program files and keeps `ref/` and earlier results. `HLA_WGS_NO_UPDATE=1` switches the check off.
+- The start files speak English, or German on a German system; `HLA_WGS_LANG=de|en` chooses. Sample names taken from file names keep only letters, digits, dot, underscore and hyphen.
+- CI builds and tests on Linux, macOS and Windows.
 
 - The first-described allele of a three-field group (fourth field 01, mostly the common one) is certain at four fields with a lead of 1 instead of 4 over its nearest sibling. 80 HPRC samples: 1778 of 1801 certain four-field calls exact (before 1740 of 1761); 59 unseen HGSVC3 samples: 1337 of 1354 (before 1315 of 1331). `HLA_F401=0` restores the old threshold.
 - A database base is no longer called unsupported where the stretch has fewer than half the usual reads (a repeat piece whose reads the mask removes, such as the L1 piece in intron 1 of DPB1) and more than one read of the allele itself backs it. On 80 HPRC samples: certain four-field calls 1740 of 1761 exact (before 1731 of 1752), 14 fewer false sites, no true site lost. `HLA_UNSTHIN=0` restores the old rule.

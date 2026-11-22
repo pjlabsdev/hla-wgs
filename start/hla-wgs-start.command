@@ -12,7 +12,12 @@ FREQ_URL="https://raw.githubusercontent.com/pjlabsdev/hla-wgs/main/data/freq_100
 MASK_URL="https://raw.githubusercontent.com/pjlabsdev/hla-wgs/main/data/panel_mask_3.66.bed"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
-if [ "${LANG:-}" != "${LANG#de}" ] || [ "$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)" = "de" ]; then DE=1; else DE=0; fi
+# language: HLA_WGS_LANG=de|en wins, otherwise German on a German system, otherwise English
+case "${HLA_WGS_LANG:-}" in
+  de*) DE=1 ;;
+  en*) DE=0 ;;
+  *) if [ "${LANG:-}" != "${LANG#de}" ] || [ "$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)" = "de" ]; then DE=1; else DE=0; fi ;;
+esac
 tr_() { if [ "$DE" = 1 ]; then printf '%s' "$1"; else printf '%s' "$2"; fi; }
 
 # ── display (PJ Labs: gold accent, no bold) ──────────────────────────────────
@@ -131,6 +136,65 @@ if [ -z "$BIN" ]; then
   printf '\n  %s%s%s\n' "$ERR" "$(tr_ "Das Programm hla-wgs wurde nicht gefunden (neben dieser Datei, in ../target/release oder im PATH)." "The hla-wgs program was not found (next to this file, in ../target/release or in PATH).")" "$RST"
   finish 1
 fi
+
+# ── update: on every start ask GitHub for the latest release (5 s at most) and offer it ──
+# HLA_WGS_NO_UPDATE=1 skips the check. The reference in ref/ and the results stay untouched.
+REPO="pjlabsdev/hla-wgs"
+asset_name() {
+  case "$(uname -s)" in
+    Darwin) echo "hla-wgs-macos.zip" ;;
+    Linux) case "$(uname -m)" in x86_64|amd64) echo "hla-wgs-linux-x86_64.zip" ;; *) echo "" ;; esac ;;
+    *) echo "" ;;
+  esac
+}
+vernum() { printf '%s' "$1" | sed -E 's/^v//; s/[-+].*//' | awk -F. '{ printf "%d%04d%04d", $1, $2, $3 }'; }
+# newer LATEST CURRENT: a release is newer than a development build of the same number (1.1.0-dev)
+newer() {
+  local a b; a="$(vernum "$1")"; b="$(vernum "$2")"
+  [ "$a" -gt "$b" ] && return 0
+  [ "$a" = "$b" ] && [ "$2" != "${2%%-*}" ] && [ "$1" = "${1%%-*}" ] && return 0
+  return 1
+}
+check_update() {
+  [ "${HLA_WGS_NO_UPDATE:-0}" = 1 ] && return 0
+  command -v curl >/dev/null 2>&1 || return 0
+  local cur latest asset tmp dir
+  cur="$("$BIN" --version 2>/dev/null | awk '{ print $2 }')"
+  latest="$(curl -fsL --max-time 5 -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)"
+  latest="${latest#v}"
+  if [ -z "$latest" ] || [ -z "$cur" ] || ! newer "$latest" "$cur"; then return 0; fi
+  asset="$(asset_name)"
+  printf '\n'
+  row 2 "$(tr_ "Neue Version verfügbar" "New version available")" "$cur → $latest" "$ACC"
+  if [ -z "$asset" ]; then
+    printf '  %s%s%s\n' "$MUT" "https://github.com/$REPO/releases/latest" "$RST"
+    return 0
+  fi
+  ask "Jetzt aktualisieren? [j/N]" "Update now? [y/N]"
+  local yn; IFS= read -r yn || return 0
+  case "$yn" in [jJyY]*) ;; *) return 0 ;; esac
+  tmp="$(mktemp -d -t hla-wgs-update.XXXXXX)"
+  printf '\n'
+  download "https://github.com/$REPO/releases/download/v$latest/$asset" "$tmp/$asset" || { result fail "Download" "$asset" "$(secs "$T0")"; rm -rf "$tmp"; return 0; }
+  result ok "Download" "$asset" "$(secs "$T0")"
+  T0=$(now)
+  if ! unzip -o -q "$tmp/$asset" -d "$tmp/x"; then result fail "$(tr_ "Entpacken" "Unpacking")" "" "$(secs "$T0")"; rm -rf "$tmp"; return 0; fi
+  dir="$(find "$tmp/x" -maxdepth 2 -type f \( -name hla-wgs -o -name hla-wgs.exe \) | head -1)"
+  [ -n "$dir" ] || { result fail "$(tr_ "Entpacken" "Unpacking")" "$(tr_ "Programm fehlt im Paket" "program missing in the package")" ""; rm -rf "$tmp"; return 0; }
+  dir="$(dirname "$dir")"
+  # everything of the package replaces its copy here; ref/ and other files stay. bash reads this
+  # running file piece by piece, so it is moved aside first and the new copy gets a fresh file
+  mv -f "$HERE/$(basename "$0")" "$tmp/running.command" 2>/dev/null
+  (cd "$dir" && tar cf - .) | (cd "$HERE" && tar xf -) || { result fail "Update" "$(tr_ "Dateien nicht ersetzbar" "files could not be replaced")" ""; rm -rf "$tmp"; return 0; }
+  chmod +x "$HERE/hla-wgs" "$HERE"/*.command "$HERE"/*.sh 2>/dev/null
+  command -v xattr >/dev/null 2>&1 && xattr -dr com.apple.quarantine "$HERE" 2>/dev/null
+  rm -rf "$tmp"
+  result ok "Update" "$latest" "$(secs "$T0")"
+  printf '  %s%s%s\n' "$MUT" "$(tr_ "Startet neu …" "Restarting …")" "$RST"
+  sleep 1
+  HLA_WGS_NO_UPDATE=1 exec bash "$0" "$@"
+}
+check_update "$@"
 
 # ── reference: HLA_WGS_DB, else ref/hladb in the folder of this file (built there on the first start) ──
 # Another IPD-IMGT/HLA release in one step: HLA_WGS_RELEASE=3.67 builds ref/hladb_3.67 beside the
@@ -285,6 +349,8 @@ S="$(basename "$IN")"
 for x in .fastq.gz .fq.gz .fastq .fq .bam .cram .BAM .CRAM; do S="${S%"$x"}"; done
 # FASTQ: drop the read-1 part of the name (PJ_R1, PJ_1, Illumina S1_L001_R1_001)
 case "$lower" in *.fq|*.fastq|*.fq.gz|*.fastq.gz) S="$(printf '%s' "$S" | sed -E 's/_S[0-9]+_L[0-9]{3}_R1_001$//; s/_L[0-9]{3}_R1_001$//; s/_R1_001$//; s/([._])[Rr]?1$//')" ;; esac
+# only letters, digits, dot, underscore and hyphen, so spaces or quotes in a file name break nothing
+S="$(printf '%s' "$S" | tr -c 'A-Za-z0-9._-' '_')"
 [ -z "$S" ] && S=sample
 OUT="$HOME/Downloads/hla-wgs-$S"; n=2
 while [ -e "$OUT/$S.tsv" ] || [ -e "$OUT/$S.long.tsv" ]; do OUT="$HOME/Downloads/hla-wgs-$S-$n"; n=$((n + 1)); done
@@ -380,5 +446,7 @@ fi |
 printf '\n  %s%s%s\n' "$MUT" "$(tr_ "safe_call und resolution: so viele Felder, wie die Reads tragen. Maßgeblich ist der sichere Ruf." "safe_call and resolution: as many fields as the reads support. Use the safe call.")" "$RST"
 printf '  %s%s%s\n' "$MUT" "$SHOWOUT" "$RST"
 title "hla-wgs · $S · $(tr_ "fertig" "done")"
-if command -v open >/dev/null 2>&1; then open "$OUT"; [ -f "$OUT/$S.html" ] && open "$OUT/$S.html"; fi
+if [ "$(uname -s)" = Darwin ] && command -v open >/dev/null 2>&1; then open "$OUT"; [ -f "$OUT/$S.html" ] && open "$OUT/$S.html"
+elif command -v xdg-open >/dev/null 2>&1; then [ -f "$OUT/$S.html" ] && xdg-open "$OUT/$S.html" >/dev/null 2>&1 &
+fi
 finish 0
