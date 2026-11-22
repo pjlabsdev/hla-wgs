@@ -52,7 +52,7 @@ fn note_release(line: &str) {
 }
 
 fn parse(dat: &str) -> Vec<Al> {
-    let f = std::fs::File::open(dat).unwrap_or_else(|e| crate::util::die(&format!("{dat}: {e}")));
+    let f = crate::vfs::open(dat).unwrap_or_else(|e| crate::util::die(&format!("{dat}: {e}")));
     let mut rd = std::io::BufReader::with_capacity(1 << 20, f);
     // an EMBL flat file starts with "ID   HLA....."; anything else is the wrong file
     let head = std::io::BufRead::fill_buf(&mut rd).unwrap_or_else(|e| crate::util::die(&format!("{dat}: {e}")));
@@ -361,7 +361,7 @@ fn donors(ext: &[(String, Vec<Al>)], orig: &BTreeMap<(String, String), String>) 
 
 /// panel.py: one representative per 2-field group (non-imputed first, by name), max 60 per gene
 fn panel(genes: &[(String, Vec<Al>)], out: &str) {
-    let mut f = std::io::BufWriter::new(std::fs::File::create(out).unwrap());
+    let mut f = std::io::BufWriter::new(crate::vfs::create(out).unwrap());
     for (_, al) in genes {
         let mut idx: Vec<usize> = (0..al.len()).collect();
         idx.sort_by(|&x, &y| (al[x].imputed, al[x].name.as_bytes()).cmp(&(al[y].imputed, al[y].name.as_bytes())));
@@ -388,12 +388,12 @@ pub fn run(args: &[String]) {
         std::process::exit(2);
     }
     let (dat, freq, outdir) = (&args[0], &args[1], &args[2]);
-    std::fs::create_dir_all(outdir).unwrap();
-    let t = std::time::Instant::now();
+    crate::vfs::create_dir_all(outdir).unwrap();
+    let t = crate::vfs::Instant::now();
     let alleles = parse(dat);
-    eprintln!("[{:.0}s] {} alleles", t.elapsed().as_secs_f64(), alleles.len());
+    crate::elog!("[{:.0}s] {} alleles", t.elapsed().as_secs_f64(), alleles.len());
     let base = refbuild(alleles);
-    eprintln!("[{:.0}s] genomic sequences built", t.elapsed().as_secs_f64());
+    crate::elog!("[{:.0}s] genomic sequences built", t.elapsed().as_secs_f64());
     panel(&base, &format!("{outdir}/panel.fa"));
     let orig: BTreeMap<(String, String), String> = base
         .iter()
@@ -401,11 +401,11 @@ pub fn run(args: &[String]) {
         .collect();
     let mut ext = base.clone();
     extend(&mut ext);
-    eprintln!("[{:.0}s] flanks extended", t.elapsed().as_secs_f64());
+    crate::elog!("[{:.0}s] flanks extended", t.elapsed().as_secs_f64());
     let donor = donors(&ext, &orig);
-    eprintln!("[{:.0}s] donor distances {}", t.elapsed().as_secs_f64(), donor.len());
+    crate::elog!("[{:.0}s] donor distances {}", t.elapsed().as_secs_f64(), donor.len());
     // keep the frequency table as written (exact float text), not re-serialised
-    let fr_txt = std::fs::read_to_string(freq).unwrap_or_else(|e| panic!("{freq}: {e}"));
+    let fr_txt = crate::vfs::read_to_string(freq).unwrap_or_else(|e| panic!("{freq}: {e}"));
     let fr: Box<serde_json::value::RawValue> = serde_json::value::RawValue::from_string(fr_txt.trim().to_string()).expect("freq json");
     let genes: Vec<serde_json::Value> = ext
         .iter()
@@ -424,7 +424,7 @@ pub fn run(args: &[String]) {
         })
         .collect();
     let donor_j: Vec<serde_json::Value> = donor.iter().map(|(g, a, b, v)| serde_json::json!([g, a, b, v])).collect();
-    let f = std::fs::File::create(format!("{outdir}/hladb.json.gz")).unwrap();
+    let f = crate::vfs::create(&format!("{outdir}/hladb.json.gz")).unwrap();
     let mut gz = flate2::write::GzEncoder::new(f, flate2::Compression::default());
     gz.write_all(b"{\"genes\":").unwrap();
     serde_json::to_writer(&mut gz, &genes).unwrap();
@@ -434,12 +434,12 @@ pub fn run(args: &[String]) {
     serde_json::to_writer(&mut gz, &donor_j).unwrap();
     gz.write_all(b"}").unwrap();
     gz.finish().unwrap();
-    std::fs::write(format!("{outdir}/format"), format!("{DB_FORMAT}\n")).unwrap_or_else(|e| crate::util::die(&format!("{outdir}/format: {e}")));
+    crate::vfs::write(&format!("{outdir}/format"), format!("{DB_FORMAT}\n").as_bytes()).unwrap_or_else(|e| crate::util::die(&format!("{outdir}/format: {e}")));
     let r = *RELEASE.lock().unwrap();
     if r.0 > 0 {
         let rel = format!("{}.{}.{}", r.0, r.1, r.2);
-        std::fs::write(format!("{outdir}/release"), format!("{rel}\n")).unwrap_or_else(|e| crate::util::die(&format!("{outdir}/release: {e}")));
-        eprintln!("[{:.0}s] IPD-IMGT/HLA release {rel}", t.elapsed().as_secs_f64());
+        crate::vfs::write(&format!("{outdir}/release"), format!("{rel}\n").as_bytes()).unwrap_or_else(|e| crate::util::die(&format!("{outdir}/release: {e}")));
+        crate::elog!("[{:.0}s] IPD-IMGT/HLA release {rel}", t.elapsed().as_secs_f64());
     }
-    eprintln!("[{:.0}s] wrote {outdir}/hladb.json.gz and {outdir}/panel.fa", t.elapsed().as_secs_f64());
+    crate::elog!("[{:.0}s] wrote {outdir}/hladb.json.gz and {outdir}/panel.fa", t.elapsed().as_secs_f64());
 }

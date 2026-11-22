@@ -44,7 +44,7 @@ const MASK_ANCHOR: i64 = 40;
 fn load_mask(panel: &str) -> AHashMap<String, Vec<(i64, i64)>> {
     let p = std::env::var("HLA_MASK").unwrap_or_else(|_| format!("{panel}.mask.bed"));
     let mut m: AHashMap<String, Vec<(i64, i64)>> = AHashMap::new();
-    if let Ok(t) = std::fs::read_to_string(&p) {
+    if let Ok(t) = crate::vfs::read_to_string(&p) {
         for l in t.lines() {
             let f: Vec<&str> = l.split('\t').collect();
             if f.len() >= 3 {
@@ -54,7 +54,7 @@ fn load_mask(panel: &str) -> AHashMap<String, Vec<(i64, i64)>> {
             }
         }
     }
-    eprintln!("[mask] {} alleles with repeat intervals from {}", m.len(), p);
+    crate::elog!("[mask] {} alleles with repeat intervals from {}", m.len(), p);
     MASK_LOADED.store(!m.is_empty(), std::sync::atomic::Ordering::Relaxed);
     m
 }
@@ -62,12 +62,33 @@ fn load_mask(panel: &str) -> AHashMap<String, Vec<(i64, i64)>> {
 /// whether a repeat mask was in use (reported in PREFIX.json and on the result page)
 pub static MASK_LOADED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// all read pairs of the input, in batches, into `sink`
+fn read_input(inp: Input, threads: usize, sink: &mut dyn FnMut(Vec<crate::util::Fq>, Vec<crate::util::Fq>)) {
+    match inp {
+        Input::Fastq(r1s, r2s) => {
+            let mut src = crate::util::PairedFq::new(&r1s, &r2s);
+            loop {
+                let (b1, b2) = src.batch(50_000);
+                if b1.is_empty() {
+                    break;
+                }
+                sink(b1, b2);
+            }
+        }
+        Input::Aligned(path, reference) => {
+            let t = crate::vfs::Instant::now();
+            let (n, pairs, single) = crate::bamin::stream(&path, reference.as_deref(), threads, sink);
+            crate::elog!("[input] {path}: {n} records, {pairs} pairs, {single} unpaired dropped, {:.1}s", t.elapsed().as_secs_f64());
+        }
+    }
+}
+
 pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
     let envn = |k: &str, d: usize| std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d);
     let opts = crate::aln::Opts { max_align: envn("HLA_PANEL_N", 100), chain_ratio: 0.6, per_group: envn("HLA_PANEL_G", 25), min_chain: envn("HLA_PANEL_C", 25) as f32, min_score: envn("HLA_PANEL_SE", 60) as i32, win: envn("HLA_PANEL_MW", 11), full: envn("HLA_PANEL_FULL", 80) as f32 / 100.0, ..crate::aln::Opts::sr() };
-    let t0 = std::time::Instant::now();
+    let t0 = crate::vfs::Instant::now();
     let al = crate::aln::Index::from_fasta(panel, opts);
-    eprintln!("[panel] {} sequences indexed, {:.1}s", al.seqs.len(), t0.elapsed().as_secs_f64());
+    crate::elog!("[panel] {} sequences indexed, {:.1}s", al.seqs.len(), t0.elapsed().as_secs_f64());
     // genes whose best alignment of a mate lies within this many points of the mate's best alignment
     let win = envn("HLA_PANEL_W", 0) as i32;
     let clip = envn("HLA_PANEL_CLIP", 0);
@@ -88,29 +109,6 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
     // from other chromosomes cannot enter through an intronic Alu or L1 copy
     let mask = load_mask(panel);
     let set = panel_kmers(panel, &mask);
-    // read the next batch while the current one is mapped
-    let (tx, rx) = std::sync::mpsc::sync_channel::<(Vec<crate::util::Fq>, Vec<crate::util::Fq>)>(2);
-    let inp = match input {
-        Input::Fastq(a, b) => Input::Fastq(a.clone(), b.clone()),
-        Input::Aligned(a, b) => Input::Aligned(a.clone(), b.clone()),
-    };
-    let reader = std::thread::spawn(move || match inp {
-        Input::Fastq(r1s, r2s) => {
-            let mut src = crate::util::PairedFq::new(&r1s, &r2s);
-            loop {
-                let (b1, b2) = src.batch(50_000);
-                if b1.is_empty() {
-                    break;
-                }
-                tx.send((b1, b2)).unwrap();
-            }
-        }
-        Input::Aligned(path, reference) => {
-            let t = std::time::Instant::now();
-            let (n, pairs, single) = crate::bamin::stream(&path, reference.as_deref(), threads, tx);
-            eprintln!("[input] {path}: {n} records, {pairs} pairs, {single} unpaired dropped, {:.1}s", t.elapsed().as_secs_f64());
-        }
-    });
     let mut names = vec![];
     let mut seqs: Vec<[Option<Vec<u8>>; 2]> = vec![];
     // per read: genes in first-hit order with best AS per mate
@@ -120,12 +118,12 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
     // FASTQ gives the same result as the original input, without reading the BAM/FASTQ again.
     let mut cache = std::env::var("HLA_SAVE_READS").ok().map(|pre| {
         let w = |m: u8| {
-            let f = std::fs::File::create(format!("{pre}.R{m}.fq.gz")).unwrap_or_else(|e| panic!("{pre}.R{m}.fq.gz: {e}"));
+            let f = crate::vfs::create(&format!("{pre}.R{m}.fq.gz")).unwrap_or_else(|e| panic!("{pre}.R{m}.fq.gz: {e}"));
             flate2::write::GzEncoder::new(std::io::BufWriter::with_capacity(1 << 20, f), flate2::Compression::fast())
         };
         (w(1), w(2))
     });
-    for (b1, b2) in rx {
+    let mut consume = |b1: Vec<crate::util::Fq>, b2: Vec<crate::util::Fq>| {
         if let Some((w1, w2)) = cache.as_mut() {
             use std::io::Write;
             let keep: Vec<bool> = b1.par_iter().zip(b2.par_iter()).map(|(x, y)| has_kmer(&x.seq, &set) || has_kmer(&y.seq, &set)).collect();
@@ -334,8 +332,24 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
             seqs.push(r.1);
             gscore.push(r.2);
         }
+    };
+    let inp = match input {
+        Input::Fastq(a, b) => Input::Fastq(a.clone(), b.clone()),
+        Input::Aligned(a, b) => Input::Aligned(a.clone(), b.clone()),
+    };
+    // read the next batch while the current one is mapped
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let (tx, rx) = std::sync::mpsc::sync_channel::<(Vec<crate::util::Fq>, Vec<crate::util::Fq>)>(2);
+        let reader = std::thread::spawn(move || read_input(inp, threads, &mut |b1, b2| tx.send((b1, b2)).unwrap()));
+        for (b1, b2) in rx {
+            consume(b1, b2);
+        }
+        reader.join().unwrap();
     }
-    reader.join().unwrap();
+    // the browser build has one thread: each batch is mapped as soon as it is read
+    #[cfg(target_arch = "wasm32")]
+    read_input(inp, threads, &mut consume);
     if let Some((w1, w2)) = cache {
         w1.finish().and_then(|mut b| std::io::Write::flush(&mut b)).expect("read cache R1");
         w2.finish().and_then(|mut b| std::io::Write::flush(&mut b)).expect("read cache R2");
@@ -434,7 +448,7 @@ fn panel_kmers(panel: &str, mask: &AHashMap<String, Vec<(i64, i64)>>) -> KSet {
     }
     let n = set.len();
     set.retain(|k| !rep.contains(k));
-    eprintln!("[prefilter] {} panel 21-mers, {} inside the repeat mask left out", n, n - set.len());
+    crate::elog!("[prefilter] {} panel 21-mers, {} inside the repeat mask left out", n, n - set.len());
     set.shrink_to_fit();
     let mut bits = vec![0u64; KSET_BITS / 64];
     for &k in &set {

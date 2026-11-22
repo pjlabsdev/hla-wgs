@@ -5,7 +5,6 @@
 use crate::util::Fq;
 use ahash::AHashMap;
 use noodles::sam::alignment::record::Flags;
-use std::sync::mpsc::SyncSender;
 
 const MHC_ALTS: [&str; 16] = [
     "chr6_GL000250v2_alt", "chr6_GL000251v2_alt", "chr6_GL000252v2_alt", "chr6_GL000253v2_alt",
@@ -43,18 +42,23 @@ fn revcomp_into(s: &[u8]) -> Vec<u8> {
     crate::util::revcomp(s)
 }
 
-struct Pairer {
+struct Pairer<'a> {
     open: AHashMap<Vec<u8>, [Option<(Vec<u8>, Vec<u8>)>; 2]>,
     b1: Vec<Fq>,
     b2: Vec<Fq>,
-    tx: SyncSender<(Vec<Fq>, Vec<Fq>)>,
+    tx: &'a mut dyn FnMut(Vec<Fq>, Vec<Fq>),
     pub records: u64,
     pub pairs: u64,
 }
 
-impl Pairer {
+impl Pairer<'_> {
     fn add(&mut self, name: &[u8], flags: Flags, seq: Vec<u8>, qual: &[u8]) {
         self.records += 1;
+        // the browser shows that reading goes on (natively the terminal stays as it was)
+        #[cfg(target_arch = "wasm32")]
+        if self.records % 250_000 == 0 {
+            crate::elog!("[input] {} records read", self.records);
+        }
         if flags.intersects(Flags::SECONDARY.union(Flags::SUPPLEMENTARY)) || !flags.is_segmented() {
             return;
         }
@@ -85,16 +89,16 @@ impl Pairer {
         if !self.b1.is_empty() {
             let b1 = std::mem::take(&mut self.b1);
             let b2 = std::mem::take(&mut self.b2);
-            self.tx.send((b1, b2)).unwrap();
+            (self.tx)(b1, b2);
         }
     }
 }
 
-/// stream all pairs of an indexed BAM or CRAM into `tx`; returns (records seen, pairs, singletons).
+/// stream all pairs of an indexed BAM or CRAM into `tx` (batches of up to 50,000 pairs); returns (records seen, pairs, singletons).
 /// An I/O error (USB disk dropping out, volume briefly unmounted) does not abort the run: the
 /// file is reopened after a pause and reading resumes after the last record already consumed.
 /// Records arrive in the same order as in an uninterrupted pass, so results are unchanged.
-pub fn stream(path: &str, reference: Option<&str>, threads: usize, tx: SyncSender<(Vec<Fq>, Vec<Fq>)>) -> (u64, u64, usize) {
+pub fn stream(path: &str, reference: Option<&str>, threads: usize, tx: &mut dyn FnMut(Vec<Fq>, Vec<Fq>)) -> (u64, u64, usize) {
     let mut p = Pairer { open: AHashMap::new(), b1: vec![], b2: vec![], tx, records: 0, pairs: 0 };
     let tries = crate::util::io_retries();
     let mut attempt = 0;
@@ -120,8 +124,8 @@ pub fn stream(path: &str, reference: Option<&str>, threads: usize, tx: SyncSende
                     crate::util::die(&format!("{path}: {e} (gave up after {tries} retries)"));
                 }
                 let wait = crate::util::backoff(attempt);
-                eprintln!("[input] {path}: I/O error after {} records: {e}; retry {attempt}/{tries} in {wait}s", p.records);
-                std::thread::sleep(std::time::Duration::from_secs(wait));
+                crate::elog!("[input] {path}: I/O error after {} records: {e}; retry {attempt}/{tries} in {wait}s", p.records);
+                crate::util::pause(wait);
             }
         }
     }
@@ -139,14 +143,28 @@ fn pass(path: &str, reference: Option<&str>, threads: usize, skip: u64, p: &mut 
     let lower = path.to_ascii_lowercase();
     if lower.ends_with(".cram") {
         use noodles::{cram, fasta};
+        #[cfg(not(target_arch = "wasm32"))]
         let repo = reference
             .map(|src| fasta::io::indexed_reader::Builder::default().build_from_path(src).expect("reference fasta (.fai needed)"))
             .map(fasta::repository::adapters::IndexedReader::new)
             .map(fasta::Repository::new)
             .unwrap_or_default();
-        let mut rd = cram::io::reader::Builder::default().set_reference_sequence_repository(repo).build_from_path(path)?;
+        // browser: plain (not bgzip-compressed) FASTA with its .fai, read in pieces
+        #[cfg(target_arch = "wasm32")]
+        let repo = match reference {
+            Some(src) => {
+                if src.ends_with(".gz") || src.ends_with(".bgz") {
+                    return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, format!("{src}: the browser version needs the reference FASTA unpacked (.fa with .fa.fai)")));
+                }
+                let fai = noodles::fasta::fai::io::Reader::new(std::io::BufReader::new(crate::vfs::open(&format!("{src}.fai"))?)).read_index()?;
+                let rd = std::io::BufReader::with_capacity(1 << 20, crate::vfs::OneThread(crate::vfs::open(src)?));
+                fasta::Repository::new(fasta::repository::adapters::IndexedReader::new(fasta::io::IndexedReader::new(rd, fai)))
+            }
+            None => fasta::Repository::default(),
+        };
+        let mut rd = cram::io::reader::Builder::default().set_reference_sequence_repository(repo).build_from_reader(crate::vfs::open(path)?);
         let header = rd.read_header()?;
-        let index = cram::fs::read_associated_index(path)?;
+        let index = cram::crai::io::Reader::new(crate::vfs::open(&format!("{path}.crai"))?).read_index()?;
         let refs: Vec<(String, usize)> = header.reference_sequences().iter().map(|(n, m)| (n.to_string(), m.length().get())).collect();
         for reg in regions(&refs) {
             let region = reg.parse().unwrap();
@@ -173,19 +191,31 @@ fn pass(path: &str, reference: Option<&str>, threads: usize, skip: u64, p: &mut 
         use noodles::{bam, bgzf};
         // multithreaded BGZF decompression over a large read buffer: the unmapped tail of a WGS
         // BAM is several GB, and USB disks like large sequential reads
-        let workers = std::num::NonZero::new(threads.clamp(1, 8)).unwrap();
-        let f = std::fs::File::open(path)?;
-        let mut rd = bam::io::Reader::from(bgzf::io::MultithreadedReader::with_worker_count(
-            workers,
-            std::io::BufReader::with_capacity(8 << 20, f),
-        ));
+        let f = crate::vfs::open(path)?;
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut rd = {
+            let workers = std::num::NonZero::new(threads.clamp(1, 8)).unwrap();
+            bam::io::Reader::from(bgzf::io::MultithreadedReader::with_worker_count(workers, std::io::BufReader::with_capacity(8 << 20, f)))
+        };
+        // browser: one thread
+        #[cfg(target_arch = "wasm32")]
+        let mut rd = {
+            let _ = threads;
+            bam::io::Reader::from(bgzf::io::Reader::new(f))
+        };
         let header = rd.read_header()?;
-        let index = bam::fs::read_associated_index(path)
-            .or_else(|_| {
-                let alt = path.strip_suffix(".bam").map(|b| format!("{b}.bai")).unwrap_or_default();
-                noodles::bam::bai::fs::read(&alt).map(noodles::bam::Index::Bai)
-            })
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("index .bam.bai/.bai/.csi needed: {e}")))?;
+        // PATH.bai, else PATH.csi, else PATH without .bam plus .bai (as bam::fs::read_associated_index and samtools)
+        let bai = |p: &str| -> std::io::Result<noodles::bam::Index> {
+            noodles::bam::bai::io::Reader::new(std::io::BufReader::new(crate::vfs::open(p)?)).read_index().map(noodles::bam::Index::Bai)
+        };
+        let index = match bai(&format!("{path}.bai")) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                noodles::csi::io::Reader::new(crate::vfs::open(&format!("{path}.csi"))?).read_index().map(noodles::bam::Index::Csi)
+            }
+            x => x,
+        }
+        .or_else(|_| bai(&path.strip_suffix(".bam").map(|b| format!("{b}.bai")).unwrap_or_default()))
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("index .bam.bai/.bai/.csi needed: {e}")))?;
         let refs: Vec<(String, usize)> = header.reference_sequences().iter().map(|(n, m)| (n.to_string(), m.length().get())).collect();
         for reg in regions(&refs) {
             let region = reg.parse().unwrap();

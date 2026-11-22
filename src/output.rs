@@ -36,8 +36,8 @@ pub fn write(
     grp: &crate::groups::Groups,
     log: &dyn Fn(String),
 ) {
-    let mut fh = std::fs::File::create(format!("{prefix}.tsv")).unwrap();
-    let mut cf = std::fs::File::create(format!("{prefix}.conf.tsv")).unwrap();
+    let mut fh = crate::vfs::create(&format!("{prefix}.tsv")).unwrap();
+    let mut cf = crate::vfs::create(&format!("{prefix}.conf.tsv")).unwrap();
     writeln!(cf, "gene\tslot\tallele\tsafe_call\tresolution\tmargin2\tmargin3\tmargin4\talt2\talt3\talt4\tnew_sites\tnew_detail").unwrap();
     writeln!(fh, "gene\tallele1\tallele2\tcall1\tcall2\tgap\treads\tcopies").unwrap();
     let mut js: Vec<serde_json::Value> = vec![];
@@ -248,7 +248,7 @@ pub fn write(
         "thresholds": {"2": T[0], "3": T[1], "4": T[2], "4_01": if std::env::var("HLA_F401").map_or(true, |v| v != "0") { serde_json::json!(1.0) } else { serde_json::Value::Null }}, "genes": js,
         "database_release": DB_RELEASE.get(),
         "input": INPUTS.get(),
-        "analysis_time": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
+        "analysis_time": crate::vfs::unix_time(),
         "groups_loaded": grp.loaded,
         "serology_loaded": grp.serology().loaded,
         "repeat_mask": crate::panel::MASK_LOADED.load(std::sync::atomic::Ordering::Relaxed),
@@ -263,17 +263,19 @@ pub fn write(
             })
         }).collect::<Vec<_>>(),
     });
-    std::fs::write(format!("{prefix}.json"), serde_json::to_string_pretty(&rep).unwrap()).unwrap();
+    // files of the browser build are complete when their writer is dropped
+    drop((fh, cf));
+    crate::vfs::write(&format!("{prefix}.json"), serde_json::to_string_pretty(&rep).unwrap().as_bytes()).unwrap();
     let sample = std::path::Path::new(prefix).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-    std::fs::write(format!("{prefix}.html"), crate::html::render(&rep, &sample)).unwrap();
+    crate::vfs::write(&format!("{prefix}.html"), crate::html::render(&rep, &sample).as_bytes()).unwrap();
     if !fasta.is_empty() {
-        std::fs::write(format!("{prefix}.novel.fa"), fasta).unwrap();
+        crate::vfs::write(&format!("{prefix}.novel.fa"), fasta.as_bytes()).unwrap();
         let head = format!("# hla-wgs {}: candidates for new alleles, one line per difference from the nearest database allele\n\
 # pos counts from the first base of that allele's genomic sequence, cds_pos and the codon number from the start codon\n\
 # a proposal from short reads is not a confirmed allele: before a submission to IPD-IMGT/HLA the sequence normally has to be\n\
 # confirmed independently (for example by long reads or Sanger sequencing of the separated allele); see the database's current guidelines\n\
 gene\tslot\trecord\tnearest_allele\tpos\tchange\tregion\tcds_pos\teffect\treads\tdepth\tassignment\tin_sequence\tstatus\n", env!("CARGO_PKG_VERSION"));
-        std::fs::write(format!("{prefix}.novel.tsv"), head + &sheet).unwrap();
+        crate::vfs::write(&format!("{prefix}.novel.tsv"), (head + &sheet).as_bytes()).unwrap();
     }
 }
 

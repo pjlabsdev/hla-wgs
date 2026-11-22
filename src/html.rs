@@ -565,7 +565,7 @@ pub fn render(rep: &Value, sample: &str) -> String {
 fn render_one(rep: &Value, sample: &str, de: bool) -> String {
     let t = |d: &'static str, e: &'static str| if de { d } else { e };
     let version = rep["version"].as_str().unwrap_or("");
-    let now = rep["analysis_time"].as_u64().unwrap_or_else(|| std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0));
+    let now = rep["analysis_time"].as_u64().unwrap_or_else(crate::vfs::unix_time);
     let (y, m, d) = date(now);
     let day = if de { format!("{d:02}.{m:02}.{y}") } else { format!("{y}-{m:02}-{d:02}") };
     let empty = vec![];

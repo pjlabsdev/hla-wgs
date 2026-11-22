@@ -266,7 +266,7 @@ impl Index {
         let k = self.opts.k;
         let ns = self.seqs.len();
         let mut out = vec![];
-        let mut tm = if *STAT_ON { Some(std::time::Instant::now()) } else { None };
+        let mut tm = if *STAT_ON { Some(crate::vfs::Instant::now()) } else { None };
         let rc = revcomp(q);
         // k-mer hits per strand: (query end, start in pos, count)
         let mut hl: [Vec<(u32, u32, u32)>; 2] = [vec![], vec![]];
@@ -474,7 +474,7 @@ impl Index {
     /// all alignments of the query, best score first; the first is marked primary
     pub fn map(&self, q: &[u8]) -> Vec<Hit> {
         let q = q.to_ascii_uppercase();
-        let t = if *STAT_ON { Some(std::time::Instant::now()) } else { None };
+        let t = if *STAT_ON { Some(crate::vfs::Instant::now()) } else { None };
         let mut ch = self.chains(&q, self.opts.win);
         // minimizers find a read that matches a sequence almost exactly; a read whose best chain covers
         // less than `full` of it (variants, a new allele, a gene boundary) is seeded again with every k-mer
@@ -789,7 +789,7 @@ fn local_band_ad_impl(q: &[u8], r: &[u8], dlo: i64, dhi: i64, sc: &Score) -> (i3
 
 /// `local`, restricted to the stretches of r around the two diagonals with the most shared 11-mers
 pub fn local_seeded(q: &[u8], r: &[u8], sc: &Score) -> (i32, usize, usize, usize, usize) {
-    let t = if *STAT_ON { Some(std::time::Instant::now()) } else { None };
+    let t = if *STAT_ON { Some(crate::vfs::Instant::now()) } else { None };
     let x = local_seeded_in(q, r, sc);
     if let Some(t) = t {
         RESCUE[0].fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -1126,9 +1126,9 @@ static STAT: [[std::sync::atomic::AtomicU64; 4]; 3] = [const { [const { std::syn
 static CHAIN_NS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 /// time in chains(): seeding, candidate counting, anchor collection and sorting, chaining (ns)
 static PART_NS: [std::sync::atomic::AtomicU64; 4] = [const { std::sync::atomic::AtomicU64::new(0) }; 4];
-fn part(k: usize, t: &mut Option<std::time::Instant>) {
+fn part(k: usize, t: &mut Option<crate::vfs::Instant>) {
     if let Some(t0) = t {
-        let now = std::time::Instant::now();
+        let now = crate::vfs::Instant::now();
         PART_NS[k].fetch_add((now - *t0).as_nanos() as u64, std::sync::atomic::Ordering::Relaxed);
         *t0 = now;
     }
@@ -1255,7 +1255,7 @@ fn dp_raw(q: &[u8], r: &[u8], sc: &Score, ext: bool) -> DpOut {
         }
     }
     if *STAT_ON {
-        let t = std::time::Instant::now();
+        let t = crate::vfs::Instant::now();
         let r = SCRATCH.with(|c| {
             let mut c = c.borrow_mut();
             let Scratch { hp, hc, f1, f2, tb, lo_v, off } = &mut *c;

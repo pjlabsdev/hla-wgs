@@ -128,10 +128,11 @@ fn parse(text: &str) -> AHashMap<String, String> {
 impl Groups {
     /// `dir`: directory of the database; missing files give an empty table
     pub fn load(dir: &std::path::Path) -> Groups {
-        let rd = |n: &str| std::fs::read_to_string(dir.join(n)).ok().map(|t| parse(&t));
+        let path = |n: &str| dir.join(n).to_string_lossy().into_owned();
+        let rd = |n: &str| crate::vfs::read_to_string(&path(n)).ok().map(|t| parse(&t));
         let (g, p) = (rd("hla_nom_g.txt"), rd("hla_nom_p.txt"));
         let loaded = g.is_some() || p.is_some();
-        let ser = match (std::fs::read_to_string(dir.join("rel_dna_ser.txt")), std::fs::read_to_string(dir.join("rel_ser_ser.txt"))) {
+        let ser = match (crate::vfs::read_to_string(&path("rel_dna_ser.txt")), crate::vfs::read_to_string(&path("rel_ser_ser.txt"))) {
             (Ok(d), Ok(s)) => Serology::parse(&d, &s),
             _ => Serology::default(),
         };

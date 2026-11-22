@@ -2,7 +2,7 @@ use flate2::read::MultiGzDecoder;
 use std::io::{BufRead, BufReader};
 
 pub fn open_reader(p: &str) -> Box<dyn BufRead> {
-    let f = std::fs::File::open(p).unwrap_or_else(|e| panic!("{p}: {e}"));
+    let f = crate::vfs::open(p).unwrap_or_else(|e| panic!("{p}: {e}"));
     if p.ends_with(".gz") {
         Box::new(BufReader::with_capacity(1 << 20, MultiGzDecoder::new(f)))
     } else {
@@ -12,8 +12,23 @@ pub fn open_reader(p: &str) -> Box<dyn BufRead> {
 
 /// end the run with a plain message (no panic trace) and exit code 1
 pub fn die(msg: &str) -> ! {
-    eprintln!("error: {msg}");
-    std::process::exit(1)
+    // the browser build has no process to end: the page shows the message of the panic
+    #[cfg(target_arch = "wasm32")]
+    panic!("error: {msg}");
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        eprintln!("error: {msg}");
+        std::process::exit(1)
+    }
+}
+
+/// pause before a retry after an I/O error; the browser build has no sleep (and its files are
+/// local, so a retry would not help there anyway)
+pub fn pause(secs: u64) {
+    #[cfg(not(target_arch = "wasm32"))]
+    std::thread::sleep(std::time::Duration::from_secs(secs));
+    #[cfg(target_arch = "wasm32")]
+    let _ = secs;
 }
 
 /// errors that a pause cannot cure: the content itself is wrong
@@ -34,6 +49,9 @@ pub struct Fq {
 
 /// how often an I/O error on the input is retried (env HLA_IO_RETRIES, default 6)
 pub fn io_retries() -> u32 {
+    if cfg!(target_arch = "wasm32") {
+        return 0;
+    }
     std::env::var("HLA_IO_RETRIES").ok().and_then(|v| v.parse().ok()).unwrap_or(6)
 }
 
@@ -94,7 +112,7 @@ pub fn read_fq_res(r: &mut dyn BufRead, n: usize) -> std::io::Result<Vec<Fq>> {
 
 /// open_reader that reports a missing or unreadable file instead of aborting
 pub fn try_open_reader(p: &str) -> std::io::Result<Box<dyn BufRead>> {
-    let f = std::fs::File::open(p)?;
+    let f = crate::vfs::open(p)?;
     Ok(if p.ends_with(".gz") {
         Box::new(BufReader::with_capacity(1 << 20, MultiGzDecoder::new(f)))
     } else {
@@ -163,7 +181,7 @@ impl PairedFq {
                     }
                     let wait = backoff(attempt);
                     eprintln!("[input] {}: I/O error after {} pairs: {e}; retry {attempt}/{tries} in {wait}s", self.paths[0], self.done);
-                    std::thread::sleep(std::time::Duration::from_secs(wait));
+                    pause(wait);
                 }
             }
         }
