@@ -1,16 +1,19 @@
 # Validation
 
-All data are public. Scripts are the ones that were run; they expect a working directory
-(`HLA_WORK`, default: current directory) with `hla-wgs` on `PATH`, samtools, minimap2 with the
-`mappy` Python module, and a reference built with `hla-wgs build-db` / `build-mask` in `bdtest/`.
+All data are public. The evaluation is the Rust program `hla-wgs-validate` (`src/bin/hla-wgs-validate/`,
+built with `cargo build --release` next to `hla-wgs`; `hla-wgs-validate` alone lists the commands).
+It and the shell scripts expect a working directory (`HLA_WORK`, default: current directory) with
+`hla-wgs` and `hla-wgs-validate` on `PATH`, samtools, and a reference built with `hla-wgs build-db` /
+`build-mask` in `bdtest/`. No Python is needed; the commands were checked to give byte-identical
+output to the Python scripts they replace.
 The 1000 Genomes CRAMs are read remotely; only the MHC region, ALT/HLA contigs and unmapped reads
 are fetched.
 
 | folder | content |
 |---|---|
-| `hprc/` | truth from HPRC release 2 haplotype assemblies: `fetch_r2.sh` (assemblies, MHC contigs), `truth_exonx.py`, `truth_exony.py`, `truth_tablex.py`, `truth_tabley.py`, `truth4.py` (nearest full-gene allele and differences per haplotype), `extract_sr.sh` (reads from the 1000 Genomes 30x CRAM), `eval6.py` (exact four-field evaluation; its table is stored as `results/*/eval6.tsv`), `eval23.py` (two- and three-field agreement), `run_t1k.sh` (T1K with the same reads) |
-| `giab/` | GIAB trios HG002/3/4 and HG005/6/7: `run23.sh`, `trio23.py` (Mendelian consistency) |
-| `lab/` | 1000 Genomes laboratory typing (Gourraud et al. 2014; Abi-Rached et al. 2018): `run24.sh`, `eval24.py`. The frequency prior was counted from the same laboratory data, so the samples are split in two folds (`folds.tsv`) and each sample is typed with the prior of the other fold |
+| `hprc/` | truth from HPRC release 2 haplotype assemblies: `fetch_r2.sh` (assemblies, MHC contigs), `hla-wgs-validate truth-exon x|y` and `truth-table x|y` (exon truth), `truth4` (nearest full-gene allele and differences per haplotype), `extract_sr.sh` (reads from the 1000 Genomes 30x CRAM), `hla-wgs-validate eval6` (exact four-field evaluation; its table is stored as `results/*/eval6.tsv`), `eval23` (two- and three-field agreement), `run_t1k.sh` (T1K with the same reads) |
+| `giab/` | GIAB trios HG002/3/4 and HG005/6/7: `run23.sh`, `hla-wgs-validate trio23` (Mendelian consistency) |
+| `lab/` | 1000 Genomes laboratory typing (Gourraud et al. 2014; Abi-Rached et al. 2018): `run24.sh`, `hla-wgs-validate eval24`. The frequency prior was counted from the same laboratory data, so the samples are split in two folds (`folds.tsv`) and each sample is typed with the prior of the other fold |
 | `results/dev80/` | `truth4.tsv` and `truth4diff.tsv`: truth for the 80 HPRC samples used during development |
 | `results/check30/` | the same for 30 further samples (`hprc/samples_check30.txt`, run with `hprc/ho4.sh`) that were not used for the four-field rules; they had been the first held-out round of the two-field typer |
 | `results/check30_v1.1/` | the same 30 samples typed again with the 1.1 development version, with a comparison to 1.0.0 |
@@ -32,6 +35,6 @@ single truth entries such as a null allele whose own sequence is identical to th
 
 ## Reading the four-field table
 
-`eval6.py` prints per gene: haplotypes, exact calls, known alleles and how many of them were called
+`hla-wgs-validate eval6` prints per gene: haplotypes, exact calls, known alleles and how many of them were called
 exactly, new alleles, alleles reported as certain at four fields (`safe4`) and how many of those are
 exact, and how many reported new sites are true.

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>{title}</title>
+<style>{style(fonts)}</style></head><body>
+
+<div class="mast"><div>{LOGO}</div><div class="kind">Software report · preprint<br>Version {esc(version)} · {esc(date)}</div></div>
+
+<h1>{title}</h1>
+<div class="meta"><strong>Peter Jungwirth, MSc</strong> · PJ Labs, Austria</div>
+<div class="small">Software: https://github.com/pjlabsdev/hla-wgs · DOI: <span id="doi">{esc(doi)}</span> · Licence: MIT</div>
+
+<div class="top">
+<div class="summary">
+<p><strong>Summary.</strong> HLA alleles are named with up to four fields, and typing programs for whole-genome sequencing (WGS) usually print all four. Whether the fourth field is right is rarely known, because laboratory reference typing ends at two fields and because many individuals carry alleles that are absent from the IPD-IMGT/HLA database at full gene length. <i>hla-wgs</i> is a single Rust program that types 18 HLA genes from short-read WGS and reports, for every allele, the best database name, the number of fields that the reads support, and the positions at which the reads differ from that name. On {n_ho} held-out 1000 Genomes samples with assembly-based truth it made {h2['hla-wgs'][1] - h2['hla-wgs'][0]} two-field errors in {h2['hla-wgs'][1]:,} alleles (T1K: {h2['T1K'][1] - h2['T1K'][0]}) and determined the DRB3/4/5 copy number in {hc['hla-wgs'][0]} of {hc['hla-wgs'][1]} cases (T1K: {hc['T1K'][0]}). In 80 haplotype-resolved genomes, {pct(a6['new'], a6['n'])} of all gene copies carried a new allele; {a6['safe4_exact']:,} of {a6['safe4']:,} alleles that hla-wgs reported as certain at four fields were identical to the assembled gene sequence ({pct(a6['safe4_exact'], a6['safe4'])}).{unseen_sum}</p>
+<p><strong>Availability.</strong> Source code, validation scripts and result tables are available under the MIT licence at https://github.com/pjlabsdev/hla-wgs. The reference is built locally from the IPD-IMGT/HLA release; no database sequences are distributed.</p>
+</div>
+<div class="highlights"><h2>Highlights</h2><ul>
+<li>One program, no external aligner at run time; 18 genes including DRA, E, F, G, H, K and V from FASTQ, BAM or CRAM.</li>
+<li>Every allele comes with the number of fields that the reads support and with the sites that contradict the database name.</li>
+<li>{h2['hla-wgs'][0]:,} of {h2['hla-wgs'][1]:,} held-out alleles correct at two fields; DRB3/4/5 copy number correct in {hc['hla-wgs'][0]} of {hc['hla-wgs'][1]} cases.</li>
+<li>{pct(a6['new'], a6['n'])} of gene copies in 80 assembled genomes are new alleles, which no four-field name can describe.</li>
+<li>{pct(a6['safe4_exact'], a6['safe4'])} of the alleles reported as certain at four fields were exact.</li>
+{unseen_hl}
+<li>Research use only.</li>
+</ul></div>
+</div>
+
+<div class="ruo"><strong>Research use only.</strong> hla-wgs is not a medical device and has not been clinically validated. Its output must not be used for transplantation, pharmacogenetic or any other medical decision without confirmation by an accredited HLA laboratory.</div>
+
+<figure><div class="frame">{fig_workflow()}</div>
+<figcaption><strong>Figure 1. Method.</strong> Reads are assigned to genes on a panel of representative full-length allele sequences, candidates are selected by a k-mer likelihood and compared on an edit-distance matrix. The reads are then realigned to the two called alleles; consistent differences and stretches without reads limit the number of fields that is reported as certain.</figcaption></figure>
+
+<div class="cols">
+<h2>Introduction</h2>
+<p>The HLA genes in the major histocompatibility complex on chromosome 6 are the most polymorphic genes of the human genome. Their alleles determine transplant compatibility, are associated with autoimmune and infectious diseases, and predict severe drug hypersensitivity. Alleles are named with up to four colon-separated fields: the first two describe the protein, the third synonymous changes in the coding sequence, and the fourth changes in introns and untranslated regions [@nomen]. The IPD-IMGT/HLA database collects the known alleles [@imgt].</p>
+<p>WGS covers the full length of every HLA gene, and several programs derive HLA types from short reads, among them OptiType [@optitype], HLA-HD [@hlahd], xHLA [@xhla], Kourami [@kourami], HLA*LA [@hlala] and T1K [@t1k]. They are generally evaluated at two fields against laboratory typing, because that is the resolution of the available reference data [@gourraud, @abirached]. Their output nevertheless often carries three or four fields. A user cannot tell whether the additional fields are supported by the data, are the first of several equally good database entries, or describe the nearest known relative of an allele that is not in the database.</p>
+<p>Haplotype-resolved assemblies from the Human Pangenome Reference Consortium (HPRC) [@hprc] now provide the complete sequence of both copies of each HLA gene for samples that also have 30× short-read WGS from the 1000 Genomes Project [@kgp]. This allows two things that were not possible before: measuring four-field accuracy, and counting how often an individual carries an allele that the database does not contain.</p>
+<p><i>hla-wgs</i> was written with that reference in mind. Its aim is not only a correct two-field type but an explicit statement, per allele, of how far the name can be trusted.</p>
+
+<h2>Results</h2>
+<h3>Design</h3>
+<p>hla-wgs is one Rust program without run-time dependencies (Figure 1). It reads paired FASTQ files or a coordinate-sorted BAM or CRAM file on GRCh38 or GRCh37; from alignments it takes the MHC region, the ALT and HLA contigs and the unmapped reads. It types HLA-A, -B, -C, -DRB1, -DRB3, -DRB4, -DRB5, -DQA1, -DQB1, -DPA1, -DPB1, -DRA, -E, -F, -G and the pseudogenes HLA-H, -K and -V. For DRB3, DRB4, DRB5, H and K, which are absent from many haplotypes, it estimates the copy number.</p>
+<p>For each allele the output gives the best database allele, a <i>safe call</i> cut to the number of fields that the reads support (<i>resolution</i>, 1 to 4), the margin to the best competing allele at fields two, three and four, and a list of <i>new sites</i>: positions at which the reads consistently differ from the called allele, or stretches that no read covers. If the called allele together with its new sites equals another database allele, the call is renamed to that allele. Output is written as two tables and as JSON.</p>
+
+<h3>Two-field accuracy and copy number on held-out samples</h3>
+<p>Development followed a frozen-version protocol: each version was fixed before the next batch of samples was downloaded, and {n_ho} 1000 Genomes samples with HPRC release 2 assemblies were evaluated in four such rounds. T1K 1.0.10 [@t1k] was run on the same reads with the same IPD-IMGT/HLA release. For the eight classical genes with two copies, hla-wgs called {h2['hla-wgs'][0]:,} of {h2['hla-wgs'][1]:,} alleles correctly at two fields ({pct(*h2['hla-wgs'])}) and T1K {h2['T1K'][0]:,} ({pct(*h2['T1K'])}). The copy number of DRB3, DRB4 and DRB5 (0, 1 or 2) was correct in {hc['hla-wgs'][0]} of {hc['hla-wgs'][1]} cases with hla-wgs and in {hc['T1K'][0]} with T1K, counted from the alleles it reports (Figure 2). The advantage was present in all five continental groups.</p>
+<figure><div class="frame">{fig_heldout(d)}</div>
+<figcaption><strong>Figure 2. Held-out comparison with T1K.</strong> (A) Number of wrong two-field calls per gene in the 150 samples of rounds 1 to 3. (B) Share of correct DRB3/4/5 copy numbers by continental group. Truth: alleles of both assembled haplotypes.</figcaption></figure>
+<p>These rounds were run with the prototype of the algorithm (a Python driver around the Rust kernel). The released program is a port of that algorithm; on the 80 samples of the next section its two-field agreement was {a23['ok2']:,} of {a23['n']:,}.</p>
+
+<h3>Many individuals carry alleles that are not in the database</h3>
+<p>For 80 HPRC samples the sequence of every HLA gene was cut from both assembled haplotypes and compared with all database alleles of that gene at full genomic length. Of {a6['n']:,} gene copies, {a6['known']:,} were identical to a database allele and {a6['new']} ({pct(a6['new'], a6['n'])}) were not. New alleles were frequent in DRB1 ({d.dev6['DRB1']['new']} of {d.dev6['DRB1']['n']}), in DRB3 and DRB4, and in the pseudogenes K and V, and rare in the class I genes A and C ({d.dev6['A']['new']} and {d.dev6['C']['new']} of 160). {d.one} of them differ from the nearest database allele at a single position and {d.many} at ten or more; the latter are concentrated in K and V. For such a gene copy the first fields of the nearest allele usually remain meaningful, while a correct fourth field does not exist.</p>
+
+<h3>Four-field statements</h3>
+<p>On these 80 samples, hla-wgs agreed with the assembly at two fields for {a23['ok2']:,} and at three fields for {a23['ok3']:,} of {a23['n']:,} haplotypes. Of the {a6['known']:,} known alleles, {a6['known_ok']:,} were called exactly at four fields ({pct(a6['known_ok'], a6['known'])}). The program reported {a6['safe4']:,} alleles as certain at four fields; {a6['safe4_exact']:,} of them were identical to the assembled sequence ({pct(a6['safe4_exact'], a6['safe4'])}; Figure 3, Table 2). Of the {a6['safe4'] - a6['safe4_exact']} that were not, {ix['homopolymer_or_str_only']} differed only in the length of a homopolymer or short tandem repeat, {ix['b_3prime_phase']} were phase swaps near the 3′ end of HLA-B, where the distinguishing variant lies further from the next heterozygous position than a read pair reaches, and {ix['other']} were single missed variants in other genes. Of {a6['site_snv']:,} single-nucleotide differences between new alleles and their nearest database allele, {a6['site_snv_found']:,} were reported as new sites ({pct(a6['site_snv_found'], a6['site_snv'])}), and {a6['site_det_true']:,} of {a6['site_det']:,} reported sites were true ({pct(a6['site_det_true'], a6['site_det'])}).</p>
+<figure><div class="frame">{FIG3}</div>
+<figcaption><strong>Figure 3. What is reported as certain.</strong> Each bar is the set of assembled gene copies of one gene. Dark green: reported as certain at four fields and identical to the assembly. Red: reported as certain but not identical. Light green: identical, but reported with fewer certain fields. Grey: new or different allele, reported with fewer certain fields. Numbers: exact / certain of all copies.</figcaption></figure>
+<table class="wide"><caption><strong>Table 2.</strong> 80 HPRC samples against the alleles of both assembled haplotypes. Two and three fields: the call shares these fields with a nearest database allele of its haplotype. Known alleles exact: haplotypes identical to a database allele that were called with all four fields right.</caption>
+<tr><th>Gene</th><th>Haplotypes</th><th>Two fields</th><th>Three fields</th><th>Known alleles exact</th><th>New alleles</th><th>Certain at four fields</th><th>of these exact</th></tr>
+{gene_table(d.dev6, d.dev23)}</table>
+<p>For HLA-E the resolution is capped at three fields, because its fourth-field differences lie in repeats of the untranslated regions and were miscalled with large margins during development. For DRB3 and DRB4 no four-field statement was made in these samples; the new-allele examination found unsupported positions or uncovered stretches in every case. The copy numbers of DRB3, DRB4, DRB5, H and K agreed with the assemblies in all 80 samples.</p>
+{unseen}
+<h3>Laboratory typing and family trios</h3>
+<p>Forty-five further 1000 Genomes samples with laboratory typing of HLA-A, -B, -C, -DRB1 and -DQB1 [@gourraud, @abirached] were typed with a frequency prior that excluded them. {lab['agree']} of {lab['total']} alleles agreed at two fields. Of the {lab['total'] - lab['agree']} differences, {ld['method_resolution']} involve allele pairs that the laboratory method does not separate because they differ outside the typed exons, {ld['probable_lab_error']} are B*27:05 calls against a laboratory B*27:03 in European samples, where B*27:05 is the common allele and the laboratory result is the probable error, and {ld['open']} remain unexplained.</p>
+<p>In the Genome in a Bottle trios [@giabdata] (Ashkenazi: HG002, HG003, HG004 at 60×; Han Chinese: HG005, HG006, HG007 at 100×) the child's alleles were consistent with Mendelian inheritance at two and three fields in every gene that is present ({tr['ashkenazi']['consistent_3']} of {tr['ashkenazi']['genes_present']} and {tr['han']['consistent_3']} of {tr['han']['genes_present']}). At four fields {tr['ashkenazi']['genes_present'] - tr['ashkenazi']['consistent_4']} and {tr['han']['genes_present'] - tr['han']['consistent_4']} genes were inconsistent; in each of them at least one call was not reported as certain. All genes in which every call of the three family members was certain at four fields were consistent ({tr['ashkenazi']['all_safe_consistent']} of {tr['ashkenazi']['all_safe_genes']} and {tr['han']['all_safe_consistent']} of {tr['han']['all_safe_genes']}).</p>
+
+<h3>Run time</h3>
+<p>On four cores and the MHC and unmapped reads of a 30× genome, the prototype needed {tm['prototype_v16']['wall_s']} s and {tm['prototype_v16']['peak_gb']} GB, T1K {tm['T1K_1.0.10']['wall_s']} s and {tm['T1K_1.0.10']['peak_gb']} GB.{rel_txt} Building the reference from the database release takes about four minutes and the repeat mask about one minute, once.</p>
+
+<h2>Discussion</h2>
+<p>Two results stand out. First, a typer built around full-length alleles and an explicit copy-number model for the DRB paralogues makes fewer two-field errors than a current general-purpose tool and almost never misjudges whether DRB3, DRB4 or DRB5 is present. Second, a substantial share of gene copies carry alleles outside the database. For these, a four-field name is necessarily wrong, however accurate the typer. A program that always prints four fields therefore gives a wrong fourth field for about one in six gene copies, and gives no indication which ones.</p>
+<p>hla-wgs addresses this by separating the name from its certainty. The price is that it declines to state four fields for {pct(a6['known'] - a6['safe4_exact'], a6['known'])} of the alleles that are in fact in the database and could have been named. In return, a four-field statement that is made was correct in {pct(a6['safe4_exact'], a6['safe4'])} of cases. For applications that rely on the non-coding sequence, such as expression studies or fine-mapping, the list of new sites is more informative than a name.</p>
+<p>The remaining errors have identifiable causes. Homopolymer and repeat lengths are at the limit of short-read accuracy. Variants at the far 3′ end of a gene cannot be assigned to a haplotype when no heterozygous position lies within reach of a read pair; this is a property of the data, and the program marks such sites as belonging to either allele where it recognises the situation.</p>
+
+<h2>Limitations of the study</h2>
+<ul>
+<li>Short-read WGS only (2×100 to 2×150 bp, validated at 30× and above). Exome, amplicon, RNA and long-read data are not supported.</li>
+<li>Assembly-based truth exists for individuals of the HPRC. It is itself not error-free, and its definition favours shorter database entries when two alleles are equally near.</li>
+{unseen_lim}
+<li>The held-out comparison with T1K was run with the prototype of the algorithm; T1K was run with default settings and may perform better with tuned parameters. T1K also types KIR genes and RNA-seq data, which hla-wgs does not.</li>
+<li>Laboratory reference typing covers five genes at two fields. For DRA, E, F, G, H, K and V the only reference is the assemblies.</li>
+<li>Four-field statements reported as certain were not always exact; homopolymer lengths and the 3′ end of HLA-B are known weak points.</li>
+<li>The repeat mask assumes GRCh38. The program has not been validated for clinical use.</li>
+</ul>
+
+<h2>Methods</h2>
+<h3>Reference</h3>
+<p><code>hla-wgs build-db</code> reads the IPD-IMGT/HLA <code>hla.dat</code> file (release 3.66 in this report) and writes the allele sequences with exon coordinates, and a panel of representative full-length allele sequences. Alleles without a full genomic sequence are extended with the sequence of their nearest full-length relative. <code>hla-wgs build-mask</code> counts 21-mers of the panel in the genome outside the MHC and masks panel stretches that occur there three times or more.</p>
+<h3>Typing</h3>
+<p>Reads are mapped to the panel with the minimap2 library [@minimap2]; reads anchored only in masked sequence are dropped. Per gene, alleles are scored by a k-mer likelihood, and an expectation-maximisation step selects candidates. All reads of the gene are aligned to all candidates, and pairs of candidates are compared on the resulting edit-distance matrix; a refinement step re-examines the exons. A weak prior from two-field allele frequencies of the 1000 Genomes laboratory typing separates otherwise equal candidates of five genes. DRB1, DRB3, DRB4 and DRB5 are modelled jointly by depth relative to the two-copy genes, as are H and K.</p>
+<h3>Certainty</h3>
+<p>For fields two, three and four the margin is the log-likelihood difference to the best pair that differs at that field. A field is supported when its margin is at least 6 (fields two and three) or 4 (field four). The reads are then realigned to the two called alleles. A position becomes a new site when at least five reads and a clear majority of the reads assigned to that allele carry the same difference; long insertions and deletions count as one event. A stretch of 30 bp or more without any read is reported as blind when such stretches sum to 300 bp or more. A new site in an exon reduces the resolution to one field, any other site to three.</p>
+<h3>Truth and evaluation</h3>
+<p>Assemblies of HPRC release 2 were downloaded, contigs with HLA sequence extracted, and each gene located by alignment of the database alleles. The truth for a haplotype is the nearest database allele at full genomic length together with the list of differences. Reads were taken from the 1000 Genomes 30× CRAM files (MHC region, ALT and HLA contigs, unmapped reads). A four-field call counts as exact only if the assembled sequence is identical to the called allele. All scripts are in the repository under <code>validation/</code>.</p>
+
+<h2>Resource availability</h2>
+<p><strong>Repository:</strong> https://github.com/pjlabsdev/hla-wgs · <strong>Archived version:</strong> DOI {esc(doi)} · <strong>Operating systems:</strong> Linux, macOS · <strong>Requirements:</strong> Rust 1.85 or newer, a C compiler; IPD-IMGT/HLA <code>hla.dat</code> and a GRCh38 FASTA to build the reference · <strong>Licence:</strong> MIT. The IPD-IMGT/HLA database is distributed by its owners under CC BY-ND and is not included.</p>
+<pre>hla-wgs build-db hla.dat data/freq_1000g_2field.json hladb
+hla-wgs build-mask hladb GRCh38.fa
+hla-wgs hladb sample.cram out/sample 4 GRCh38.fa</pre>
+
+<h2>Acknowledgements</h2>
+<p>This work used the IPD-IMGT/HLA database, assemblies of the Human Pangenome Reference Consortium, sequencing data of the 1000 Genomes Project (New York Genome Center) and of the Genome in a Bottle Consortium, and the published HLA typing of 1000 Genomes samples.</p>
+<h2>Declaration of interests</h2>
+<p>None declared.</p>
+
+<h2>References</h2>
+{REFS}
+</div>
+</body></html>

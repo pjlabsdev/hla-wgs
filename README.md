@@ -182,7 +182,7 @@ serological antigens (the start file fetches all four).
 `hla-wgs html PREFIX.json` writes the result page again from the JSON, for example after an update.
 
 `data/freq_1000g_2field.json` holds two-field allele frequencies of A, B, C, DRB1 and DQB1 counted
-from the public 1000 Genomes laboratory typing (`data/build_freq.py`). They serve as a weak prior
+from the public 1000 Genomes laboratory typing (`hla-wgs-validate build-freq`). They serve as a weak prior
 between otherwise equal candidates.
 
 ## Run

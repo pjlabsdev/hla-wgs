@@ -1,0 +1,8 @@
+
+<h3>Samples not used for the certainty rules</h3>
+<p>The certainty rules were developed on the 80 samples above. To test them, {n_un} further HPRC release 2 samples were typed once with the released version 1.0.0. These samples had formed the first held-out round of the two-field typer and were available during its later development, but they were never looked at while the new-allele examination and the certainty rules were written. Two-field agreement was {u23['ok2']} of {u23['n']} and three-field agreement {u23['ok3']} of {u23['n']} haplotypes. Of {u6['known']} known alleles, {u6['known_ok']} were called exactly ({pct(u6['known_ok'], u6['known'])}); {u6['new']} of {u6['n']} haplotypes ({pct(u6['new'], u6['n'])}) carried a new allele. {u6['safe4']} alleles were reported as certain at four fields, and {u6['safe4_exact']} of them were exact ({pct(u6['safe4_exact'], u6['safe4'])}; Figure 4, Table 3). Of the {u6['safe4'] - u6['safe4_exact']} that were not, {s['check30']['inexact_safe4']['homopolymer_or_str_only']} differed only in a homopolymer or short tandem repeat length. The rate is slightly below that of the development samples, as expected for rules tuned on those.</p>
+<figure><div class="frame">{FIG4UN}</div>
+<figcaption><strong>Figure 4. Samples not used for the certainty rules.</strong> As Figure 3.</figcaption></figure>
+<table class="wide"><caption><strong>Table 3.</strong> Thirty samples not used for the certainty rules, columns as in Table 2.</caption>
+<tr><th>Gene</th><th>Haplotypes</th><th>Two fields</th><th>Three fields</th><th>Known alleles exact</th><th>New alleles</th><th>Certain at four fields</th><th>of these exact</th></tr>
+{gene_table(d.un6, d.un23)}</table>
