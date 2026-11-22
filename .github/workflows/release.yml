@@ -81,4 +81,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" "${{ matrix.zip }}" --clobber --repo "${{ github.repository }}"
+        run: |
+          gh release upload "$TAG" "${{ matrix.zip }}" --clobber --repo "${{ github.repository }}"
+          # the terminal installer once per release
+          if [ "${{ runner.os }}" = Linux ]; then gh release upload "$TAG" start/install.sh --clobber --repo "${{ github.repository }}"; fi

@@ -122,6 +122,16 @@ askpath() {  # $1 de, $2 en, $3 allow empty
   done
 }
 
+# release packages on GitHub; the one for this system
+REPO="pjlabsdev/hla-wgs"
+asset_name() {
+  case "$(uname -s)" in
+    Darwin) echo "hla-wgs-macos.zip" ;;
+    Linux) case "$(uname -m)" in x86_64|amd64) echo "hla-wgs-linux-x86_64.zip" ;; *) echo "" ;; esac ;;
+    *) echo "" ;;
+  esac
+}
+
 # hla-wgs program: next to this file, in the repository build, or in PATH
 BIN=""
 for c in "$HERE/hla-wgs" "$HERE/bin/hla-wgs" "$HERE/../target/release/hla-wgs" "$(command -v hla-wgs 2>/dev/null)"; do
@@ -129,7 +139,9 @@ for c in "$HERE/hla-wgs" "$HERE/bin/hla-wgs" "$HERE/../target/release/hla-wgs" "
 done
 WORKLOG="$(mktemp -t hla-wgs-start.XXXXXX)"
 # a ZIP unpacked after a browser download marks the program as quarantined, and macOS then stops it
-# at once; this file was started on purpose, so the mark is removed from the program only
+# at once; this file was started on purpose, so the mark is removed
+# (the whole folder, so that this file also opens later without the warning)
+command -v xattr >/dev/null 2>&1 && xattr -dr com.apple.quarantine "$HERE" 2>/dev/null
 [ -n "$BIN" ] && command -v xattr >/dev/null 2>&1 && xattr -d com.apple.quarantine "$BIN" 2>/dev/null
 
 # ── header ───────────────────────────────────────────────────────────────────
@@ -139,21 +151,38 @@ printf '\n'
 row 2 "hla-wgs" "$(date '+%d.%m.%Y  %H:%M')" "$ACC" "$MUT"
 printf '  %s%s%s\n' "$MUT" "$(tr_ "HLA-Typisierung aus dem Genom · nur für Forschung (RUO)" "HLA typing from the genome · research use only (RUO)")" "$RST"
 divider
+# no program (for example the "Source code" ZIP of a release): offer the ready package of this system
+fetch_program() {
+  local asset tmp f
+  asset="$(asset_name)"
+  [ -n "$asset" ] && command -v curl >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1 || return 1
+  printf '  %s%s%s\n' "$MUT" "$(tr_ "Das fertige Programm für dieses System kann von GitHub geladen werden ($asset, etwa 3 MB)." "The ready program for this system can be downloaded from GitHub ($asset, about 3 MB).")" "$RST"
+  ask "Jetzt herunterladen? [J/n]" "Download it now? [Y/n]"
+  local yn; IFS= read -r yn || return 1
+  case "$yn" in [nN]*) return 1 ;; esac
+  tmp="$(mktemp -d -t hla-wgs-fetch.XXXXXX)"
+  printf '\n'
+  download "https://github.com/$REPO/releases/latest/download/$asset" "$tmp/$asset" || { result fail "Download" "$asset" "$(secs "$T0")"; rm -rf "$tmp"; return 1; }
+  result ok "Download" "$asset" "$(secs "$T0")"
+  unzip -o -q "$tmp/$asset" -d "$tmp/x" 2>/dev/null
+  f="$(find "$tmp/x" -maxdepth 2 -type f -name hla-wgs | head -1)"
+  if [ -z "$f" ] || ! cp "$f" "$HERE/hla-wgs"; then result fail "$(tr_ "Entpacken" "Unpacking")" "" ""; rm -rf "$tmp"; return 1; fi
+  rm -rf "$tmp"
+  chmod +x "$HERE/hla-wgs"
+  command -v xattr >/dev/null 2>&1 && xattr -d com.apple.quarantine "$HERE/hla-wgs" 2>/dev/null
+  BIN="$HERE/hla-wgs"
+  result ok "$(tr_ "Programm" "Program")" "$("$BIN" --version 2>/dev/null)" ""
+}
 if [ -z "$BIN" ]; then
   printf '\n  %s%s%s\n' "$ERR" "$(tr_ "Das Programm hla-wgs wurde nicht gefunden (neben dieser Datei, in ../target/release oder im PATH)." "The hla-wgs program was not found (next to this file, in ../target/release or in PATH).")" "$RST"
-  finish 1
+  if ! fetch_program; then
+    printf '  %s%s%s\n' "$MUT" "$(tr_ "Das fertige Paket für macOS, Windows und Linux: https://github.com/$REPO/releases/latest (nicht das Quelltext-ZIP). Aus dem Quelltext: cargo build --release" "Ready packages for macOS, Windows and Linux: https://github.com/$REPO/releases/latest (not the source code ZIP). From source: cargo build --release")" "$RST"
+    finish 1
+  fi
 fi
 
 # ── update: on every start ask GitHub for the latest release (5 s at most) and offer it ──
 # HLA_WGS_NO_UPDATE=1 skips the check. The reference in ref/ and the results stay untouched.
-REPO="pjlabsdev/hla-wgs"
-asset_name() {
-  case "$(uname -s)" in
-    Darwin) echo "hla-wgs-macos.zip" ;;
-    Linux) case "$(uname -m)" in x86_64|amd64) echo "hla-wgs-linux-x86_64.zip" ;; *) echo "" ;; esac ;;
-    *) echo "" ;;
-  esac
-}
 vernum() { printf '%s' "$1" | sed -E 's/^v//; s/[-+].*//' | awk -F. '{ printf "%d%04d%04d", $1, $2, $3 }'; }
 # newer LATEST CURRENT: a release is newer than a development build of the same number (1.1.0-dev)
 newer() {

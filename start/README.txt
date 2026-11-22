@@ -8,10 +8,15 @@ medical decision without confirmation by an accredited HLA laboratory.
 
 Start
 -----
-macOS    Double-click hla-wgs-start.command. If macOS refuses to open it the first time, right-click
-         it, choose Open and confirm once.
+macOS    Double-click hla-wgs-start.command. The first time macOS refuses it (the package is not
+         notarized by Apple): open System Settings > Privacy & Security, click "Open Anyway" at
+         the bottom and confirm with your password. Only needed once. (macOS 14 and older:
+         right-click the file, choose Open, confirm.)
 Windows  Double-click hla-wgs-start.bat.
 Linux    In a terminal: ./hla-wgs-start.sh
+
+Without any warning (macOS, Linux), instead of the ZIP: paste this line into Terminal
+  curl -fsSL https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash
 
 Then drag your file (FASTQ R1, BAM or CRAM) into the window, or type its path, and press Enter.
 
@@ -48,10 +53,15 @@ für Transplantation, Pharmakogenetik oder andere medizinische Entscheidungen ve
 
 Start
 -----
-macOS    hla-wgs-start.command doppelklicken. Lehnt macOS das erste Öffnen ab: Rechtsklick,
-         Öffnen wählen und einmal bestätigen.
+macOS    hla-wgs-start.command doppelklicken. Beim ersten Mal lehnt macOS ab (das Paket ist
+         nicht von Apple notarisiert): Systemeinstellungen > Datenschutz & Sicherheit, ganz unten
+         „Trotzdem öffnen“ klicken und mit dem Passwort bestätigen. Nur einmal nötig.
+         (macOS 14 und älter: Rechtsklick auf die Datei, Öffnen, bestätigen.)
 Windows  hla-wgs-start.bat doppelklicken.
 Linux    Im Terminal: ./hla-wgs-start.sh
+
+Ganz ohne Warnung (macOS, Linux), statt des ZIPs: diese Zeile ins Terminal kopieren
+  curl -fsSL https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash
 
 Dann die Datei (FASTQ R1, BAM oder CRAM) ins Fenster ziehen oder ihren Pfad eingeben und Enter
 drücken.

@@ -92,11 +92,39 @@ Line 'hla-wgs' (Get-Date -Format 'dd.MM.yyyy  HH:mm')
 Write-Host ('  ' + (T 'HLA-Typisierung aus dem Genom · nur für Forschung (RUO)' 'HLA typing from the genome · research use only (RUO)')) -ForegroundColor DarkGray
 Divider
 
+# hla-wgs.exe: next to this file or in the repository build
 $Bin = Join-Path $Here 'hla-wgs.exe'
+$built = Join-Path (Split-Path -Parent $Here) 'target\release\hla-wgs.exe'
+if (-not (Test-Path $Bin) -and (Test-Path $built)) { $Bin = $built }
 if (-not (Test-Path $Bin)) {
+  # no program (for example the "Source code" ZIP of a release): offer the ready Windows package
   Write-Host ''
   Write-Host ('  ' + (T 'Das Programm hla-wgs.exe wurde neben dieser Datei nicht gefunden.' 'The hla-wgs.exe program was not found next to this file.')) -ForegroundColor Red
-  Finish 1
+  Write-Host ('  ' + (T 'Das fertige Programm kann von GitHub geladen werden (hla-wgs-windows-x86_64.zip, etwa 2 MB).' 'The ready program can be downloaded from GitHub (hla-wgs-windows-x86_64.zip, about 2 MB).')) -ForegroundColor DarkGray
+  $yn = Ask 'Jetzt herunterladen? [J/n]' 'Download it now? [Y/n]'
+  $got = $false
+  if ($yn -notmatch '^[nN]') {
+    $tmp = Join-Path $env:TEMP ('hla-wgs-fetch-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tmp | Out-Null
+    $zip = Join-Path $tmp 'hla-wgs-windows-x86_64.zip'
+    $t0 = Get-Date
+    Write-Host ''
+    if (Download "https://github.com/$Repo/releases/latest/download/hla-wgs-windows-x86_64.zip" $zip) {
+      Ok 'Download' 'hla-wgs-windows-x86_64.zip' (Secs $t0)
+      try {
+        Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $tmp 'x') -Force
+        $exe = Get-ChildItem -Path (Join-Path $tmp 'x') -Recurse -Filter 'hla-wgs.exe' | Select-Object -First 1
+        if ($exe) { Copy-Item -LiteralPath $exe.FullName -Destination $Bin -Force; $got = $true }
+      } catch { }
+    }
+    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+  }
+  if (-not $got) {
+    Write-Host ('  ' + (T "Das fertige Paket: https://github.com/$Repo/releases/latest (nicht das Quelltext-ZIP). Aus dem Quelltext: cargo build --release" "Ready packages: https://github.com/$Repo/releases/latest (not the source code ZIP). From source: cargo build --release")) -ForegroundColor DarkGray
+    Finish 1
+  }
+  Unblock-File -LiteralPath $Bin -ErrorAction SilentlyContinue
+  Ok (T 'Programm' 'Program') ((& $Bin --version) -join ' ') ''
 }
 Unblock-File -LiteralPath $Bin -ErrorAction SilentlyContinue
 $WorkLog = Join-Path $env:TEMP ('hla-wgs-start-' + [Guid]::NewGuid().ToString('N') + '.log')
