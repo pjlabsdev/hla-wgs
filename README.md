@@ -100,8 +100,9 @@ no program; started from there, the start file offers to download the program). 
 window. The first start downloads IPD-IMGT/HLA and builds the reference next to the start file
 (once, a few minutes). At every start it checks for a newer release and offers the update
 (`HLA_WGS_NO_UPDATE=1` switches this off). The start files and the result page speak English, or
-German on a German system (`HLA_WGS_LANG=de|en`). On macOS, if the first start is refused, right-click
-the start file, choose Open and confirm once.
+German on a German system (`HLA_WGS_LANG=de|en`). On macOS the first start is refused because the
+package is not notarized: open System Settings → Privacy & Security, click "Open Anyway" at the
+bottom and confirm with your password (once; on macOS 14 and older right-click → Open also works).
 
 **Deutsch:** Fertige Pakete für macOS, Windows und Linux hängen an jedem Release (Tabelle oben).
 Bitte eines dieser Pakete nehmen, nicht das „Source code“-ZIP, das GitHub an jedes Release hängt
@@ -109,7 +110,8 @@ Bitte eines dieser Pakete nehmen, nicht das „Source code“-ZIP, das GitHub an
 BAM oder CRAM) ins Fenster ziehen. Der erste Start lädt IPD-IMGT/HLA und baut die Referenz neben der
 Startdatei (einmalig, einige Minuten). Bei jedem Start prüft die Startdatei, ob es eine neuere
 Version gibt, und bietet das Update an (`HLA_WGS_NO_UPDATE=1` schaltet das ab). Startdatei und
-Ergebnisseite sind auf einem deutschen System deutsch (`HLA_WGS_LANG=de|en`). Die Anleitung liegt
+Ergebnisseite sind auf einem deutschen System deutsch (`HLA_WGS_LANG=de|en`). Auf dem Mac lehnt macOS den ersten Start ab: Systemeinstellungen → Datenschutz & Sicherheit →
+ganz unten „Trotzdem öffnen“ und einmal mit dem Passwort bestätigen. Die Anleitung liegt
 als `README.txt` auf Englisch und Deutsch im Paket.
 
 ## Build from source
