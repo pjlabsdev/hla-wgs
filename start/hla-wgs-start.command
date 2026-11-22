@@ -139,7 +139,9 @@ for c in "$HERE/hla-wgs" "$HERE/bin/hla-wgs" "$HERE/../target/release/hla-wgs" "
 done
 WORKLOG="$(mktemp -t hla-wgs-start.XXXXXX)"
 # a ZIP unpacked after a browser download marks the program as quarantined, and macOS then stops it
-# at once; this file was started on purpose, so the mark is removed from the program only
+# at once; this file was started on purpose, so the mark is removed
+# (the whole folder, so that this file also opens later without the warning)
+command -v xattr >/dev/null 2>&1 && xattr -dr com.apple.quarantine "$HERE" 2>/dev/null
 [ -n "$BIN" ] && command -v xattr >/dev/null 2>&1 && xattr -d com.apple.quarantine "$BIN" 2>/dev/null
 
 # ── header ───────────────────────────────────────────────────────────────────

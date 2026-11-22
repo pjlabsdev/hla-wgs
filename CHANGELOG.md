@@ -2,6 +2,8 @@
 
 ## 1.1.2 (2026-11-22)
 
+- Installer for macOS and Linux: `curl -fsSL https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash` installs the package of the latest release to `~/hla-wgs` (keeping `ref/` and results) and starts it. Fetched in Terminal, the files carry no quarantine mark, so macOS opens them without the "could not verify" warning.
+- The macOS start file removes the quarantine mark from its whole folder at the first start, so after one approval it opens with a double-click. The instructions name the macOS 15 way of approving it (Privacy & Security, Open Anyway).
 - Start files: when the program is missing next to them (for example after downloading the "Source code" ZIP of a release, which holds no program), they offer to download the ready package for this system from the latest release and continue. Otherwise they name the release page and `cargo build --release`. The Windows start file also finds a build in `..\target\release`.
 
 ## 1.1.1 (2026-11-22)

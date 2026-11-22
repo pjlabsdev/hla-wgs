@@ -95,7 +95,14 @@ Ready-to-run packages are attached to every [release](https://github.com/pjlabsd
 | Windows 10/11, 64 bit | [hla-wgs-windows-x86_64.zip](https://github.com/pjlabsdev/hla-wgs/releases/latest/download/hla-wgs-windows-x86_64.zip) | double-click `hla-wgs-start.bat` |
 | Linux x86_64 (glibc 2.35+) | [hla-wgs-linux-x86_64.zip](https://github.com/pjlabsdev/hla-wgs/releases/latest/download/hla-wgs-linux-x86_64.zip) | `./hla-wgs-start.sh` in a terminal |
 
-Take one of these packages, not the "Source code" ZIP that GitHub adds to every release (it holds
+**macOS and Linux, one line in Terminal** (installs to `~/hla-wgs`, starts at once, and macOS shows no
+warning because nothing was downloaded by the browser):
+
+```bash
+curl -fsSL https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash
+```
+
+Or take one of these packages, not the "Source code" ZIP that GitHub adds to every release (it holds
 no program; started from there, the start file offers to download the program). Unpack the ZIP, start the start file and drag the input file (FASTQ R1, BAM or CRAM) into the
 window. The first start downloads IPD-IMGT/HLA and builds the reference next to the start file
 (once, a few minutes). At every start it checks for a newer release and offers the update
@@ -104,7 +111,9 @@ German on a German system (`HLA_WGS_LANG=de|en`). On macOS the first start is re
 package is not notarized: open System Settings → Privacy & Security, click "Open Anyway" at the
 bottom and confirm with your password (once; on macOS 14 and older right-click → Open also works).
 
-**Deutsch:** Fertige Pakete für macOS, Windows und Linux hängen an jedem Release (Tabelle oben).
+**Deutsch:** Am einfachsten auf macOS und Linux: die Zeile oben ins Terminal kopieren. Sie installiert
+nach `~/hla-wgs`, startet sofort, und macOS zeigt keine Warnung. Sonst: Fertige Pakete für macOS, Windows
+und Linux hängen an jedem Release (Tabelle oben).
 Bitte eines dieser Pakete nehmen, nicht das „Source code“-ZIP, das GitHub an jedes Release hängt
 (es enthält kein Programm; von dort gestartet bietet die Startdatei an, es zu laden). ZIP entpacken, Startdatei doppelklicken (Linux: `./hla-wgs-start.sh`) und die Eingabedatei (FASTQ R1,
 BAM oder CRAM) ins Fenster ziehen. Der erste Start lädt IPD-IMGT/HLA und baut die Referenz neben der

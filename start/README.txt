@@ -15,6 +15,9 @@ macOS    Double-click hla-wgs-start.command. The first time macOS refuses it (th
 Windows  Double-click hla-wgs-start.bat.
 Linux    In a terminal: ./hla-wgs-start.sh
 
+Without any warning (macOS, Linux), instead of the ZIP: paste this line into Terminal
+  curl -fsSL https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash
+
 Then drag your file (FASTQ R1, BAM or CRAM) into the window, or type its path, and press Enter.
 
 The first start sets up the reference in the folder ref/ next to the start file: it downloads the
@@ -56,6 +59,9 @@ macOS    hla-wgs-start.command doppelklicken. Beim ersten Mal lehnt macOS ab (da
          (macOS 14 und älter: Rechtsklick auf die Datei, Öffnen, bestätigen.)
 Windows  hla-wgs-start.bat doppelklicken.
 Linux    Im Terminal: ./hla-wgs-start.sh
+
+Ganz ohne Warnung (macOS, Linux), statt des ZIPs: diese Zeile ins Terminal kopieren
+  curl -fsSL https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash
 
 Dann die Datei (FASTQ R1, BAM oder CRAM) ins Fenster ziehen oder ihren Pfad eingeben und Enter
 drücken.
