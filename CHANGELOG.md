@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Faster, same results: the flanks that shorter candidate alleles borrow from longer ones are computed in parallel and kept in `pad_cache.tsv.gz` next to the reference, so from the second run on a reference these alignments are not repeated (HG00438 on one core: 74 s first run, 55 s later runs). Genes with the most reads are typed first, so that a slow gene does not end a run alone. Eight HPRC samples with 4 threads: 133 s instead of 179 s. Output on the 80 validation samples is byte-identical, except that two new sites at the same position are now always listed in the same order (before it could change between runs).
+- `hla-wgs unzip` checks the length and CRC-32 of every entry (a damaged `hla.dat.zip` is refused instead of building a wrong reference) and refuses names with a drive letter or a leading backslash on Windows.
+
 ## 1.1.3 (2026-11-22)
 
 - Fresh systems: the start file and the installer need neither curl nor unzip. They download with curl or, where it is missing (some minimal Linux installations), with wget; a ZIP is unpacked by `unzip` or, without it, by hla-wgs itself (new command `hla-wgs unzip ZIP DIR`). Installer line for systems without curl: `wget -qO- https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash`.

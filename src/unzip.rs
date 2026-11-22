@@ -26,13 +26,20 @@ pub fn run(a: &[String]) {
             crate::util::die(&format!("{zip}: damaged central directory"));
         }
         let method = u16le(&b, p + 10);
+        let crc = u32le(&b, p + 16) as u32;
         let csize = u32le(&b, p + 20);
         let usize_ = u32le(&b, p + 24);
         let (nl, xl, cl) = (u16le(&b, p + 28), u16le(&b, p + 30), u16le(&b, p + 32));
         let off = u32le(&b, p + 42);
         let name = String::from_utf8_lossy(&b[p + 46..p + 46 + nl]).to_string();
         p += 46 + nl + xl + cl;
-        if name.starts_with('/') || name.split(['/', '\\']).any(|c| c == "..") {
+        // only plain relative names: no root, drive letter or parent step on any system
+        let plain = !name.is_empty()
+            && !name.starts_with(['/', '\\'])
+            && !name.contains(':')
+            && name.split(['/', '\\']).all(|c| c != ".." && c != ".")
+            && std::path::Path::new(&name).components().all(|c| matches!(c, std::path::Component::Normal(_)));
+        if !plain {
             crate::util::die(&format!("{zip}: unsafe path {name}"));
         }
         let out = dir.join(&name);
@@ -54,6 +61,12 @@ pub fn run(a: &[String]) {
             }
             m => crate::util::die(&format!("{zip}: {name}: compression method {m} not supported")),
         };
+        // a damaged archive can still inflate: compare length and checksum with the directory
+        let mut c = flate2::Crc::new();
+        c.update(&bytes);
+        if bytes.len() != usize_ || c.sum() != crc {
+            crate::util::die(&format!("{zip}: {name}: checksum mismatch, the archive is damaged"));
+        }
         if let Some(d) = out.parent() {
             std::fs::create_dir_all(d).unwrap_or_else(|e| crate::util::die(&format!("{}: {e}", d.display())));
         }
