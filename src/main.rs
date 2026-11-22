@@ -17,6 +17,7 @@ mod panel;
 mod stagea;
 mod output;
 mod util;
+mod unzip;
 mod vfs;
 #[cfg(target_arch = "wasm32")]
 mod web;
@@ -100,6 +101,7 @@ pub fn cli(mut a: Vec<String>) {
         Some("build-db") => return builddb::run(&a[2..]),
         Some("build-mask") => return mask::run(&a[2..]),
         Some("long") => return long::run(&a[2..]),
+        Some("unzip") => return unzip::run(&a[2..]),
         // the result page again from PREFIX.json, e.g. after an update of the page
         Some("html") => {
             let Some(j) = a.get(2) else { util::die("usage: hla-wgs html PREFIX.json") };

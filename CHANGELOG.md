@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.3 (2026-11-22)
+
+- Fresh systems: the start file and the installer need neither curl nor unzip. They download with curl or, where it is missing (some minimal Linux installations), with wget; a ZIP is unpacked by `unzip` or, without it, by hla-wgs itself (new command `hla-wgs unzip ZIP DIR`). Installer line for systems without curl: `wget -qO- https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash`.
+- The macOS and Linux packages are also attached as `.tar.gz` (`hla-wgs-macos.tar.gz`, `hla-wgs-linux-x86_64.tar.gz`); the installer takes them when `unzip` is missing.
+
 ## 1.1.2 (2026-11-22)
 
 - Installer for macOS and Linux: `curl -fsSL https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash` installs the package of the latest release to `~/hla-wgs` (keeping `ref/` and results) and starts it. Fetched in Terminal, the files carry no quarantine mark, so macOS opens them without the "could not verify" warning.

@@ -17,6 +17,9 @@ Linux    In a terminal: ./hla-wgs-start.sh
 
 Without any warning (macOS, Linux), instead of the ZIP: paste this line into Terminal
   curl -fsSL https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash
+Without curl (some Linux systems):
+  wget -qO- https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash
+Nothing else needs to be installed (no Python, no other tools).
 
 Then drag your file (FASTQ R1, BAM or CRAM) into the window, or type its path, and press Enter.
 
@@ -62,6 +65,9 @@ Linux    Im Terminal: ./hla-wgs-start.sh
 
 Ganz ohne Warnung (macOS, Linux), statt des ZIPs: diese Zeile ins Terminal kopieren
   curl -fsSL https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash
+Ohne curl (manche Linux-Systeme):
+  wget -qO- https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash
+Sonst muss nichts installiert sein (kein Python, keine weiteren Werkzeuge).
 
 Dann die Datei (FASTQ R1, BAM oder CRAM) ins Fenster ziehen oder ihren Pfad eingeben und Enter
 drücken.
