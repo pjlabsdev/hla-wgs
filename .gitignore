@@ -8,3 +8,6 @@ panel.fa.mask.bed
 hla.dat
 __pycache__/
 *.pyc
+start/hla-wgs
+start/hla-wgs.exe
+start/ref/

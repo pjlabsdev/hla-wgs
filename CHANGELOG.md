@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.2 (2026-11-22)
+
+- Start files: when the program is missing next to them (for example after downloading the "Source code" ZIP of a release, which holds no program), they offer to download the ready package for this system from the latest release and continue. Otherwise they name the release page and `cargo build --release`. The Windows start file also finds a build in `..\target\release`.
+
 ## 1.1.1 (2026-11-22)
 
 - Start file (macOS, Linux): it stopped at once when `LANG` was not set (possible on Linux and in a macOS Terminal without locale variables). On Linux it now uses the `C.UTF-8` character set instead of `en_US.UTF-8`, which most Linux systems lack.
