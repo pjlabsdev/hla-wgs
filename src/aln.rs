@@ -282,16 +282,26 @@ impl Index {
             if win > 1 {
                 let mut km: Vec<(u64, u64, usize)> = vec![];
                 kmers(qs, k, |v, i| km.push((hash64(v), v, i)));
+                // the first smallest hash of each window of `win` k-mers, with a monotone queue
+                // (the earliest of equal hashes stays in front, as a scan from the left finds it)
                 let w = win;
+                let nwin = km.len().saturating_sub(w - 1).max(1.min(km.len()));
+                let mut dq: std::collections::VecDeque<usize> = std::collections::VecDeque::with_capacity(w + 1);
                 let mut last = usize::MAX;
-                for s in 0..km.len().saturating_sub(w - 1).max(1.min(km.len())) {
+                let mut next = 0;
+                for s in 0..nwin {
                     let e = (s + w).min(km.len());
-                    let mut b = s;
-                    for x in s + 1..e {
-                        if km[x].0 < km[b].0 {
-                            b = x;
+                    while next < e {
+                        while dq.back().is_some_and(|&b| km[b].0 > km[next].0) {
+                            dq.pop_back();
                         }
+                        dq.push_back(next);
+                        next += 1;
                     }
+                    while dq.front().is_some_and(|&b| b < s) {
+                        dq.pop_front();
+                    }
+                    let b = *dq.front().unwrap();
                     if b != last {
                         look(km[b].1, km[b].2);
                         last = b;
@@ -368,24 +378,22 @@ impl Index {
             part(2, &mut tm);
             // alleles of one gene give the same anchors, shifted by where the stretch starts in each
             // sequence: chaining depends only on distances, so the chains are computed once per shape
-            let mut memo: AHashMap<Vec<(u32, u32)>, Vec<(f32, Vec<(u32, u32)>)>> = AHashMap::new();
+            let mut memo: AHashMap<Vec<(u32, u32)>, usize> = AHashMap::new();
+            let mut shapes: Vec<Vec<(f32, Vec<(u32, u32)>)>> = vec![];
             for (s, mut v) in buckets {
-                v.sort();
+                v.sort_unstable();
                 let r0 = v[0].0;
                 let g: Vec<(u32, u32)> = v.iter().map(|x| (x.1, x.0 - r0)).collect();
-                let cs = match memo.get(&g) {
-                    Some(c) => c.clone(),
+                let id = match memo.get(&g) {
+                    Some(&id) => id,
                     None => {
-                        let c = self.chain(&g);
-                        memo.insert(g, c.clone());
-                        c
+                        shapes.push(self.chain(&g));
+                        memo.insert(g, shapes.len() - 1);
+                        shapes.len() - 1
                     }
                 };
-                for (sc, mut c) in cs {
-                    for x in c.iter_mut() {
-                        x.1 += r0;
-                    }
-                    out.push((sc, s as usize, si == 0, c));
+                for (sc, c) in &shapes[id] {
+                    out.push((*sc, s as usize, si == 0, c.iter().map(|&(a, b)| (a, b + r0)).collect()));
                 }
             }
             part(3, &mut tm);
