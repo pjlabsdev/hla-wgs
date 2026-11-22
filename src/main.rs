@@ -178,11 +178,16 @@ fn main() {
     };
     let empty = vec![];
     let ctx = stageb::Ctx::new(&db, reads);
+    ctx.load_cache(&a[1]);
     let mut res: AHashMap<String, (stageb::StageB, Option<Vec<String>>, refine::RMarg)> = AHashMap::new();
     let mut depth: AHashMap<String, usize> = AHashMap::new();
     type GeneRes = (stageb::StageB, Option<Vec<String>>, refine::RMarg);
     type Nov = [Vec<novel::Site>; 2];
-    let outs: Vec<(String, usize, Option<GeneRes>, Option<Nov>)> = genes.par_iter().map(|g| {
+    // the genes with the most reads first, so that a slow gene does not start last and leave the
+    // other threads idle (results do not depend on the order)
+    let mut order: Vec<&str> = genes.clone();
+    order.sort_by_key(|g| std::cmp::Reverse(p.assign.get(*g).map_or(0, |v| v.len())));
+    let outs: Vec<(String, usize, Option<GeneRes>, Option<Nov>)> = order.iter().par_bridge().map(|g| {
         let mut dg = 0usize;
         let qn_a: &Vec<usize> = p.assign.get(*g).unwrap_or(&empty);
         let mut qn: Vec<usize> = qn_a.clone();
@@ -202,6 +207,7 @@ fn main() {
             return (g.to_string(), dg, None, None);
         }
         let al = &db.ref_[*g];
+        if std::env::var("HLA_TDBG").is_ok() { log(format!("{g} stagea start")); }
         let idx = stagea::build_index(al);
         let sa = stagea::run(g, al, &idx, reads, qn_a);
         log(sa.log.clone());
@@ -213,7 +219,10 @@ fn main() {
         if cand.is_empty() {
             return (g.to_string(), dg, None, None);
         }
+        let tdbg = std::env::var("HLA_TDBG").is_ok();
+        if tdbg { log(format!("{g} stageb1 start")); }
         let mut r1 = ctx.stage_b(g, &qn, &cand);
+        if tdbg { log(format!("{g} stageb1 end")); }
         if let Some(r) = &r1 {
             // pass 2: expand the exon classes of the best pair(s) to all members
             let mut win: AHashSet<usize> = r.ties.iter().take(6).flat_map(|p| [cand[p.0], cand[p.1]]).collect();
@@ -251,18 +260,21 @@ fn main() {
                 r1 = Some(x);
             }
             log(format!("{} pass2 candidates {}", g, cand2.len()));
+            if tdbg { log(format!("{g} pad {}", stageb::Ctx::pad_stat())); }
         }
         if let Some(r) = r1 {
             let n = |k: usize| al[r.cand[k]].name.as_str();
             if std::env::var("DUMPB").is_ok() {
                 println!("{}\t{}\t{}\t{:.3}\t{:.3}\t{}\t{}", g, n(r.pair.0), n(r.pair.1), r.ll, r.gap, r.nreads, r.ties.len());
             }
+            if tdbg { log(format!("{g} refine start")); }
             let mut rm = refine::RMarg::new();
             let names = refine::exon_refine(&ctx, g, &qn, &r, &mut rm, &log);
             let fin: [String; 2] = match &names {
                 Some(v) => [v[0].clone(), v[1].clone()],
                 None => [al[r.cand[r.pair.0]].name.clone(), al[r.cand[r.pair.1]].name.clone()],
             };
+            if tdbg { log(format!("{g} novel start")); }
             let nv = if std::env::var("HLA_NONOVEL").is_ok() { None } else { Some(novel::sites(&ctx, g, &qn, [fin[0].as_str(), fin[1].as_str()])) };
             if let Some(n) = &nv {
                 for (k, v) in n.iter().enumerate() {
@@ -305,9 +317,11 @@ fn main() {
         }
     }
 
+    ctx.save_cache(&a[1]);
     let drb = drb_copies(&ctx, &res, &p.assign, &log);
     let grp = groups::Groups::load(std::path::Path::new(&a[1]).parent().unwrap_or(std::path::Path::new(".")));
     output::write(&out, &genes, &ctx, &res, &depth, &drb, &nov, &known, &grp, &log);
+    if std::env::var("HLA_TDBG").is_ok() { log(format!("pad total {}", stageb::Ctx::pad_stat())); }
     log("total".to_string());
     if std::env::var("HLA_ALNSTAT").is_ok() { eprintln!("[aln] {}", aln::stat()); }
 }
