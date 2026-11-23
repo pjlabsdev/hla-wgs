@@ -6,7 +6,8 @@
 //! 2. per gene family these parts are split into haplotypes at positions where two bases are each
 //!    carried by a good share of the reads (the reference for this is one of the reads itself);
 //! 3. per haplotype one read is lengthened with the overhang of others until it covers the gene and
-//!    corrected by majority at every position (consensus);
+//!    corrected at every position by the variant most reads carry (consensus; HLA_LPLUR=0: absolute
+//!    majority);
 //! 4. the consensus is compared with every full-length allele of the gene. Distance 0 is an exact
 //!    four-field result; otherwise the nearest allele and the number of differences are reported and
 //!    the consensus itself is written to `PREFIX.long.fa`.
@@ -190,14 +191,39 @@ fn extend(mut r: Vec<u8>, segs: &[Seg], ids: &[usize]) -> Vec<u8> {
     r
 }
 
-/// majority consensus; returns the sequence and the positions where a minority of 30 % or more disagrees
+/// plurality per position and kind: substitutions compete with each other, insertions and deletions
+/// with each other, and each group with the reads that keep the template there. In a single-base run
+/// the reads split over several lengths, so that the right length often has no absolute majority.
+fn plural(cnt: &AHashMap<Ev, u32>, d: &dyn Fn(usize) -> u32) -> Vec<Ev> {
+    let mut by: AHashMap<(usize, bool), Vec<(&Ev, u32)>> = AHashMap::new();
+    for (e, c) in cnt {
+        by.entry((e.0, e.1 == b'S')).or_default().push((e, *c));
+    }
+    let mut out = vec![];
+    for ((p, _), mut v) in by {
+        let dp = d(p);
+        if dp < 3 {
+            continue;
+        }
+        let alt: u32 = v.iter().map(|x| x.1).sum();
+        let keep = dp.saturating_sub(alt);
+        v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+        let (e, c) = v[0];
+        if c > keep && (v.len() == 1 || c > v[1].1) {
+            out.push(e.clone());
+        }
+    }
+    out
+}
+
+/// consensus by plurality (see `plural`); returns the sequence and the positions where a minority of 30 % or more disagrees
 fn polish(mut t: Vec<u8>, segs: &[Seg], ids: &[usize]) -> (Vec<u8>, Vec<usize>) {
     let mut unsure = vec![];
     for round in 0..5 {
         let aln = align(&t, segs, ids);
         let (cov, cnt) = tally(&aln, ids, t.len());
         let d = |p: usize| cov[p.min(t.len() - 1)];
-        let mut maj: Vec<Ev> = cnt.iter().filter(|(e, c)| d(e.0) >= 3 && 2 * **c > d(e.0)).map(|(e, _)| e.clone()).collect();
+        let mut maj: Vec<Ev> = if std::env::var("HLA_LPLUR").map_or(true, |v| v != "0") { plural(&cnt, &d) } else { cnt.iter().filter(|(e, c)| d(e.0) >= 3 && 2 * **c > d(e.0)).map(|(e, _)| e.clone()).collect() };
         if maj.is_empty() || round == 4 {
             unsure = cnt.iter().filter(|(e, c)| d(e.0) >= 4 && 10 * **c >= 3 * d(e.0)).map(|(e, _)| e.0).collect();
             unsure.sort();
