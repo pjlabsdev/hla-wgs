@@ -522,7 +522,14 @@ pub fn run(args: &[String]) {
         }
         calls.append(&mut kept);
     }
-    calls.sort_by(|x, y| x.gene.cmp(&y.gene).then(y.reads.cmp(&x.reads)));
+    // haplotypes first: a group whose reads mostly stop inside the gene is a mixture or a fragment,
+    // also when it has more reads than a real haplotype with reads across the whole gene
+    // (HG02630: 9 reads, 2 spanning, 12 differences before C*17:01:01:30 with 8 reads, 7 spanning)
+    if std::env::var("HLA_LSPAN").map_or(true, |v| v != "0") {
+        calls.sort_by(|x, y| x.gene.cmp(&y.gene).then(y.spanning.cmp(&x.spanning)).then(y.reads.cmp(&x.reads)));
+    } else {
+        calls.sort_by(|x, y| x.gene.cmp(&y.gene).then(y.reads.cmp(&x.reads)));
+    }
     let mut tsv = std::io::BufWriter::new(std::fs::File::create(format!("{out}.long.tsv")).unwrap());
     let mut fa = std::io::BufWriter::new(std::fs::File::create(format!("{out}.long.fa")).unwrap());
     writeln!(tsv, "gene\tslot\tallele\tdifferences\texact\treads\tspanning\tunsure_sites\tequal_alternatives\tnote").unwrap();
