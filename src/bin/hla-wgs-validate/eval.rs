@@ -177,6 +177,8 @@ struct Call {
     name: String,
     res: i64,
     det: HashSet<i64>,
+    /// sites marked as possibly on the other allele (`:either`, novel.tsv "phase uncertain")
+    either: HashSet<i64>,
     nn: i64,
     detail: String,
 }
@@ -211,38 +213,47 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
         let mut conf: OMap<String, Vec<Call>> = OMap::default();
         // the table lists at most 20 sites per allele; PREFIX.novel.tsv has all of them
         let nf = format!("{dir}/{smp}.novel.tsv");
-        let mut novel: HashMap<(String, String), Vec<i64>> = HashMap::new();
+        let mut novel: HashMap<(String, String), Vec<(i64, bool)>> = HashMap::new();
         if exists(&nf) {
             for l in read(&nf).lines().filter(|l| !l.starts_with('#') && !l.starts_with("gene\t")) {
                 let f: Vec<&str> = l.split('\t').collect();
                 if f.len() > 5 {
                     if let Ok(p) = f[4].parse::<i64>() {
-                        novel.entry((f[0].to_string(), f[1].to_string())).or_default().push(p);
+                        let unsure = f.get(13).map_or(false, |x| x.starts_with("phase uncertain"));
+                        novel.entry((f[0].to_string(), f[1].to_string())).or_default().push((p, unsure));
                     }
                 }
             }
         }
         for r in conf_lines(&cf) {
             let mut det = HashSet::new();
+            let mut either = HashSet::new();
             let nn = if r.len() > 11 && r[11] != "-" { r[11].parse().unwrap() } else { 0 };
             if r.len() > 12 && r[12] != "-" {
                 let src = if r[12].starts_with("known:") { "" } else { r[12].as_str() };
                 for x in src.split(',') {
                     if !x.is_empty() && !x.contains("blind") && !x.contains("unphased") && !x.contains("repunverified") {
-                        det.insert(x.split(':').next().unwrap().parse::<i64>().unwrap());
+                        let p = x.split(':').next().unwrap().parse::<i64>().unwrap();
+                        det.insert(p);
+                        if x.ends_with(":either") {
+                            either.insert(p);
+                        }
                     }
                 }
                 let listed = src.split(',').filter(|x| !x.is_empty()).count() as i64;
                 if !src.is_empty() && nn > listed {
                     let shown: HashSet<i64> = src.split(',').filter_map(|x| x.split(':').next()?.parse().ok()).collect();
-                    for p in novel.get(&(r[0].clone(), r[1].clone())).into_iter().flatten() {
+                    for (p, unsure) in novel.get(&(r[0].clone(), r[1].clone())).into_iter().flatten() {
                         if !shown.contains(p) {
                             det.insert(*p);
+                            if *unsure {
+                                either.insert(*p);
+                            }
                         }
                     }
                 }
             }
-            conf.entry(r[0].clone()).push(Call { name: r[2].clone(), res: r[4].parse().unwrap(), det, nn, detail: if r.len() > 12 { r[12].clone() } else { "-".into() } });
+            conf.entry(r[0].clone()).push(Call { name: r[2].clone(), res: r[4].parse().unwrap(), det, either, nn, detail: if r.len() > 12 { r[12].clone() } else { "-".into() } });
         }
         let names: BTreeSet<String> = conf.iter().flat_map(|(_, v)| v.iter().map(|x| x.name.clone())).collect();
         let mut hits: HashMap<(String, String), (i64, Vec<(i64, String)>)> = HashMap::new();
@@ -327,7 +338,9 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
                     }
                 }
                 let true_snv: HashSet<i64> = dl.iter().filter(|(_, t)| t == "snv").map(|x| x.0).collect();
-                let tp = c.det.iter().filter(|p| dl.iter().any(|(q, _)| (**p - q).abs() <= 2)).count() as i64;
+                // a site marked "either" is true when the other haplotype carries it
+                let other: Vec<(i64, String)> = hh.iter().filter(|x| **x != *h).map(|x| hit(x, &c.name).1.clone()).next().unwrap_or_default();
+                let tp = c.det.iter().filter(|p| dl.iter().any(|(q, _)| (**p - q).abs() <= 2) || (c.either.contains(p) && other.iter().any(|(q, _)| (**p - q).abs() <= 2))).count() as i64;
                 k.add("site_det", c.det.len() as i64);
                 k.add("site_det_true", tp);
                 k.add("site_snv", true_snv.len() as i64);
