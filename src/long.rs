@@ -235,6 +235,11 @@ fn polish(mut t: Vec<u8>, segs: &[Seg], ids: &[usize]) -> (Vec<u8>, Vec<usize>) 
     (t, unsure)
 }
 
+/// new unsure sites that the joint consensus of two groups may have and still be one haplotype (HLA_LMU)
+fn lmu() -> usize {
+    std::env::var("HLA_LMU").ok().and_then(|v| v.parse().ok()).unwrap_or(2)
+}
+
 fn template(segs: &[Seg], ids: &[usize]) -> usize {
     let mut sp: Vec<usize> = ids.iter().copied().filter(|&i| segs[i].span >= SPANNING).collect();
     if sp.is_empty() {
@@ -376,6 +381,7 @@ struct Call {
     names: Vec<String>,
     unsure: usize,
     seq: Vec<u8>,
+    ids: Vec<usize>,
 }
 
 pub fn run(args: &[String]) {
@@ -452,7 +458,8 @@ pub fn run(args: &[String]) {
         let (t_split, mut t_pol, mut t_db) = (tf.elapsed().as_secs_f64(), 0.0, 0.0);
         let fgenes: Vec<&String> = db.genes.iter().filter(|g| family(g) == fam).collect();
         let mut found: Vec<Call> = vec![];
-        for cl in clusters.iter().filter(|c| c.len() >= 4) {
+        // consensus and nearest allele of one read group
+        let mut make = |cl: &[usize]| -> Option<Call> {
             let tp = std::time::Instant::now();
             let (cons, unsure) = polish(extend(segs[template(segs, cl)].seq.clone(), segs, cl), segs, cl);
             t_pol += tp.elapsed().as_secs_f64();
@@ -505,12 +512,12 @@ pub fn run(args: &[String]) {
                 best = keyed.into_iter().map(|x| x.1).collect();
             }
             t_db += tp.elapsed().as_secs_f64();
-            let Some(&(d0, n0, s0, e0)) = best.first() else { continue };
+            let Some(&(d0, n0, s0, e0)) = best.first() else { return None };
             // parts of reads only, copies of pseudogenes and mixtures stay far from every allele
             if dmin > 20.max((e0 - s0) as i64 / 200) {
-                continue;
+                return None;
             }
-            found.push(Call {
+            Some(Call {
                 gene: n0.split('*').next().unwrap().to_string(),
                 reads: cl.len(),
                 spanning: cl.iter().filter(|&&i| segs[i].span >= SPANNING).count(),
@@ -518,21 +525,48 @@ pub fn run(args: &[String]) {
                 names: best.iter().take_while(|b| b.0 == d0).map(|b| b.1.to_string()).collect(),
                 unsure: unsure.iter().filter(|&&u| s0 <= u && u < e0).count(),
                 seq: cons[s0..e0].to_vec(),
-            });
+                ids: cl.to_vec(),
+            })
+        };
+        for cl in clusters.iter().filter(|c| c.len() >= 4) {
+            if let Some(c) = make(cl) {
+                found.push(c);
+            }
+        }
+        // groups that name the same allele are mostly one haplotype split by read noise: their reads
+        // together give the consensus. Two haplotypes can share the nearest allele (HG02622 TAP1: 35 and
+        // 37 differences from TAP1*01:05); their joint consensus has new sites where the reads split, so
+        // such groups stay apart. HLA_LMERGE=0: old way, the larger group's sequence with all reads counted.
+        found.sort_by(|x, y| y.reads.cmp(&x.reads).then(x.names.cmp(&y.names)));
+        let joint_on = std::env::var("HLA_LMERGE").map_or(true, |v| v != "0");
+        let mut kept: Vec<Call> = vec![];
+        for c in found {
+            let Some(ki) = kept.iter().position(|k| k.gene == c.gene && k.names.iter().any(|n| c.names.contains(n))) else {
+                kept.push(c);
+                continue;
+            };
+            let k = &mut kept[ki];
+            let mut ids: Vec<usize> = k.ids.iter().chain(c.ids.iter()).copied().collect();
+            ids.sort();
+            ids.dedup();
+            if !joint_on {
+                k.reads = ids.len();
+                k.spanning = ids.iter().filter(|&&i| segs[i].span >= SPANNING).count();
+                k.ids = ids;
+                continue;
+            }
+            match make(&ids) {
+                Some(j) if j.gene == k.gene && j.unsure <= k.unsure.max(c.unsure) + lmu() => *k = j,
+                Some(j) if j.gene == k.gene => kept.push(c),
+                _ => {
+                    k.reads = ids.len();
+                    k.spanning = ids.iter().filter(|&&i| segs[i].span >= SPANNING).count();
+                    k.ids = ids;
+                }
+            }
         }
         if std::env::var("HLA_LONG_TIME").is_ok() {
             log(format!("{fam}: {} groups, split {t_split:.1}s, consensus {t_pol:.1}s, naming {t_db:.1}s", clusters.len()));
-        }
-        // groups that name the same allele are one haplotype split by read noise
-        found.sort_by(|x, y| y.reads.cmp(&x.reads).then(x.names.cmp(&y.names)));
-        let mut kept: Vec<Call> = vec![];
-        for c in found {
-            if let Some(k) = kept.iter_mut().find(|k| k.gene == c.gene && k.names.iter().any(|n| c.names.contains(n))) {
-                k.reads += c.reads;
-                k.spanning += c.spanning;
-            } else {
-                kept.push(c);
-            }
         }
         calls.append(&mut kept);
     }
