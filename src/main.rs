@@ -26,6 +26,11 @@ use rayon::prelude::*;
 
 pub const FOCUS: [&str; 26] = ["A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DRA", "E", "F", "G", "H", "K", "V", "DMA", "DMB", "DOA", "DOB", "MICA", "MICB", "TAP1", "TAP2"];
 
+/// DRB1 exon refinement with the reads of DRB3/4/5 (HLA_DRBREL=0: off)
+pub fn drb_rel() -> bool {
+    std::env::var("HLA_DRBREL").map_or(true, |v| v != "0")
+}
+
 pub fn related(g: &str) -> &'static [&'static str] {
     match g {
         "A" => &["Y", "H", "J"],
@@ -269,7 +274,21 @@ fn main() {
             }
             if tdbg { log(format!("{g} refine start")); }
             let mut rm = refine::RMarg::new();
-            let names = refine::exon_refine(&ctx, g, &qn, &r, &mut rm, &log);
+            // The panel gives some DRB1 reads to DRB3/4/5, also when those genes are absent: the exon-2
+            // reads that tell DRB1*09:01 from its siblings went to DRB5, the DRB1*01:01 reads of
+            // 01:01/07:01 carriers to DRB3 and DRB5. The exon refinement of DRB1 therefore also sees
+            // the reads of DRB3/4/5. Only there: in stage B and the new-variant search they moved
+            // fourth fields and added false sites (80 HPRC: 5 fourth fields wrong). HLA_DRBREL=0: off.
+            let qn_ex: Vec<usize> = if *g == "DRB1" && drb_rel() {
+                let mut set: std::collections::BTreeSet<usize> = qn.iter().copied().collect();
+                for x in ["DRB3", "DRB4", "DRB5"] {
+                    set.extend(p.assign.get(x).unwrap_or(&empty).iter().copied());
+                }
+                set.into_iter().collect()
+            } else {
+                qn.clone()
+            };
+            let names = refine::exon_refine(&ctx, g, &qn_ex, &r, &mut rm, &log);
             let fin: [String; 2] = match &names {
                 Some(v) => [v[0].clone(), v[1].clone()],
                 None => [al[r.cand[r.pair.0]].name.clone(), al[r.cand[r.pair.1]].name.clone()],

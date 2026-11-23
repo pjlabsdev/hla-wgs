@@ -143,6 +143,17 @@ pub fn write(
                     }
                 }
             }
+            // DRB1: a competitor that differs in the first two fields differs in the exons, and the exon
+            // refinement judges it with the reads that the panel gave to DRB3/4/5 (main.rs). Stage B
+            // without them saw 01:01/07:01 as nearly homozygous 07:01 (lead 0.9, group withheld).
+            // 80 HPRC: 13 DRB1 calls one or two fields deeper, all right, nothing else changed.
+            if g == "DRB1" && crate::drb_rel() && rm.contains_key(&(if i != j { sl } else { 0 })) {
+                for ni in 0..2 {
+                    if !alt[ni].is_empty() && diff_level(&alt[ni], fin) <= 2 {
+                        m[ni] = 999.0;
+                    }
+                }
+            }
             if let Some((rmm, ralt)) = rm.get(&(if i != j { sl } else { 0 })) {
                 for ni in 0..2 {
                     if rmm[ni] < m[ni] {
