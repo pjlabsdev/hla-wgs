@@ -209,8 +209,22 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
             continue;
         }
         let mut conf: OMap<String, Vec<Call>> = OMap::default();
+        // the table lists at most 20 sites per allele; PREFIX.novel.tsv has all of them
+        let nf = format!("{dir}/{smp}.novel.tsv");
+        let mut novel: HashMap<(String, String), Vec<i64>> = HashMap::new();
+        if exists(&nf) {
+            for l in read(&nf).lines().filter(|l| !l.starts_with('#') && !l.starts_with("gene\t")) {
+                let f: Vec<&str> = l.split('\t').collect();
+                if f.len() > 5 {
+                    if let Ok(p) = f[4].parse::<i64>() {
+                        novel.entry((f[0].to_string(), f[1].to_string())).or_default().push(p);
+                    }
+                }
+            }
+        }
         for r in conf_lines(&cf) {
             let mut det = HashSet::new();
+            let nn = if r.len() > 11 && r[11] != "-" { r[11].parse().unwrap() } else { 0 };
             if r.len() > 12 && r[12] != "-" {
                 let src = if r[12].starts_with("known:") { "" } else { r[12].as_str() };
                 for x in src.split(',') {
@@ -218,8 +232,16 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
                         det.insert(x.split(':').next().unwrap().parse::<i64>().unwrap());
                     }
                 }
+                let listed = src.split(',').filter(|x| !x.is_empty()).count() as i64;
+                if !src.is_empty() && nn > listed {
+                    let shown: HashSet<i64> = src.split(',').filter_map(|x| x.split(':').next()?.parse().ok()).collect();
+                    for p in novel.get(&(r[0].clone(), r[1].clone())).into_iter().flatten() {
+                        if !shown.contains(p) {
+                            det.insert(*p);
+                        }
+                    }
+                }
             }
-            let nn = if r.len() > 11 && r[11] != "-" { r[11].parse().unwrap() } else { 0 };
             conf.entry(r[0].clone()).push(Call { name: r[2].clone(), res: r[4].parse().unwrap(), det, nn, detail: if r.len() > 12 { r[12].clone() } else { "-".into() } });
         }
         let names: BTreeSet<String> = conf.iter().flat_map(|(_, v)| v.iter().map(|x| x.name.clone())).collect();
