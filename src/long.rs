@@ -490,10 +490,24 @@ pub fn run(args: &[String]) {
                 })
                 .collect();
             best.sort();
+            let dmin = best.first().map_or(0, |b| b.0);
+            // No allele equals the consensus: the nearest by whole sequence can be an allele of another
+            // group that only shares the introns better (HG01928: DRB1*04:03 named for a 04:04 haplotype).
+            // The protein is read off the exons, so first the alleles whose exons the consensus holds
+            // unchanged, most of them first, then the distance. HLA_LEXON=0: distance only.
+            if best.first().map_or(false, |b| b.0 > 0) && std::env::var("HLA_LEXON").map_or(true, |v| v != "0") {
+                let byname: AHashMap<&str, &crate::db::Allele> = pick.iter().map(|a| (a.name.as_str(), *a)).collect();
+                let miss = |n: &str| -> usize { byname[n].exons.iter().filter(|(_, e)| !e.is_empty() && !cons.windows(e.len()).any(|w| w == e.as_slice())).count() };
+                // only among alleles at most 5 differences further away: pseudogenes such as HLA-K have
+                // alleles with exons that other alleles of the gene describe differently
+                let mut keyed: Vec<(usize, (i64, &str, usize, usize))> = best.iter().map(|b| (if b.0 <= dmin + 5 { miss(b.1) } else { usize::MAX }, *b)).collect();
+                keyed.sort();
+                best = keyed.into_iter().map(|x| x.1).collect();
+            }
             t_db += tp.elapsed().as_secs_f64();
             let Some(&(d0, n0, s0, e0)) = best.first() else { continue };
             // parts of reads only, copies of pseudogenes and mixtures stay far from every allele
-            if d0 > 20.max((e0 - s0) as i64 / 200) {
+            if dmin > 20.max((e0 - s0) as i64 / 200) {
                 continue;
             }
             found.push(Call {
