@@ -13,6 +13,7 @@ environment switch is documented, and that every link in the manual and in the R
 | `hla-wgs build-db hla.dat freq.json DBDIR` | [Building the database](build-db.md) |
 | `hla-wgs build-mask DBDIR GENOME.fa [EXCLUDE.bed]`, `--from OLDDBDIR` | [Building the repeat mask](build-mask.md) |
 | `hla-wgs html PREFIX.json` | [Result page again](html.md) |
+| `hla-wgs report PREFIX.json [--text de\|en]` | [Report part for Genome](report.md) |
 | `hla-wgs diag OUTPREFIX` | [Diagnostic package](diag.md) |
 | `hla-wgs mcp` | [MCP server for agents](mcp.md) |
 | `hla-wgs unzip ZIP DIR` | [Unpacking a ZIP archive](unzip.md) |
@@ -23,6 +24,7 @@ environment switch is documented, and that every link in the manual and in the R
 
 | File | Page |
 |---|---|
+| `PREFIX.report.json` (`genome.report.v1`) | [Report part](report.md) |
 | `PREFIX.tsv`, `.conf.tsv`, `.json`, `.novel.fa`, `.novel.tsv`, `.long.tsv`, `.long.fa`, `.html` | [Output](../output.md) |
 | `PREFIX.log.jsonl`, `PREFIX.log.txt` | [Run log](log.md) |
 | error codes `HW-Ennn` | [Error codes](errors.md) |

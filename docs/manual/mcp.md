@@ -60,5 +60,5 @@ Version and commit of hla-wgs, the database format it needs, the schemas of log 
 - `hla-wgs://manual/index` and one resource per page of the [manual](README.md), named like the
   page (`hla-wgs://manual/typing`, `.../log`, `.../errors`, `.../switches`, ...), and
   `hla-wgs://manual/output` for the [output formats](../output.md)
-- `file://PREFIX.json`, `.tsv`, `.conf.tsv`, `.long.tsv`, `.log.jsonl`, `.log.txt` of the runs this
+- `file://PREFIX.json`, `.report.json`, `.tsv`, `.conf.tsv`, `.long.tsv`, `.log.jsonl`, `.log.txt` of the runs this
   server started; other files cannot be read through the server

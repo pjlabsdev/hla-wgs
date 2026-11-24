@@ -73,6 +73,12 @@ Genes with an estimated copy number also carry `copy_ratio` (depth relative to t
 genes). `margin` values are `null` when no competitor exists at that field; `new_sites` is `null`
 when the allele was not examined.
 
+## PREFIX.report.json
+
+The report part for the overall report of Genome (schema `genome.report.v1`), derived from
+`PREFIX.json`: key findings, tables, run quality, method, validation, limits and references, with all
+texts in German and English. Format in [manual/report.md](manual/report.md).
+
 ## PREFIX.novel.fa
 
 Written when at least one allele has new sites that can be applied. One record per such allele:
