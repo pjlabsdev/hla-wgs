@@ -1,12 +1,13 @@
 [package]
 name = "hla-wgs"
-version = "1.1.3"
+version = "1.2.0"
 edition = "2024"
 description = "HLA typing from whole-genome sequencing reads with a per-allele statement of what is certain"
 license = "MIT"
 repository = "https://github.com/pjlabsdev/hla-wgs"
 
 [dependencies]
+gc-panel = { path = "crates/gc-panel" }
 ahash = "0.8.12"
 flate2 = "1.1.11"
 noodles = { version = "0.119", features = ["bam", "cram", "sam", "bgzf", "core", "fasta", "csi"] }
@@ -23,3 +24,6 @@ paper = ["dep:typst", "dep:typst-layout", "dep:typst-pdf"]
 
 [profile.release]
 opt-level = 3
+
+[workspace]
+members = [".", "crates/gc-sys", "crates/gc-panel"]

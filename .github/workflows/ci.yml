@@ -16,7 +16,7 @@ jobs:
       - name: Build
         run: cargo build --release --locked
       - name: Unit tests
-        run: cargo test --release --locked
+        run: cargo test --release --locked --workspace
       - name: Software report builds from the result tables (Typst)
         if: runner.os == 'Linux'
         run: |

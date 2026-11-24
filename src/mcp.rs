@@ -18,6 +18,19 @@ pub const PAGES: &[(&str, &str)] = &[
     ("log", include_str!("../docs/manual/log.md")),
     ("errors", include_str!("../docs/manual/errors.md")),
     ("output", include_str!("../docs/output.md")),
+    ("index", include_str!("../docs/manual/README.md")),
+    ("typing", include_str!("../docs/manual/typing.md")),
+    ("long", include_str!("../docs/manual/long.md")),
+    ("build-db", include_str!("../docs/manual/build-db.md")),
+    ("build-mask", include_str!("../docs/manual/build-mask.md")),
+    ("html", include_str!("../docs/manual/html.md")),
+    ("report", include_str!("../docs/manual/report.md")),
+    ("diag", include_str!("../docs/manual/diag.md")),
+    ("unzip", include_str!("../docs/manual/unzip.md")),
+    ("database", include_str!("../docs/manual/database.md")),
+    ("switches", include_str!("../docs/manual/switches.md")),
+    ("start-file", include_str!("../docs/manual/start-file.md")),
+    ("procedures", include_str!("../docs/manual/procedures.md")),
 ];
 
 struct Run {
@@ -219,7 +232,7 @@ impl Server {
     fn resources(&self) -> Value {
         let mut v: Vec<Value> = PAGES.iter().map(|(n, _)| json!({"uri": format!("hla-wgs://manual/{n}"), "name": format!("manual: {n}"), "mimeType": "text/markdown"})).collect();
         for (id, r) in &self.runs {
-            for (ext, mime) in [("json", "application/json"), ("tsv", "text/tab-separated-values"), ("conf.tsv", "text/tab-separated-values"), ("long.tsv", "text/tab-separated-values"), ("log.jsonl", "application/jsonl"), ("log.txt", "text/plain")] {
+            for (ext, mime) in [("json", "application/json"), ("report.json", "application/json"), ("tsv", "text/tab-separated-values"), ("conf.tsv", "text/tab-separated-values"), ("long.tsv", "text/tab-separated-values"), ("log.jsonl", "application/jsonl"), ("log.txt", "text/plain")] {
                 let p = format!("{}.{ext}", r.prefix);
                 if std::path::Path::new(&p).is_file() {
                     v.push(json!({"uri": format!("file://{}", abs(&p)), "name": format!("{id}: {ext}"), "mimeType": mime}));
@@ -238,7 +251,7 @@ impl Server {
         // only the result and log files of runs started here
         let ok = self.runs.values().any(|r| {
             let rp = abs(&r.prefix);
-            ["json", "tsv", "conf.tsv", "long.tsv", "log.jsonl", "log.txt"].iter().any(|e| p == format!("{rp}.{e}"))
+            ["json", "report.json", "tsv", "conf.tsv", "long.tsv", "log.jsonl", "log.txt"].iter().any(|e| p == format!("{rp}.{e}"))
         });
         if !ok {
             return Err("only the result and log files of runs started by this server can be read".into());

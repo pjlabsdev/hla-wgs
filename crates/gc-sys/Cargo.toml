@@ -1,0 +1,9 @@
+[package]
+name = "gc-sys"
+description = "Genome 4.0: Systemnahes je Prozessor und Betriebssystem (copy, see crates/README.md)"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]

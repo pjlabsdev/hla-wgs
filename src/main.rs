@@ -1,5 +1,6 @@
 mod align;
-mod aln;
+/// the panel aligner (crate gc-panel, a copy of the Genome 4 crate, see crates/README.md), formerly src/aln.rs
+use gc_panel as aln;
 mod bamin;
 mod builddb;
 mod db;
@@ -19,6 +20,7 @@ mod output;
 mod util;
 mod unzip;
 mod errors;
+mod report;
 mod runlog;
 mod mcp;
 mod vfs;
@@ -121,6 +123,7 @@ pub fn cli(mut a: Vec<String>) {
     match a.get(1).map(|x| x.as_str()) {
         Some("diag") => return runlog::diag(&a[2..]),
         Some("mcp") => return mcp::run(),
+        Some("report") => return report::run(&a[2..]),
         Some("build-db") => return builddb::run(&a[2..]),
         Some("build-mask") => return mask::run(&a[2..]),
         Some("long") => return long::run(&a[2..]),
@@ -174,6 +177,7 @@ pub fn cli(mut a: Vec<String>) {
         eprintln!("       hla-wgs build-db hla.dat freq.json DBDIR");
         eprintln!("       hla-wgs build-mask DBDIR GENOME.fa [EXCLUDE.bed]");
         eprintln!("       hla-wgs diag OUTPREFIX   (run log and version as OUTPREFIX.diag.tar for a bug report)");
+        eprintln!("       hla-wgs report PREFIX.json [--text de|en]   (report part PREFIX.report.json again, optionally as text)");
         eprintln!("       hla-wgs mcp   (MCP server over stdio for Claude and other agents)");
         eprintln!("       (DBDIR may also be given as its two files: hladb.json.gz panel.fa; --trace GENE logs one gene in detail)");
         errors::fail("HW-E001", "too few arguments");
@@ -447,7 +451,11 @@ pub fn cli(mut a: Vec<String>) {
     let grp = groups::Groups::load(std::path::Path::new(&a[1]).parent().unwrap_or(std::path::Path::new(".")));
     let st = runlog::begin("write_results");
     output::write(&out, &genes, &ctx, &res, &depth, &drb, &nov, &known, &grp, &log);
-    let mut outputs: Vec<String> = ["tsv", "conf.tsv", "json", "html", "novel.fa", "novel.tsv"].iter().map(|e| format!("{out}.{e}")).filter(|p| std::path::Path::new(p).exists()).collect();
+    // the report part for the overall report of Genome (genome.report.v1), from PREFIX.json
+    if let Err(e) = report::write(&out) {
+        errors::fail("HW-E020", &format!("cannot write the report part: {e}"));
+    }
+    let mut outputs: Vec<String> = ["tsv", "conf.tsv", "json", "report.json", "html", "novel.fa", "novel.tsv"].iter().map(|e| format!("{out}.{e}")).filter(|p| std::path::Path::new(p).exists()).collect();
     outputs.iter_mut().for_each(|p| *p = std::path::Path::new(p.as_str()).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
     st.end(serde_json::json!({"files": outputs.len()}));
     if std::env::var("HLA_TDBG").is_ok() { log(format!("pad total {}", stageb::Ctx::pad_stat())); }

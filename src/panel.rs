@@ -1,4 +1,4 @@
-//! Stage 0: map the extracted read pairs to the gene panel (own aligner, src/aln.rs) and
+//! Stage 0: map the extracted read pairs to the gene panel (own aligner, crate gc-panel) and
 //! assign every pair to the gene(s) with the best summed alignment score.
 use crate::util::open_reader;
 use ahash::AHashMap;
@@ -96,11 +96,26 @@ fn read_input(inp: Input, threads: usize, sink: &mut dyn FnMut(Vec<crate::util::
     }
 }
 
+/// as `aln::Index::from_fasta`, but the file is read through vfs (the browser build has no file system)
+fn index_from_fasta(path: &str, opts: crate::aln::Opts) -> crate::aln::Index {
+    let t = crate::vfs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));
+    let (mut names, mut seqs): (Vec<String>, Vec<Vec<u8>>) = (vec![], vec![]);
+    for l in t.lines() {
+        if let Some(h) = l.strip_prefix('>') {
+            names.push(h.split_whitespace().next().unwrap_or("").to_string());
+            seqs.push(vec![]);
+        } else if let Some(s) = seqs.last_mut() {
+            s.extend_from_slice(l.trim().as_bytes());
+        }
+    }
+    crate::aln::Index::new(names, seqs, opts)
+}
+
 pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
     let envn = |k: &str, d: usize| std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d);
     let opts = crate::aln::Opts { max_align: envn("HLA_PANEL_N", 100), chain_ratio: 0.6, per_group: envn("HLA_PANEL_G", 25), min_chain: envn("HLA_PANEL_C", 25) as f32, min_score: envn("HLA_PANEL_SE", 60) as i32, win: envn("HLA_PANEL_MW", 11), full: envn("HLA_PANEL_FULL", 80) as f32 / 100.0, ..crate::aln::Opts::sr() };
     let t0 = crate::vfs::Instant::now();
-    let al = crate::aln::Index::from_fasta(panel, opts);
+    let al = index_from_fasta(panel, opts);
     crate::elog!("[panel] {} sequences indexed, {:.1}s", al.seqs.len(), t0.elapsed().as_secs_f64());
     // genes whose best alignment of a mate lies within this many points of the mate's best alignment
     let win = envn("HLA_PANEL_W", 0) as i32;

@@ -6,7 +6,10 @@ use super::*;
 struct Rng(u64);
 impl Rng {
     fn next(&mut self) -> u64 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         self.0 >> 33
     }
     fn below(&mut self, n: usize) -> usize {
@@ -48,7 +51,10 @@ impl Rng {
 
 /// number of random cases; HLA_PROPS=n runs n times as many (a longer sweep before a release)
 fn reps(n: usize) -> usize {
-    n * std::env::var("HLA_PROPS").ok().and_then(|v| v.parse().ok()).unwrap_or(1)
+    n * std::env::var("HLA_PROPS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1)
 }
 
 fn subst(sc: &Score, a: u8, b: u8) -> i32 {
@@ -88,7 +94,11 @@ fn full_matrix(q: &[u8], r: &[u8], sc: &Score) -> Vec<Vec<i32>> {
                 f1[i][j] = (h[i - 1][j] - sc.q - sc.e).max(f1[i - 1][j] - sc.e);
                 f2[i][j] = (h[i - 1][j] - sc.q2 - sc.e2).max(f2[i - 1][j] - sc.e2);
             }
-            let d = if i > 0 && j > 0 { h[i - 1][j - 1] + subst(sc, q[i - 1], r[j - 1]) } else { neg };
+            let d = if i > 0 && j > 0 {
+                h[i - 1][j - 1] + subst(sc, q[i - 1], r[j - 1])
+            } else {
+                neg
+            };
             h[i][j] = d.max(e1[i][j]).max(e2[i][j]).max(f1[i][j]).max(f2[i][j]);
         }
     }
@@ -128,7 +138,12 @@ fn path_score(q: &[u8], r: &[u8], ops: &[(u8, u32)], sc: &Score) -> (i32, usize,
 }
 
 fn presets() -> [(&'static str, Score); 4] {
-    [("sr", Opts::sr().sc), ("asm10", Opts::asm10().sc), ("asm5", Opts::asm5().sc), ("hifi", Opts::hifi().sc)]
+    [
+        ("sr", Opts::sr().sc),
+        ("asm10", Opts::asm10().sc),
+        ("asm5", Opts::asm5().sc),
+        ("hifi", Opts::hifi().sc),
+    ]
 }
 
 #[test]
@@ -146,7 +161,11 @@ fn global_is_optimal_on_small_pieces() {
             let best = full_matrix(&q, &r, &sc)[q.len()][r.len()];
             assert_eq!(s, best, "{name} case {t}: score {s}, optimum {best}");
             assert_eq!((qn, rn), (q.len(), r.len()));
-            assert_eq!(path_score(&q, &r, &ops, &sc), (s, q.len(), r.len()), "{name} case {t}: path");
+            assert_eq!(
+                path_score(&q, &r, &ops, &sc),
+                (s, q.len(), r.len()),
+                "{name} case {t}: path"
+            );
         }
     }
 }
@@ -193,9 +212,18 @@ fn extension_finds_the_best_end() {
             assert_eq!(s, any, "{name} case {t}: score");
             let (ps, pi, pj) = path_score(&q, &r, &ops, &sc);
             assert_eq!((pi, pj), (qn, rn), "{name} case {t}: path end");
-            assert_eq!(ps, h[qn][rn], "{name} case {t}: path not optimal for its end");
+            assert_eq!(
+                ps, h[qn][rn],
+                "{name} case {t}: path not optimal for its end"
+            );
             let got = ps + if qn == q.len() { sc.end_bonus } else { 0 };
-            assert_eq!(got, any.max(at_end), "{name} case {t}: end chosen {qn},{rn} q {} r {}", String::from_utf8_lossy(&q), String::from_utf8_lossy(&r));
+            assert_eq!(
+                got,
+                any.max(at_end),
+                "{name} case {t}: end chosen {qn},{rn} q {} r {}",
+                String::from_utf8_lossy(&q),
+                String::from_utf8_lossy(&r)
+            );
         }
     }
 }
@@ -210,7 +238,11 @@ fn split_fill_matches_the_full_alignment() {
         let q = g.rseq(600, 600);
         let r = g.mutate(&q, if t % 2 == 0 { 5 } else { 15 }, 20);
         let (s, ops) = fill(&q, &r, &sc, 0);
-        assert_eq!(path_score(&q, &r, &ops, &sc), (s, q.len(), r.len()), "case {t}: path");
+        assert_eq!(
+            path_score(&q, &r, &ops, &sc),
+            (s, q.len(), r.len()),
+            "case {t}: path"
+        );
         let best = full_matrix(&q, &r, &sc)[q.len()][r.len()];
         assert!(s <= best);
         total += 1;
@@ -220,7 +252,10 @@ fn split_fill_matches_the_full_alignment() {
             eprintln!("fill case {t}: {s} vs optimum {best}");
         }
     }
-    assert!(same * 10 >= total * 9, "split fill optimal in {same} of {total}");
+    assert!(
+        same * 10 >= total * 9,
+        "split fill optimal in {same} of {total}"
+    );
 }
 
 #[test]
@@ -238,14 +273,22 @@ fn left_align_keeps_the_score_and_moves_gaps_left() {
         let r = g.mutate(&q, 40, 3);
         let (s, _, _, ops) = dp_raw(&q, &r, &sc, false);
         let la = left_align(&ops, &q, &r, 0, 0);
-        assert_eq!(path_score(&q, &r, &la, &sc), (s, q.len(), r.len()), "case {t}");
+        assert_eq!(
+            path_score(&q, &r, &la, &sc),
+            (s, q.len(), r.len()),
+            "case {t}"
+        );
         assert_eq!(left_align(&la, &q, &r, 0, 0), la, "case {t}: not stable");
         // no single gap can move one base further left
         let (mut i, mut j) = (0usize, 0usize);
         for (k, &(op, l)) in la.iter().enumerate() {
             let l = l as usize;
             if (op == b'I' || op == b'D') && k > 0 && la[k - 1].0 == b'=' {
-                let last = if op == b'D' { r[j + l - 1] } else { q[i + l - 1] };
+                let last = if op == b'D' {
+                    r[j + l - 1]
+                } else {
+                    q[i + l - 1]
+                };
                 let before = if op == b'D' { r[j - 1] } else { q[i - 1] };
                 assert_ne!(last, before, "case {t}: gap at q {i} r {j} could move left");
             }
@@ -268,7 +311,11 @@ fn family(g: &mut Rng, len: usize, alleles: usize) -> (Vec<String>, Vec<Vec<u8>>
     let mut seqs = vec![];
     for a in 0..alleles {
         names.push(format!("G*{:02}", a + 1));
-        seqs.push(if a == 0 { base.clone() } else { g.mutate(&base, 6, 3) });
+        seqs.push(if a == 0 {
+            base.clone()
+        } else {
+            g.mutate(&base, 6, 3)
+        });
     }
     (names, seqs)
 }
@@ -278,7 +325,16 @@ fn reads_map_to_their_allele_and_paths_hold() {
     let mut g = Rng(6);
     let (names, seqs) = family(&mut g, 3000, 12);
     for win in [0usize, 11] {
-        let idx = Index::new(names.clone(), seqs.clone(), Opts { win, full: 0.8, per_group: 25, ..Opts::sr() });
+        let idx = Index::new(
+            names.clone(),
+            seqs.clone(),
+            Opts {
+                win,
+                full: 0.8,
+                per_group: 25,
+                ..Opts::sr()
+            },
+        );
         let (mut ok, mut n) = (0, 0);
         for t in 0..reps(300) {
             let a = g.below(seqs.len());
@@ -290,14 +346,36 @@ fn reads_map_to_their_allele_and_paths_hold() {
                 read = revcomp(&read);
             }
             let hs = idx.map(&read);
-            let Some(top) = hs.first() else { panic!("read {t} without hit") };
+            let Some(top) = hs.first() else {
+                panic!("read {t} without hit")
+            };
             for h in &hs {
                 let qo = if h.fwd { read.clone() } else { revcomp(&read) };
-                let (qa, qb) = if h.fwd { (h.q_st, h.q_en) } else { (read.len() - h.q_en, read.len() - h.q_st) };
-                let (ps, pi, pj) = path_score(&qo[qa..qb], &seqs[h.seq][h.r_st..h.r_en], &h.ops, &Opts::sr().sc);
-                assert_eq!((pi, pj), (qb - qa, h.r_en - h.r_st), "read {t}: path length");
+                let (qa, qb) = if h.fwd {
+                    (h.q_st, h.q_en)
+                } else {
+                    (read.len() - h.q_en, read.len() - h.q_st)
+                };
+                let (ps, pi, pj) = path_score(
+                    &qo[qa..qb],
+                    &seqs[h.seq][h.r_st..h.r_en],
+                    &h.ops,
+                    &Opts::sr().sc,
+                );
+                assert_eq!(
+                    (pi, pj),
+                    (qb - qa, h.r_en - h.r_st),
+                    "read {t}: path length"
+                );
                 assert!(ps <= h.score, "read {t}: path {ps} over score {}", h.score);
-                assert_eq!(h.nm, h.ops.iter().filter(|o| o.0 != b'=').map(|o| o.1 as usize).sum::<usize>());
+                assert_eq!(
+                    h.nm,
+                    h.ops
+                        .iter()
+                        .filter(|o| o.0 != b'=')
+                        .map(|o| o.1 as usize)
+                        .sum::<usize>()
+                );
             }
             n += 1;
             let mine = hs.iter().filter(|h| h.seq == a).map(|h| h.score).max();
@@ -307,7 +385,10 @@ fn reads_map_to_their_allele_and_paths_hold() {
             }
         }
         // a read of an allele scores best on its own allele (ties with alleles equal there count)
-        assert!(ok * 100 >= n * 99, "win {win}: own allele best for {ok} of {n} reads");
+        assert!(
+            ok * 100 >= n * 99,
+            "win {win}: own allele best for {ok} of {n} reads"
+        );
     }
 }
 
@@ -315,7 +396,16 @@ fn reads_map_to_their_allele_and_paths_hold() {
 fn mapping_is_the_same_with_any_number_of_threads() {
     let mut g = Rng(7);
     let (names, seqs) = family(&mut g, 2500, 10);
-    let idx = Index::new(names, seqs.clone(), Opts { win: 11, full: 0.8, per_group: 25, ..Opts::sr() });
+    let idx = Index::new(
+        names,
+        seqs.clone(),
+        Opts {
+            win: 11,
+            full: 0.8,
+            per_group: 25,
+            ..Opts::sr()
+        },
+    );
     let reads: Vec<Vec<u8>> = (0..400)
         .map(|_| {
             let s = &seqs[g.below(seqs.len())];
@@ -323,14 +413,36 @@ fn mapping_is_the_same_with_any_number_of_threads() {
             g.mutate(&s[p..p + 150], 10, 4)
         })
         .collect();
-    let key = |hs: Vec<Hit>| hs.iter().map(|h| (h.seq, h.fwd, h.q_st, h.q_en, h.r_st, h.r_en, h.score, h.ops.clone())).collect::<Vec<_>>();
+    let key = |hs: Vec<Hit>| {
+        hs.iter()
+            .map(|h| {
+                (
+                    h.seq,
+                    h.fwd,
+                    h.q_st,
+                    h.q_en,
+                    h.r_st,
+                    h.r_en,
+                    h.score,
+                    h.ops.clone(),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
     let one: Vec<_> = reads.iter().map(|r| key(idx.map(r))).collect();
     for th in [2usize, 4, 8] {
         let out: Vec<_> = std::thread::scope(|s| {
             let hs: Vec<_> = (0..th)
                 .map(|k| {
                     let (idx, reads) = (&idx, &reads);
-                    s.spawn(move || reads.iter().enumerate().filter(|(i, _)| i % th == k).map(|(i, r)| (i, key(idx.map(r)))).collect::<Vec<_>>())
+                    s.spawn(move || {
+                        reads
+                            .iter()
+                            .enumerate()
+                            .filter(|(i, _)| i % th == k)
+                            .map(|(i, r)| (i, key(idx.map(r))))
+                            .collect::<Vec<_>>()
+                    })
                 })
                 .collect();
             let mut v: Vec<_> = hs.into_iter().flat_map(|h| h.join().unwrap()).collect();
@@ -368,7 +480,11 @@ fn quality_lowers_only_the_cost_of_uncertain_mismatches() {
     let b = Opts::sr().sc.b;
     let mut qual = vec![30u8; 150];
     let h = idx.map(&q)[0].clone();
-    assert_eq!(qual_score(&h, &qual, b, 20), h.score, "high qualities change nothing");
+    assert_eq!(
+        qual_score(&h, &qual, b, 20),
+        h.score,
+        "high qualities change nothing"
+    );
     qual[140] = 2;
     assert_eq!(qual_score(&h, &qual, b, 20), h.score + b - b * 2 / 20);
     // on the reverse strand the same base keeps its quality
@@ -402,7 +518,11 @@ fn bench_ext() {
         sum += o.0 as i64;
     }
     let e = t.elapsed().as_secs_f64();
-    eprintln!("ext: {:.1} ms, {:.2} ns per band cell, checksum {sum}", e * 1e3, e * 1e9 / cells as f64);
+    eprintln!(
+        "ext: {:.1} ms, {:.2} ns per band cell, checksum {sum}",
+        e * 1e3,
+        e * 1e9 / cells as f64
+    );
 }
 
 #[test]
@@ -415,7 +535,11 @@ fn banded_local_matches_local() {
         let q = g.mutate(&r[p..(p + 150).min(r.len())], 30, 6);
         let full = local(&q, &r, &sc);
         // a band over every cell is the full problem
-        assert_eq!(local_band(&q, &r, -(q.len() as i64), r.len() as i64, &sc), full, "case {t}: wide band");
+        assert_eq!(
+            local_band(&q, &r, -(q.len() as i64), r.len() as i64, &sc),
+            full,
+            "case {t}: wide band"
+        );
         // a band around the true diagonal with room for the indels finds the same score
         let d = p as i64;
         let b = local_band(&q, &r, d - 40, d + 40, &sc);
@@ -444,14 +568,20 @@ fn bench_rescue() {
         sum += local_seeded(q, r, &sc).0 as i64;
     }
     let e = t.elapsed().as_secs_f64();
-    eprintln!("rescue: {:.1} us per call, checksum {sum}", e * 1e6 / cases.len() as f64);
+    eprintln!(
+        "rescue: {:.1} us per call, checksum {sum}",
+        e * 1e6 / cases.len() as f64
+    );
     let t = std::time::Instant::now();
     for (q, r) in &cases {
         let p: i64 = 0;
         sum += local_band(q, &r[..230.min(r.len())], p - 40, p + 40, &sc).0 as i64;
     }
     let e = t.elapsed().as_secs_f64();
-    eprintln!("band only: {:.1} us per call", e * 1e6 / cases.len() as f64);
+    eprintln!(
+        "band only: {:.1} us per call, checksum {sum}",
+        e * 1e6 / cases.len() as f64
+    );
 }
 
 /// banded local alignment cell by cell: (best, i, j) with the smallest (i, j) among the best cells
@@ -459,7 +589,12 @@ fn band_ref(q: &[u8], r: &[u8], dlo: i64, dhi: i64, sc: &Score) -> (i32, usize, 
     let (n, m) = (q.len(), r.len());
     let neg = i32::MIN / 4;
     let mut h = vec![vec![0i32; m + 1]; n + 1];
-    let (mut e1, mut e2, mut f1, mut f2) = (vec![vec![neg; m + 1]; n + 1], vec![vec![neg; m + 1]; n + 1], vec![vec![neg; m + 1]; n + 1], vec![vec![neg; m + 1]; n + 1]);
+    let (mut e1, mut e2, mut f1, mut f2) = (
+        vec![vec![neg; m + 1]; n + 1],
+        vec![vec![neg; m + 1]; n + 1],
+        vec![vec![neg; m + 1]; n + 1],
+        vec![vec![neg; m + 1]; n + 1],
+    );
     let mut best = (0, 0, 0);
     for i in 1..=n {
         for j in 1..=m {
@@ -471,7 +606,12 @@ fn band_ref(q: &[u8], r: &[u8], dlo: i64, dhi: i64, sc: &Score) -> (i32, usize, 
             e2[i][j] = (h[i][j - 1] - sc.q2 - sc.e2).max(e2[i][j - 1] - sc.e2);
             f1[i][j] = (h[i - 1][j] - sc.q - sc.e).max(f1[i - 1][j] - sc.e);
             f2[i][j] = (h[i - 1][j] - sc.q2 - sc.e2).max(f2[i - 1][j] - sc.e2);
-            let v = (h[i - 1][j - 1] + subst(sc, q[i - 1], r[j - 1])).max(e1[i][j]).max(e2[i][j]).max(f1[i][j]).max(f2[i][j]).max(0);
+            let v = (h[i - 1][j - 1] + subst(sc, q[i - 1], r[j - 1]))
+                .max(e1[i][j])
+                .max(e2[i][j])
+                .max(f1[i][j])
+                .max(f2[i][j])
+                .max(0);
             h[i][j] = v;
             if v > best.0 {
                 best = (v, i, j);
@@ -487,14 +627,25 @@ fn antidiagonal_band_matches_cell_by_cell() {
     let sc = Opts::sr().sc;
     for t in 0..reps(400) {
         let r = g.rseq(20, 250);
-        let q = if t % 3 == 0 { g.rseq(5, 160) } else { let p = g.below(r.len()); g.mutate(&r[p..(p + 150).min(r.len())], 40, 6) };
+        let q = if t % 3 == 0 {
+            g.rseq(5, 160)
+        } else {
+            let p = g.below(r.len());
+            g.mutate(&r[p..(p + 150).min(r.len())], 40, 6)
+        };
         if q.is_empty() {
             continue;
         }
         let c = g.below(r.len()) as i64 - g.below(q.len()) as i64;
         let w = 2 + g.below(60) as i64;
         let (dlo, dhi) = (c - w, c + w);
-        assert_eq!(local_band_ad(&q, &r, dlo, dhi, &sc), band_ref(&q, &r, dlo, dhi, &sc), "case {t} n {} m {} band {dlo}..{dhi}", q.len(), r.len());
+        assert_eq!(
+            local_band_ad(&q, &r, dlo, dhi, &sc),
+            band_ref(&q, &r, dlo, dhi, &sc),
+            "case {t} n {} m {} band {dlo}..{dhi}",
+            q.len(),
+            r.len()
+        );
     }
 }
 
@@ -529,7 +680,15 @@ fn antidiagonal_extension_equals_row_wise() {
             FORCE_ROWS.with(|c| c.set(true));
             let b = dp_raw(&q, &r, &sc, true);
             FORCE_ROWS.with(|c| c.set(false));
-            assert_eq!(a, b, "{name} case {t} n {} m {} bw {} zdrop {}", q.len(), r.len(), sc.bw, sc.zdrop);
+            assert_eq!(
+                a,
+                b,
+                "{name} case {t} n {} m {} bw {} zdrop {}",
+                q.len(),
+                r.len(),
+                sc.bw,
+                sc.zdrop
+            );
         }
     }
 }

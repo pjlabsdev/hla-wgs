@@ -73,6 +73,12 @@ Genes with an estimated copy number also carry `copy_ratio` (depth relative to t
 genes). `margin` values are `null` when no competitor exists at that field; `new_sites` is `null`
 when the allele was not examined.
 
+## PREFIX.report.json
+
+The report part for the overall report of Genome (schema `genome.report.v1`), derived from
+`PREFIX.json`: key findings, tables, run quality, method, validation, limits and references, with all
+texts in German and English. Format in [manual/report.md](manual/report.md).
+
 ## PREFIX.novel.fa
 
 Written when at least one allele has new sites that can be applied. One record per such allele:
@@ -159,27 +165,8 @@ counts, every automatic decision with its reason, progress, and errors with thei
 
 ## Environment switches
 
-For experiments; the defaults are the validated configuration.
-
-| variable | effect |
-|---|---|
-| `HLA_NONOVEL` | skip the new-allele examination |
-| `HLA_NOREP` | skip the repeat-length examination |
-| `HLA_IO_RETRIES` | number of retries after an input I/O error (default 6); wrong or damaged content (no index, truncated file, not a FASTQ) is not retried but reported at once |
-| `HLA_FULLKMERS` | set to use all panel 21-mers in the FASTQ prefilter, including those inside the repeat mask (slower, the behaviour before 1.1) |
-| `HLA_SAVE_READS` | prefix for a FASTQ copy of the read pairs that pass the panel prefilter |
-| `HLA_NOKNOWN` | do not rename a call to the database allele that its new sites describe |
-| `HLA_NOBIG` | count long insertions and deletions per base instead of as one event |
-| `HLA_UNPH` | also cut the fourth field when a sibling allele differs only at positions without phase information (fewer wrong, clearly fewer certain calls) |
-| `HLA_TGRP=6` | two and three fields need a lead of 6 as before 1.2 (`thresholds.2` and `.3`); a four-field call always needs leads of `thresholds.4_lead_2_3` at fields 2 and 3 |
-| `HLA_F401=0` | fourth field 01 needs the full lead of 4 like any other allele (`thresholds.4_01` is then null) |
-| `HLA_UNSTHIN=0` | old rule for unsupported database bases: also in stretches with fewer than half the usual reads |
-| `HLA_PAD_MIN` | a database allele more than this many bases shorter than another allele of its gene gets that allele's flank when alleles are compared (default 8; 1.0 used 20) |
-| `HLA_PAD_CACHE` | file for the padding cache (default `pad_cache.tsv.gz` next to `hladb.json.gz`; `0` switches it off). It keeps the alignments of database alleles against each other that the first run on a reference makes; later runs read them instead of aligning again. The result is the same with and without it. |
-| `HLA_NOV_EDGE` | distance from a gene end within which a new site needs 90 % of the reads (default 15) |
-| `HLA_WGS_LANG` | `de` or `en`: language of the start files and of the result page |
-| `HLA_WGS_NO_UPDATE=1` | the start files do not check GitHub for a newer release |
-| `HLA_PHASE`, `HLA_BREAK` | experimental phase and break-point rules, off by default |
+For experiments; the defaults are the validated configuration. All switches with their effect are
+in [manual/switches.md](manual/switches.md).
 
 ## PREFIX.html
 

@@ -1,7 +1,22 @@
-//! Own sequence aligner in Rust: exact k-mer anchors, chaining of the anchors, and an alignment with
-//! two-piece affine gap costs between the anchors (global) and beyond them (extension with z-drop).
-//! It replaces the C library minimap2; scores follow the minimap2 presets, so thresholds keep their
-//! meaning.
+//! Panel-Aligner: Reads und Allele gegen viele sehr ähnliche Sequenzen einer Genfamilie (alle Allele
+//! eines Gens, seine Paraloge und Pseudogene). Übernommen aus hla-wgs, wo er minimap2 ersetzt hat:
+//! k-mer-Anker, Ketten, Alignment mit zweistufigen affinen Lücken und linksbündigen Lücken, gebändertes
+//! lokales Alignment für die Rettung des Partner-Reads, Voreinstellungen mit den Punktwerten von
+//! minimap2, damit darauf gebaute Schwellen ihre Bedeutung behalten. Das Ergebnis hängt weder vom
+//! Prozessor noch von der Kernzahl ab; AVX2 ändert nur das Tempo (`gc_sys::with_avx2`).
+//! Handbuch: docs/handbuch/verfahren/panel-alignment.md. Die Kommentare im Code sind aus hla-wgs
+//! übernommen (Englisch).
+// Der Code ist unverändert aus hla-wgs übernommen, damit dessen Ergebnisse byte-gleich bleiben;
+// diese Stil-Hinweise ändern nichts am Verhalten und werden deshalb hier nicht umgesetzt.
+#![allow(
+    clippy::type_complexity,
+    clippy::too_many_arguments,
+    clippy::collapsible_if,
+    clippy::unnecessary_map_or,
+    clippy::manual_repeat_n,
+    clippy::missing_const_for_thread_local
+)]
+
 use ahash::AHashMap;
 
 #[derive(Clone, Copy, Debug)]
@@ -53,20 +68,115 @@ pub struct Opts {
 
 impl Opts {
     pub fn sr() -> Opts {
-        Opts { k: 21, sc: Score { a: 2, b: 8, q: 12, e: 2, q2: 24, e2: 1, zdrop: 100, end_bonus: 10, bw: 32 }, max_occ: 5000, max_gap: 100, chain_bw: 100, min_chain: 25.0, max_align: 20, chain_ratio: 0.0, min_score: 40, per_group: 0, max_occ_seq: 50, lookback: 50, stride: 1, win: 0, full: 0.0 }
+        Opts {
+            k: 21,
+            sc: Score {
+                a: 2,
+                b: 8,
+                q: 12,
+                e: 2,
+                q2: 24,
+                e2: 1,
+                zdrop: 100,
+                end_bonus: 10,
+                bw: 32,
+            },
+            max_occ: 5000,
+            max_gap: 100,
+            chain_bw: 100,
+            min_chain: 25.0,
+            max_align: 20,
+            chain_ratio: 0.0,
+            min_score: 40,
+            per_group: 0,
+            max_occ_seq: 50,
+            lookback: 50,
+            stride: 1,
+            win: 0,
+            full: 0.0,
+        }
     }
     /// short reads against a single sequence: shorter seeds find reads of new alleles with dense differences
     pub fn sr_single() -> Opts {
-        Opts { k: 15, max_occ: 50, ..Opts::sr() }
+        Opts {
+            k: 15,
+            max_occ: 50,
+            ..Opts::sr()
+        }
     }
     pub fn asm10() -> Opts {
-        Opts { k: 19, sc: Score { a: 1, b: 9, q: 16, e: 2, q2: 41, e2: 1, zdrop: 200, end_bonus: 0, bw: 500 }, max_occ: 50, max_gap: 10000, chain_bw: 2000, min_chain: 40.0, max_align: 5, chain_ratio: 0.0, min_score: 40, per_group: 0, max_occ_seq: 1, lookback: 200, stride: 1, win: 0, full: 0.0 }
+        Opts {
+            k: 19,
+            sc: Score {
+                a: 1,
+                b: 9,
+                q: 16,
+                e: 2,
+                q2: 41,
+                e2: 1,
+                zdrop: 200,
+                end_bonus: 0,
+                bw: 500,
+            },
+            max_occ: 50,
+            max_gap: 10000,
+            chain_bw: 2000,
+            min_chain: 40.0,
+            max_align: 5,
+            chain_ratio: 0.0,
+            min_score: 40,
+            per_group: 0,
+            max_occ_seq: 1,
+            lookback: 200,
+            stride: 1,
+            win: 0,
+            full: 0.0,
+        }
     }
     pub fn asm5() -> Opts {
-        Opts { sc: Score { a: 1, b: 19, q: 39, e: 3, q2: 81, e2: 1, zdrop: 200, end_bonus: 0, bw: 500 }, ..Opts::asm10() }
+        Opts {
+            sc: Score {
+                a: 1,
+                b: 19,
+                q: 39,
+                e: 3,
+                q2: 81,
+                e2: 1,
+                zdrop: 200,
+                end_bonus: 0,
+                bw: 500,
+            },
+            ..Opts::asm10()
+        }
     }
     pub fn hifi() -> Opts {
-        Opts { k: 19, sc: Score { a: 1, b: 4, q: 6, e: 2, q2: 26, e2: 1, zdrop: 400, end_bonus: 0, bw: 100 }, max_occ: 5000, max_gap: 5000, chain_bw: 5000, min_chain: 40.0, max_align: 50, chain_ratio: 0.0, min_score: 40, per_group: 0, max_occ_seq: 2, lookback: 200, stride: 4, win: 0, full: 0.0 }
+        Opts {
+            k: 19,
+            sc: Score {
+                a: 1,
+                b: 4,
+                q: 6,
+                e: 2,
+                q2: 26,
+                e2: 1,
+                zdrop: 400,
+                end_bonus: 0,
+                bw: 100,
+            },
+            max_occ: 5000,
+            max_gap: 5000,
+            chain_bw: 5000,
+            min_chain: 40.0,
+            max_align: 50,
+            chain_ratio: 0.0,
+            min_score: 40,
+            per_group: 0,
+            max_occ_seq: 2,
+            lookback: 200,
+            stride: 4,
+            win: 0,
+            full: 0.0,
+        }
     }
 }
 
@@ -93,7 +203,14 @@ impl Hit {
     /// difference string in minimap2 short form (":n", "*rq", "+ins", "-del"), lower case
     pub fn cs(&self, q: &[u8], r: &[u8]) -> String {
         let qo: Vec<u8> = if self.fwd { q.to_vec() } else { revcomp(q) };
-        let (mut i, mut j) = (if self.fwd { self.q_st } else { q.len() - self.q_en }, self.r_st);
+        let (mut i, mut j) = (
+            if self.fwd {
+                self.q_st
+            } else {
+                q.len() - self.q_en
+            },
+            self.r_st,
+        );
         let mut s = String::new();
         for &(op, l) in &self.ops {
             let l = l as usize;
@@ -192,7 +309,11 @@ fn hash64(mut x: u64) -> u64 {
 
 /// k-mers ending at each position (value, end position); positions with N are skipped
 fn kmers(s: &[u8], k: usize, mut f: impl FnMut(u64, usize)) {
-    let mask = if k >= 32 { u64::MAX } else { (1u64 << (2 * k)) - 1 };
+    let mask = if k >= 32 {
+        u64::MAX
+    } else {
+        (1u64 << (2 * k)) - 1
+    };
     let (mut v, mut l) = (0u64, 0usize);
     for (i, &c) in s.iter().enumerate() {
         let x = code(c);
@@ -238,8 +359,22 @@ impl Index {
             i = j;
         }
         let mut gid: AHashMap<&str, u32> = AHashMap::new();
-        let group = names.iter().map(|n| { let g = n.split('*').next().unwrap_or(""); let l = gid.len() as u32; *gid.entry(g).or_insert(l) }).collect();
-        Index { opts, names, seqs, map, pos, group }
+        let group = names
+            .iter()
+            .map(|n| {
+                let g = n.split('*').next().unwrap_or("");
+                let l = gid.len() as u32;
+                *gid.entry(g).or_insert(l)
+            })
+            .collect();
+        Index {
+            opts,
+            names,
+            seqs,
+            map,
+            pos,
+            group,
+        }
     }
 
     pub fn single(seq: &[u8], opts: Opts) -> Index {
@@ -248,7 +383,11 @@ impl Index {
 
     pub fn from_fasta(path: &str, opts: Opts) -> Index {
         let mut t = String::new();
-        std::io::Read::read_to_string(&mut crate::util::open_reader(path), &mut t).unwrap_or_else(|e| panic!("{path}: {e}"));
+        std::io::Read::read_to_string(
+            &mut std::fs::File::open(path).unwrap_or_else(|e| panic!("{path}: {e}")),
+            &mut t,
+        )
+        .unwrap_or_else(|e| panic!("{path}: {e}"));
         let (mut names, mut seqs): (Vec<String>, Vec<Vec<u8>>) = (vec![], vec![]);
         for l in t.lines() {
             if let Some(h) = l.strip_prefix('>') {
@@ -266,7 +405,11 @@ impl Index {
         let k = self.opts.k;
         let ns = self.seqs.len();
         let mut out = vec![];
-        let mut tm = if *STAT_ON { Some(crate::vfs::Instant::now()) } else { None };
+        let mut tm = if *STAT_ON {
+            Some(std::time::Instant::now())
+        } else {
+            None
+        };
         let rc = revcomp(q);
         // k-mer hits per strand: (query end, start in pos, count)
         let mut hl: [Vec<(u32, u32, u32)>; 2] = [vec![], vec![]];
@@ -286,7 +429,8 @@ impl Index {
                 // (the earliest of equal hashes stays in front, as a scan from the left finds it)
                 let w = win;
                 let nwin = km.len().saturating_sub(w - 1).max(1.min(km.len()));
-                let mut dq: std::collections::VecDeque<usize> = std::collections::VecDeque::with_capacity(w + 1);
+                let mut dq: std::collections::VecDeque<usize> =
+                    std::collections::VecDeque::with_capacity(w + 1);
                 let mut last = usize::MAX;
                 let mut next = 0;
                 for s in 0..nwin {
@@ -336,7 +480,8 @@ impl Index {
             let mut ch = vec![false; ns * 2];
             for x in cand {
                 let e = per.entry(self.group[x / 2]).or_insert((0, cnt[x]));
-                if e.0 < self.opts.per_group || (cnt[x] + 1 >= e.1 && e.0 < 4 * self.opts.per_group) {
+                if e.0 < self.opts.per_group || (cnt[x] + 1 >= e.1 && e.0 < 4 * self.opts.per_group)
+                {
                     e.0 += 1;
                     ch[x] = true;
                 }
@@ -359,14 +504,18 @@ impl Index {
                         b += 1;
                     }
                     let s = ps[a].0;
-                    if b - a <= self.opts.max_occ_seq && chosen.as_ref().map_or(true, |c| c[s as usize * 2 + si]) {
+                    if b - a <= self.opts.max_occ_seq
+                        && chosen.as_ref().map_or(true, |c| c[s as usize * 2 + si])
+                    {
                         let mut x = bid[s as usize];
                         if x == u32::MAX {
                             x = buckets.len() as u32;
                             bid[s as usize] = x;
                             buckets.push((s, Vec::with_capacity(hl[si].len())));
                         }
-                        buckets[x as usize].1.extend(ps[a..b].iter().map(|&(_, p)| (p, i)));
+                        buckets[x as usize]
+                            .1
+                            .extend(ps[a..b].iter().map(|&(_, p)| (p, i)));
                     }
                     a = b;
                 }
@@ -393,12 +542,22 @@ impl Index {
                     }
                 };
                 for (sc, c) in &shapes[id] {
-                    out.push((*sc, s as usize, si == 0, c.iter().map(|&(a, b)| (a, b + r0)).collect()));
+                    out.push((
+                        *sc,
+                        s as usize,
+                        si == 0,
+                        c.iter().map(|&(a, b)| (a, b + r0)).collect(),
+                    ));
                 }
             }
             part(3, &mut tm);
         }
-        out.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap().then(a.1.cmp(&b.1)).then(b.2.cmp(&a.2)));
+        out.sort_by(|a, b| {
+            b.0.partial_cmp(&a.0)
+                .unwrap()
+                .then(a.1.cmp(&b.1))
+                .then(b.2.cmp(&a.2))
+        });
         out
     }
 
@@ -436,7 +595,11 @@ impl Index {
                     continue;
                 }
                 let gain = dq.min(dr).min(self.opts.k as i64) as f32;
-                let cost = if dd == 0 { 0.0 } else { 0.01 * k * dd as f32 + 0.5 * (dd as f32).log2() };
+                let cost = if dd == 0 {
+                    0.0
+                } else {
+                    0.01 * k * dd as f32 + 0.5 * (dd as f32).log2()
+                };
                 let s = f[j] + gain - cost;
                 if s > f[i] {
                     f[i] = s;
@@ -482,15 +645,26 @@ impl Index {
     /// all alignments of the query, best score first; the first is marked primary
     pub fn map(&self, q: &[u8]) -> Vec<Hit> {
         let q = q.to_ascii_uppercase();
-        let t = if *STAT_ON { Some(crate::vfs::Instant::now()) } else { None };
+        let t = if *STAT_ON {
+            Some(std::time::Instant::now())
+        } else {
+            None
+        };
         let mut ch = self.chains(&q, self.opts.win);
         // minimizers find a read that matches a sequence almost exactly; a read whose best chain covers
         // less than `full` of it (variants, a new allele, a gene boundary) is seeded again with every k-mer
-        if self.opts.win > 1 && ch.first().map_or(true, |c| c.0 < self.opts.full * q.len() as f32) {
+        if self.opts.win > 1
+            && ch
+                .first()
+                .map_or(true, |c| c.0 < self.opts.full * q.len() as f32)
+        {
             ch = self.chains(&q, 0);
         }
         if let Some(t) = t {
-            CHAIN_NS.fetch_add(t.elapsed().as_nanos() as u64, std::sync::atomic::Ordering::Relaxed);
+            CHAIN_NS.fetch_add(
+                t.elapsed().as_nanos() as u64,
+                std::sync::atomic::Ordering::Relaxed,
+            );
         }
         let best = ch.first().map(|c| c.0).unwrap_or(0.0);
         let rc = revcomp(&q);
@@ -551,9 +725,21 @@ impl Index {
                 Some(h)
             })
             .collect();
-        hits.sort_by(|a, b| b.score.cmp(&a.score).then(a.seq.cmp(&b.seq)).then(b.fwd.cmp(&a.fwd)).then(a.r_st.cmp(&b.r_st)));
+        hits.sort_by(|a, b| {
+            b.score
+                .cmp(&a.score)
+                .then(a.seq.cmp(&b.seq))
+                .then(b.fwd.cmp(&a.fwd))
+                .then(a.r_st.cmp(&b.r_st))
+        });
         // the same alignment reached by two chains is reported once
-        hits.dedup_by(|a, b| a.seq == b.seq && a.fwd == b.fwd && a.r_st == b.r_st && a.r_en == b.r_en && a.q_st == b.q_st);
+        hits.dedup_by(|a, b| {
+            a.seq == b.seq
+                && a.fwd == b.fwd
+                && a.r_st == b.r_st
+                && a.r_en == b.r_en
+                && a.q_st == b.q_st
+        });
         if let Some(h) = hits.first_mut() {
             h.primary = true;
         }
@@ -591,7 +777,14 @@ pub fn local(q: &[u8], r: &[u8], sc: &Score) -> (i32, usize, usize, usize, usize
                 e1 = (hleft - oe1).max(e1 - e_1);
                 e2 = (hleft - oe2).max(e2 - e_2);
                 let x = r[j - 1];
-                let d = hpr[j - 1] + if qn || x == b'N' { -1 } else if qi == x { a } else { -b };
+                let d = hpr[j - 1]
+                    + if qn || x == b'N' {
+                        -1
+                    } else if qi == x {
+                        a
+                    } else {
+                        -b
+                    };
                 let h = d.max(e1).max(e2).max(n1).max(n2).max(0);
                 hcr[j] = h;
                 hleft = h;
@@ -622,7 +815,13 @@ pub fn local(q: &[u8], r: &[u8], sc: &Score) -> (i32, usize, usize, usize, usize
 /// `local` restricted to the cells with dlo <= j - i <= dhi (i in q, j in r, both from 1): an
 /// alignment along a known diagonal with indels up to the band's margin. Cells outside the band count
 /// as the start of a new alignment, which is exact for the banded problem.
-pub fn local_band(q: &[u8], r: &[u8], dlo: i64, dhi: i64, sc: &Score) -> (i32, usize, usize, usize, usize) {
+pub fn local_band(
+    q: &[u8],
+    r: &[u8],
+    dlo: i64,
+    dhi: i64,
+    sc: &Score,
+) -> (i32, usize, usize, usize, usize) {
     let fwd = |q: &[u8], r: &[u8], dlo: i64, dhi: i64| -> (i32, usize, usize) {
         let (n, m) = (q.len(), r.len());
         let (oe1, oe2) = (sc.q + sc.e, sc.q2 + sc.e2);
@@ -656,7 +855,14 @@ pub fn local_band(q: &[u8], r: &[u8], dlo: i64, dhi: i64, sc: &Score) -> (i32, u
                 e1 = (hleft - oe1).max(e1 - e_1);
                 e2 = (hleft - oe2).max(e2 - e_2);
                 let x = r[j - 1];
-                let d = hp[j - 1] + if qn || x == b'N' { -1 } else if qi == x { a } else { -b };
+                let d = hp[j - 1]
+                    + if qn || x == b'N' {
+                        -1
+                    } else if qi == x {
+                        a
+                    } else {
+                        -b
+                    };
                 let h = d.max(e1).max(e2).max(n1).max(n2).max(0);
                 hc[j] = h;
                 hleft = h;
@@ -680,7 +886,13 @@ pub fn local_band(q: &[u8], r: &[u8], dlo: i64, dhi: i64, sc: &Score) -> (i32, u
         }
         (best, bi, bj)
     };
-    let fwd = |q: &[u8], r: &[u8], dlo: i64, dhi: i64| if *RESCUE_AD && dhi > dlo { local_band_ad(q, r, dlo, dhi, sc) } else { fwd(q, r, dlo, dhi) };
+    let fwd = |q: &[u8], r: &[u8], dlo: i64, dhi: i64| {
+        if *RESCUE_AD && dhi > dlo {
+            local_band_ad(q, r, dlo, dhi, sc)
+        } else {
+            fwd(q, r, dlo, dhi)
+        }
+    };
     let (s, qe, re) = fwd(q, r, dlo, dhi);
     if s == 0 {
         return (0, 0, 0, 0, 0);
@@ -692,25 +904,15 @@ pub fn local_band(q: &[u8], r: &[u8], dlo: i64, dhi: i64, sc: &Score) -> (i32, u
     (s, qe - ql, qe, re - rl, re)
 }
 
-static RESCUE_AD: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| std::env::var("HLA_RESCUE_AD").map_or(true, |v| v != "0"));
+static RESCUE_AD: std::sync::LazyLock<bool> =
+    std::sync::LazyLock::new(|| std::env::var("HLA_RESCUE_AD").map_or(true, |v| v != "0"));
 
 /// The forward pass of `local_band` computed by anti-diagonals: the cells of one anti-diagonal do
 /// not depend on each other, so the inner loop has no carried dependency and the compiler turns it
 /// into vector instructions (SSE/AVX on x86, NEON on ARM). Same result as the row-wise pass,
 /// including which of several equally good end cells is reported (smallest i, then smallest j).
 fn local_band_ad(q: &[u8], r: &[u8], dlo: i64, dhi: i64, sc: &Score) -> (i32, usize, usize) {
-    #[cfg(target_arch = "x86_64")]
-    if std::arch::is_x86_feature_detected!("avx2") {
-        // SAFETY: the CPU has AVX2
-        return unsafe { local_band_ad_avx2(q, r, dlo, dhi, sc) };
-    }
-    local_band_ad_impl(q, r, dlo, dhi, sc)
-}
-
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2")]
-unsafe fn local_band_ad_avx2(q: &[u8], r: &[u8], dlo: i64, dhi: i64, sc: &Score) -> (i32, usize, usize) {
-    local_band_ad_impl(q, r, dlo, dhi, sc)
+    gc_sys::with_avx2(|| local_band_ad_impl(q, r, dlo, dhi, sc))
 }
 
 #[inline(always)]
@@ -760,7 +962,13 @@ fn local_band_ad_impl(q: &[u8], r: &[u8], dlo: i64, dhi: i64, sc: &Score) -> (i3
             let ho = &mut h2[ilo..=ihi];
             for x in 0..len {
                 let (a, b) = (qs[x], rs[x]);
-                let sv = if a == b'N' || b == b'N' { -1 } else if a == b { sa } else { sb };
+                let sv = if a == b'N' || b == b'N' {
+                    -1
+                } else if a == b {
+                    sa
+                } else {
+                    sb
+                };
                 let e1 = (hl[x] - oe1).max(ear[x] - e_1);
                 let e2 = (hl[x] - oe2).max(ebr[x] - e_2);
                 let f1 = (hu[x] - oe1).max(fap[x] - e_1);
@@ -797,18 +1005,36 @@ fn local_band_ad_impl(q: &[u8], r: &[u8], dlo: i64, dhi: i64, sc: &Score) -> (i3
 
 /// `local`, restricted to the stretches of r around the two diagonals with the most shared 11-mers
 pub fn local_seeded(q: &[u8], r: &[u8], sc: &Score) -> (i32, usize, usize, usize, usize) {
-    let t = if *STAT_ON { Some(crate::vfs::Instant::now()) } else { None };
+    let t = if *STAT_ON {
+        Some(std::time::Instant::now())
+    } else {
+        None
+    };
     let x = local_seeded_in(q, r, sc);
     if let Some(t) = t {
         RESCUE[0].fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        RESCUE[1].fetch_add(t.elapsed().as_nanos() as u64, std::sync::atomic::Ordering::Relaxed);
+        RESCUE[1].fetch_add(
+            t.elapsed().as_nanos() as u64,
+            std::sync::atomic::Ordering::Relaxed,
+        );
     }
     x
 }
-static RESCUE_VOTES: std::sync::LazyLock<u32> = std::sync::LazyLock::new(|| std::env::var("HLA_RESCUE_V").ok().and_then(|v| v.parse().ok()).unwrap_or(3));
+static RESCUE_VOTES: std::sync::LazyLock<u32> = std::sync::LazyLock::new(|| {
+    std::env::var("HLA_RESCUE_V")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(3)
+});
 /// indel margin of the banded rescue alignment (HLA_RESCUE_BAND; 0 = the whole window)
-static RESCUE_BAND: std::sync::LazyLock<i64> = std::sync::LazyLock::new(|| std::env::var("HLA_RESCUE_BAND").ok().and_then(|v| v.parse().ok()).unwrap_or(24));
-static RESCUE: [std::sync::atomic::AtomicU64; 2] = [const { std::sync::atomic::AtomicU64::new(0) }; 2];
+static RESCUE_BAND: std::sync::LazyLock<i64> = std::sync::LazyLock::new(|| {
+    std::env::var("HLA_RESCUE_BAND")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(24)
+});
+static RESCUE: [std::sync::atomic::AtomicU64; 2] =
+    [const { std::sync::atomic::AtomicU64::new(0) }; 2];
 
 fn local_seeded_in(q: &[u8], r: &[u8], sc: &Score) -> (i32, usize, usize, usize, usize) {
     const K: usize = 11;
@@ -862,7 +1088,12 @@ fn local_seeded_in(q: &[u8], r: &[u8], sc: &Score) -> (i32, usize, usize, usize,
         }
         a = b;
     }
-    let mut v: Vec<(i64, u32)> = votes.iter().enumerate().filter(|x| *x.1 > 0).map(|(x, &c)| (x as i64 - base, c)).collect();
+    let mut v: Vec<(i64, u32)> = votes
+        .iter()
+        .enumerate()
+        .filter(|x| *x.1 > 0)
+        .map(|(x, &c)| (x as i64 - base, c))
+        .collect();
     v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
     // a stretch that shares fewer than three 11-mers with the read does not hold a usable alignment
     // of it (on HG00438: 0 of 282 such rescues reached the score a hit needs); skip the alignment
@@ -902,7 +1133,13 @@ fn local_seeded_in(q: &[u8], r: &[u8], sc: &Score) -> (i32, usize, usize, usize,
             if lo >= hi {
                 continue;
             }
-            let x = local_band(q, &r[lo..hi], a0 - lo as i64 - *RESCUE_BAND, a1 - lo as i64 + *RESCUE_BAND, sc);
+            let x = local_band(
+                q,
+                &r[lo..hi],
+                a0 - lo as i64 - *RESCUE_BAND,
+                a1 - lo as i64 + *RESCUE_BAND,
+                sc,
+            );
             (x.0, x.1, x.2, x.3 + lo, x.4 + lo)
         } else {
             let lo = (d * 8 - 24).max(0) as usize;
@@ -925,7 +1162,13 @@ pub fn primary_set(hits: &[Hit]) -> Vec<usize> {
     let mut keep: Vec<usize> = vec![];
     for (i, h) in hits.iter().enumerate() {
         let len = (h.q_en - h.q_st).max(1);
-        let ov = keep.iter().map(|&j| (h.q_en.min(hits[j].q_en) as i64 - h.q_st.max(hits[j].q_st) as i64).max(0) as usize).max().unwrap_or(0);
+        let ov = keep
+            .iter()
+            .map(|&j| {
+                (h.q_en.min(hits[j].q_en) as i64 - h.q_st.max(hits[j].q_st) as i64).max(0) as usize
+            })
+            .max()
+            .unwrap_or(0);
         if keep.is_empty() || ov * 2 < len {
             keep.push(i);
         }
@@ -960,7 +1203,9 @@ fn align_chain(q: &[u8], r: &[u8], c: &[(u32, u32)], k: usize, sc: &Score) -> Op
                 continue;
             }
             // a block that overlaps the previous one is trimmed at its start
-            let sh = (bq + bl).saturating_sub(qs).max((br + bl).saturating_sub(rs));
+            let sh = (bq + bl)
+                .saturating_sub(qs)
+                .max((br + bl).saturating_sub(rs));
             if sh >= k {
                 continue;
             }
@@ -1011,14 +1256,30 @@ fn align_chain(q: &[u8], r: &[u8], c: &[(u32, u32)], k: usize, sc: &Score) -> Op
             _ => nm += l as usize,
         }
     }
-    Some(Hit { seq: 0, fwd: true, q_st, q_en: qe + qn, r_st, r_en: re + rn, score, mlen, nm, ops, primary: false })
+    Some(Hit {
+        seq: 0,
+        fwd: true,
+        q_st,
+        q_en: qe + qn,
+        r_st,
+        r_en: re + rn,
+        score,
+        mlen,
+        nm,
+        ops,
+        primary: false,
+    })
 }
 
 /// Global alignment of a stretch between two anchors. A large stretch is split at exact 13-mers that
 /// occur once on both sides and lie in order, so only the pieces between them need the full alignment.
 fn fill(q: &[u8], r: &[u8], sc: &Score, depth: u32) -> (i32, Vec<(u8, u32)>) {
     const K: usize = 13;
-    if (q.len() as u64) * (r.len() as u64) <= 250_000 || depth >= 2 || q.len() < 2 * K || r.len() < 2 * K {
+    if (q.len() as u64) * (r.len() as u64) <= 250_000
+        || depth >= 2
+        || q.len() < 2 * K
+        || r.len() < 2 * K
+    {
         let (s, _, _, o) = dp(q, r, sc, false);
         return (s, o);
     }
@@ -1031,7 +1292,11 @@ fn fill(q: &[u8], r: &[u8], sc: &Score, depth: u32) -> (i32, Vec<(u8, u32)>) {
         m
     };
     let (mq, mr) = (count(q), count(r));
-    let mut an: Vec<(u32, u32)> = mq.iter().filter(|(_, x)| x.0 == 1).filter_map(|(v, x)| mr.get(v).filter(|y| y.0 == 1).map(|y| (x.1, y.1))).collect();
+    let mut an: Vec<(u32, u32)> = mq
+        .iter()
+        .filter(|(_, x)| x.0 == 1)
+        .filter_map(|(v, x)| mr.get(v).filter(|y| y.0 == 1).map(|y| (x.1, y.1)))
+        .collect();
     an.sort_unstable();
     // longest chain increasing in both, with a diagonal not too far from the stretch's own
     let n = an.len();
@@ -1089,14 +1354,21 @@ fn left_align(ops: &[(u8, u32)], q: &[u8], r: &[u8], q0: usize, r0: usize) -> Ve
     if !ops.iter().any(|o| o.0 == b'I' || o.0 == b'D') {
         return ops.to_vec();
     }
-    let mut ex: Vec<u8> = ops.iter().flat_map(|&(o, l)| std::iter::repeat(o).take(l as usize)).collect();
+    let mut ex: Vec<u8> = ops
+        .iter()
+        .flat_map(|&(o, l)| std::iter::repeat(o).take(l as usize))
+        .collect();
     let (mut qi, mut rj) = (Vec::with_capacity(ex.len()), Vec::with_capacity(ex.len()));
     let (mut i, mut j) = (q0, r0);
     for &o in &ex {
         qi.push(i);
         rj.push(j);
-        if o != b'D' { i += 1; }
-        if o != b'I' { j += 1; }
+        if o != b'D' {
+            i += 1;
+        }
+        if o != b'I' {
+            j += 1;
+        }
     }
     let mut k = 0;
     while k < ex.len() {
@@ -1111,7 +1383,11 @@ fn left_align(ops: &[(u8, u32)], q: &[u8], r: &[u8], q0: usize, r0: usize) -> Ve
         }
         let next = e;
         while s > 0 && ex[s - 1] == b'=' {
-            let same = if o == b'D' { r[rj[s - 1]] == r[rj[e - 1]] } else { q[qi[s - 1]] == q[qi[e - 1]] };
+            let same = if o == b'D' {
+                r[rj[s - 1]] == r[rj[e - 1]]
+            } else {
+                q[qi[s - 1]] == q[qi[e - 1]]
+            };
             if !same {
                 break;
             }
@@ -1129,15 +1405,21 @@ fn left_align(ops: &[(u8, u32)], q: &[u8], r: &[u8], q0: usize, r0: usize) -> Ve
     out
 }
 
-static STAT_ON: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| std::env::var("HLA_ALNSTAT").is_ok());
-static STAT: [[std::sync::atomic::AtomicU64; 4]; 3] = [const { [const { std::sync::atomic::AtomicU64::new(0) }; 4] }; 3];
+static STAT_ON: std::sync::LazyLock<bool> =
+    std::sync::LazyLock::new(|| std::env::var("HLA_ALNSTAT").is_ok());
+static STAT: [[std::sync::atomic::AtomicU64; 4]; 3] =
+    [const { [const { std::sync::atomic::AtomicU64::new(0) }; 4] }; 3];
 static CHAIN_NS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 /// time in chains(): seeding, candidate counting, anchor collection and sorting, chaining (ns)
-static PART_NS: [std::sync::atomic::AtomicU64; 4] = [const { std::sync::atomic::AtomicU64::new(0) }; 4];
-fn part(k: usize, t: &mut Option<crate::vfs::Instant>) {
+static PART_NS: [std::sync::atomic::AtomicU64; 4] =
+    [const { std::sync::atomic::AtomicU64::new(0) }; 4];
+fn part(k: usize, t: &mut Option<std::time::Instant>) {
     if let Some(t0) = t {
-        let now = crate::vfs::Instant::now();
-        PART_NS[k].fetch_add((now - *t0).as_nanos() as u64, std::sync::atomic::Ordering::Relaxed);
+        let now = std::time::Instant::now();
+        PART_NS[k].fetch_add(
+            (now - *t0).as_nanos() as u64,
+            std::sync::atomic::Ordering::Relaxed,
+        );
         *t0 = now;
     }
 }
@@ -1145,7 +1427,28 @@ fn part(k: usize, t: &mut Option<crate::vfs::Instant>) {
 /// dp statistics (env HLA_ALNSTAT): calls, cells, seconds, calls over a million cells, for extensions and gap fills
 pub fn stat() -> String {
     let g = |k: usize, i: usize| STAT[k][i].load(std::sync::atomic::Ordering::Relaxed);
-    format!("long ext {} calls {} Mcells {:.1}s {} big; ext {} calls {} Mcells {:.1}s {} big; fill {} calls {} Mcells {:.1}s {} big; chaining {:.1}s (seeds {:.1}s, count {:.1}s, anchors {:.1}s, chain {:.1}s); rescue {} calls {:.1}s", g(2, 0), g(2, 1) / 1_000_000, g(2, 2) as f64 / 1e9, g(2, 3), g(0, 0), g(0, 1) / 1_000_000, g(0, 2) as f64 / 1e9, g(0, 3), g(1, 0), g(1, 1) / 1_000_000, g(1, 2) as f64 / 1e9, g(1, 3), CHAIN_NS.load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e9, PART_NS[0].load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e9, PART_NS[1].load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e9, PART_NS[2].load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e9, PART_NS[3].load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e9, RESCUE[0].load(std::sync::atomic::Ordering::Relaxed), RESCUE[1].load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e9)
+    format!(
+        "long ext {} calls {} Mcells {:.1}s {} big; ext {} calls {} Mcells {:.1}s {} big; fill {} calls {} Mcells {:.1}s {} big; chaining {:.1}s (seeds {:.1}s, count {:.1}s, anchors {:.1}s, chain {:.1}s); rescue {} calls {:.1}s",
+        g(2, 0),
+        g(2, 1) / 1_000_000,
+        g(2, 2) as f64 / 1e9,
+        g(2, 3),
+        g(0, 0),
+        g(0, 1) / 1_000_000,
+        g(0, 2) as f64 / 1e9,
+        g(0, 3),
+        g(1, 0),
+        g(1, 1) / 1_000_000,
+        g(1, 2) as f64 / 1e9,
+        g(1, 3),
+        CHAIN_NS.load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e9,
+        PART_NS[0].load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e9,
+        PART_NS[1].load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e9,
+        PART_NS[2].load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e9,
+        PART_NS[3].load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e9,
+        RESCUE[0].load(std::sync::atomic::Ordering::Relaxed),
+        RESCUE[1].load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e9
+    )
 }
 
 const NEG: i32 = i32::MIN / 4;
@@ -1157,7 +1460,8 @@ type DpOut = (i32, usize, usize, Vec<(u8, u32)>);
 
 /// results of large alignments by content: alleles of one gene share long stretches, so the same pair
 /// of stretches comes up again and again when alleles are compared with each other
-static DP_MEMO: std::sync::LazyLock<std::sync::Mutex<AHashMap<u128, DpOut>>> = std::sync::LazyLock::new(|| std::sync::Mutex::new(AHashMap::new()));
+static DP_MEMO: std::sync::LazyLock<std::sync::Mutex<AHashMap<u128, DpOut>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(AHashMap::new()));
 
 thread_local! {
     /// the same for the many small alignments of one thread: the end of a read is extended against
@@ -1174,7 +1478,18 @@ pub fn dp(q: &[u8], r: &[u8], sc: &Score, ext: bool) -> DpOut {
     let h = |salt: u8| {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         (salt, q, r, ext).hash(&mut h);
-        (sc.a, sc.b, sc.q, sc.e, sc.q2, sc.e2, sc.zdrop, sc.end_bonus, sc.bw).hash(&mut h);
+        (
+            sc.a,
+            sc.b,
+            sc.q,
+            sc.e,
+            sc.q2,
+            sc.e2,
+            sc.zdrop,
+            sc.end_bonus,
+            sc.bw,
+        )
+            .hash(&mut h);
         h.finish()
     };
     let key = ((h(1) as u128) << 64) | h(2) as u128;
@@ -1212,7 +1527,12 @@ fn dp_raw(q: &[u8], r: &[u8], sc: &Score, ext: bool) -> DpOut {
     if !ext && (n == 0 || m == 0) {
         let (op, l) = if n == 0 { (b'D', m) } else { (b'I', n) };
         let l32 = l as i32;
-        return (-(sc.q + l32 * sc.e).min(sc.q2 + l32 * sc.e2), n, m, vec![(op, l as u32)]);
+        return (
+            -(sc.q + l32 * sc.e).min(sc.q2 + l32 * sc.e2),
+            n,
+            m,
+            vec![(op, l as u32)],
+        );
     }
     if ext && n == 0 {
         return (0, 0, 0, vec![]);
@@ -1225,15 +1545,29 @@ fn dp_raw(q: &[u8], r: &[u8], sc: &Score, ext: bool) -> DpOut {
             let mut s = 0;
             for i in 0..n {
                 let eq = q[i] == r[i] && q[i] != b'N';
-                s += if eq { sc.a } else if q[i] == b'N' || r[i] == b'N' { -1 } else { -sc.b };
+                s += if eq {
+                    sc.a
+                } else if q[i] == b'N' || r[i] == b'N' {
+                    -1
+                } else {
+                    -sc.b
+                };
                 push(&mut ops, if eq { b'=' } else { b'X' }, 1);
             }
             return (s, n, n, ops);
         }
     }
     // band: global around the line from (0,0) to (n,m); extension around the main diagonal
-    let w = if ext { sc.bw as i64 } else { (n as i64 - m as i64).abs() + 64 };
-    let full = if ext { m <= sc.bw } else { (n as u64) * (m as u64) <= 100_000 };
+    let w = if ext {
+        sc.bw as i64
+    } else {
+        (n as i64 - m as i64).abs() + 64
+    };
+    let full = if ext {
+        m <= sc.bw
+    } else {
+        (n as u64) * (m as u64) <= 100_000
+    };
     // extension: an ungapped run with at most two mismatches to the end of q is taken as it is when no
     // path with a gap can beat it: such a path scores at most n·a minus one gap of one base plus the end
     // bonus (near the end of q an insertion and the bonus can pay for themselves)
@@ -1245,7 +1579,11 @@ fn dp_raw(q: &[u8], r: &[u8], sc: &Score, ext: bool) -> DpOut {
             for i in 0..n {
                 sc_i += if q[i] == r[i] { sc.a } else { -sc.b };
                 raw = raw.max(sc_i);
-                let v = if i + 1 == n { sc_i + sc.end_bonus } else { sc_i };
+                let v = if i + 1 == n {
+                    sc_i + sc.end_bonus
+                } else {
+                    sc_i
+                };
                 if v > best || (i + 1 == n && v == best) {
                     best = v;
                     bn = i + 1;
@@ -1263,22 +1601,54 @@ fn dp_raw(q: &[u8], r: &[u8], sc: &Score, ext: bool) -> DpOut {
         }
     }
     if *STAT_ON {
-        let t = crate::vfs::Instant::now();
+        let t = std::time::Instant::now();
         let r = SCRATCH.with(|c| {
             let mut c = c.borrow_mut();
-            let Scratch { hp, hc, f1, f2, tb, lo_v, off } = &mut *c;
+            let Scratch {
+                hp,
+                hc,
+                f1,
+                f2,
+                tb,
+                lo_v,
+                off,
+            } = &mut *c;
             dp_in(q, r, sc, ext, n, m, full, w, hp, hc, f1, f2, tb, lo_v, off)
         });
-        let k = if ext { if sc.bw > 100 { 2 } else { 0 } } else { 1 };
+        let k = if ext {
+            if sc.bw > 100 { 2 } else { 0 }
+        } else {
+            1
+        };
         STAT[k][0].fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         STAT[k][1].fetch_add((n * m) as u64, std::sync::atomic::Ordering::Relaxed);
-        STAT[k][2].fetch_add(t.elapsed().as_nanos() as u64, std::sync::atomic::Ordering::Relaxed);
-        if n * m > 1_000_000 { STAT[k][3].fetch_add(1, std::sync::atomic::Ordering::Relaxed); if std::env::var("HLA_ALNBIG").is_ok() { eprintln!("big dp ext={ext} n={n} m={m} full={full} w={w} us={} used={:?}", t.elapsed().as_micros(), (r.1, r.2)); } }
+        STAT[k][2].fetch_add(
+            t.elapsed().as_nanos() as u64,
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        if n * m > 1_000_000 {
+            STAT[k][3].fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if std::env::var("HLA_ALNBIG").is_ok() {
+                eprintln!(
+                    "big dp ext={ext} n={n} m={m} full={full} w={w} us={} used={:?}",
+                    t.elapsed().as_micros(),
+                    (r.1, r.2)
+                );
+            }
+        }
         return r;
     }
     SCRATCH.with(|c| {
         let mut c = c.borrow_mut();
-        let Scratch { hp, hc, f1, f2, tb, lo_v, off } = &mut *c;
+        let Scratch {
+            hp,
+            hc,
+            f1,
+            f2,
+            tb,
+            lo_v,
+            off,
+        } = &mut *c;
         dp_in(q, r, sc, ext, n, m, full, w, hp, hc, f1, f2, tb, lo_v, off)
     })
 }
@@ -1301,29 +1671,37 @@ thread_local! {
     /// tests: the row-wise extension, to compare the anti-diagonal one with
     pub(crate) static FORCE_ROWS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
-static EXT_AD: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| std::env::var("HLA_EXT_AD").map_or(true, |v| v != "0"));
+static EXT_AD: std::sync::LazyLock<bool> =
+    std::sync::LazyLock::new(|| std::env::var("HLA_EXT_AD").map_or(true, |v| v != "0"));
 
 /// The extension of `dp_in` computed by anti-diagonals, so that the inner loop vectorises. The cells,
 /// their values and traceback bits are those of the row-wise version; rows are summarised as they
 /// complete, so the best end, the score and the z-drop stop are exactly those of the row-wise scan.
-fn dp_ext_ad(q: &[u8], r: &[u8], sc: &Score, n: usize, m: usize, full: bool, w: i64, ext: bool) -> (i32, usize, usize, Vec<(u8, u32)>) {
-    #[cfg(target_arch = "x86_64")]
-    if std::arch::is_x86_feature_detected!("avx2") {
-        // SAFETY: the CPU has AVX2
-        return unsafe { dp_ext_ad_avx2(q, r, sc, n, m, full, w, ext) };
-    }
-    dp_ext_ad_impl(q, r, sc, n, m, full, w, ext)
-}
-
-/// the same code compiled for AVX2 (x86 builds default to SSE2, which lacks a 32-bit maximum)
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2")]
-unsafe fn dp_ext_ad_avx2(q: &[u8], r: &[u8], sc: &Score, n: usize, m: usize, full: bool, w: i64, ext: bool) -> (i32, usize, usize, Vec<(u8, u32)>) {
-    dp_ext_ad_impl(q, r, sc, n, m, full, w, ext)
+fn dp_ext_ad(
+    q: &[u8],
+    r: &[u8],
+    sc: &Score,
+    n: usize,
+    m: usize,
+    full: bool,
+    w: i64,
+    ext: bool,
+) -> (i32, usize, usize, Vec<(u8, u32)>) {
+    // compiled for AVX2 where the processor has it (x86 builds default to SSE2, which lacks a 32-bit maximum)
+    gc_sys::with_avx2(|| dp_ext_ad_impl(q, r, sc, n, m, full, w, ext))
 }
 
 #[inline(always)]
-fn dp_ext_ad_impl(q: &[u8], r: &[u8], sc: &Score, n: usize, m: usize, full: bool, w: i64, ext: bool) -> (i32, usize, usize, Vec<(u8, u32)>) {
+fn dp_ext_ad_impl(
+    q: &[u8],
+    r: &[u8],
+    sc: &Score,
+    n: usize,
+    m: usize,
+    full: bool,
+    w: i64,
+    ext: bool,
+) -> (i32, usize, usize, Vec<(u8, u32)>) {
     // rows that exist and their band, as in dp_in
     let nrow = if ext { n.min(m + w as usize) } else { n };
     let (rlo, rhi): (Vec<usize>, Vec<usize>) = (0..=nrow)
@@ -1331,7 +1709,11 @@ fn dp_ext_ad_impl(q: &[u8], r: &[u8], sc: &Score, n: usize, m: usize, full: bool
             if full {
                 return (0, m);
             }
-            let c = if ext { i as i64 } else { (i as i64 * m as i64) / n.max(1) as i64 };
+            let c = if ext {
+                i as i64
+            } else {
+                (i as i64 * m as i64) / n.max(1) as i64
+            };
             ((c - w).max(0) as usize, ((c + w).min(m as i64)) as usize)
         })
         .unzip();
@@ -1406,13 +1788,31 @@ fn dp_ext_ad_impl(q: &[u8], r: &[u8], sc: &Score, n: usize, m: usize, full: bool
                     tt |= ((y1 > p1) as u8) << 3 | ((y2 > p2) as u8) << 4;
                     let (e1, e2) = (p1.max(y1), p2.max(y2));
                     let (a, b) = (qs[x], rs[x]);
-                    let sv = if a == b'N' || b == b'N' { -1 } else if a == b { sa } else { sb };
+                    let sv = if a == b'N' || b == b'N' {
+                        -1
+                    } else if a == b {
+                        sa
+                    } else {
+                        sb
+                    };
                     let mut h = hd[x] + sv;
                     let mut src = 0u8;
-                    if e1 > h { h = e1; src = 1; }
-                    if e2 > h { h = e2; src = 2; }
-                    if nf1 > h { h = nf1; src = 3; }
-                    if nf2 > h { h = nf2; src = 4; }
+                    if e1 > h {
+                        h = e1;
+                        src = 1;
+                    }
+                    if e2 > h {
+                        h = e2;
+                        src = 2;
+                    }
+                    if nf1 > h {
+                        h = nf1;
+                        src = 3;
+                    }
+                    if nf2 > h {
+                        h = nf2;
+                        src = 4;
+                    }
                     ear[x] = e1;
                     ebr[x] = e2;
                     fac[x] = nf1;
@@ -1447,8 +1847,14 @@ fn dp_ext_ad_impl(q: &[u8], r: &[u8], sc: &Score, n: usize, m: usize, full: bool
                     e2 = o2.max(x2);
                     let mut hh = NEG;
                     let mut src = 0u8;
-                    if e1 > hh { hh = e1; src = 1; }
-                    if e2 > hh { hh = e2; src = 2; }
+                    if e1 > hh {
+                        hh = e1;
+                        src = 1;
+                    }
+                    if e2 > hh {
+                        hh = e2;
+                        src = 2;
+                    }
                     tt |= src;
                     h = hh;
                 }
@@ -1473,9 +1879,17 @@ fn dp_ext_ad_impl(q: &[u8], r: &[u8], sc: &Score, n: usize, m: usize, full: bool
                 let mut h = NEG;
                 let mut src = 0u8;
                 // horizontal gaps do not exist in column 0; the diagonal neither
-                if NEG > h { h = NEG; }
-                if nf1 > h { h = nf1; src = 3; }
-                if nf2 > h { h = nf2; src = 4; }
+                if NEG > h {
+                    h = NEG;
+                }
+                if nf1 > h {
+                    h = nf1;
+                    src = 3;
+                }
+                if nf2 > h {
+                    h = nf2;
+                    src = 4;
+                }
                 tt |= src;
                 ea[i + 1] = NEG;
                 eb[i + 1] = NEG;
@@ -1503,7 +1917,11 @@ fn dp_ext_ad_impl(q: &[u8], r: &[u8], sc: &Score, n: usize, m: usize, full: bool
         // rows whose last cell lies on this anti-diagonal are complete: the row-wise scan's bookkeeping
         while next_row <= nrow && next_row + row_hi(next_row) <= t {
             let i = next_row;
-            let hb = if i == n { rmax[i] + sc.end_bonus } else { rmax[i] };
+            let hb = if i == n {
+                rmax[i] + sc.end_bonus
+            } else {
+                rmax[i]
+            };
             if hb > best || (hb == best && i == n && bi != n) {
                 best = hb;
                 bi = i;
@@ -1552,13 +1970,17 @@ fn dp_ext_ad_impl(q: &[u8], r: &[u8], sc: &Score, n: usize, m: usize, full: bool
                 ops.push((b'D', 1));
                 let extd = tt & (1 << (state + 2)) != 0;
                 j -= 1;
-                if !extd { state = 0; }
+                if !extd {
+                    state = 0;
+                }
             }
             _ => {
                 ops.push((b'I', 1));
                 let extd = tt & (1 << (state + 2)) != 0;
                 i -= 1;
-                if !extd { state = 0; }
+                if !extd {
+                    state = 0;
+                }
             }
         }
     }
@@ -1571,7 +1993,23 @@ fn dp_ext_ad_impl(q: &[u8], r: &[u8], sc: &Score, n: usize, m: usize, full: bool
 }
 
 #[allow(clippy::too_many_arguments)]
-fn dp_in(q: &[u8], r: &[u8], sc: &Score, ext: bool, n: usize, m: usize, full: bool, w: i64, hp: &mut Vec<i32>, hc: &mut Vec<i32>, f1: &mut Vec<i32>, f2: &mut Vec<i32>, tb: &mut Vec<u8>, lo_v: &mut Vec<usize>, off: &mut Vec<usize>) -> (i32, usize, usize, Vec<(u8, u32)>) {
+fn dp_in(
+    q: &[u8],
+    r: &[u8],
+    sc: &Score,
+    ext: bool,
+    n: usize,
+    m: usize,
+    full: bool,
+    w: i64,
+    hp: &mut Vec<i32>,
+    hc: &mut Vec<i32>,
+    f1: &mut Vec<i32>,
+    f2: &mut Vec<i32>,
+    tb: &mut Vec<u8>,
+    lo_v: &mut Vec<usize>,
+    off: &mut Vec<usize>,
+) -> (i32, usize, usize, Vec<(u8, u32)>) {
     if *EXT_AD && !FORCE_ROWS.with(|c| c.get()) {
         return dp_ext_ad(q, r, sc, n, m, full, w, ext);
     }
@@ -1579,7 +2017,11 @@ fn dp_in(q: &[u8], r: &[u8], sc: &Score, ext: bool, n: usize, m: usize, full: bo
         if full {
             return (0, m);
         }
-        let c = if ext { i as i64 } else { (i as i64 * m as i64) / n.max(1) as i64 };
+        let c = if ext {
+            i as i64
+        } else {
+            (i as i64 * m as i64) / n.max(1) as i64
+        };
         ((c - w).max(0) as usize, ((c + w).min(m as i64)) as usize)
     };
     let s = |a: u8, b: u8| -> i32 {
@@ -1625,8 +2067,12 @@ fn dp_in(q: &[u8], r: &[u8], sc: &Score, ext: bool, n: usize, m: usize, full: bo
                 let (fp1, fp2) = (f1[j], f2[j]);
                 let (o1, x1) = (hprev_j - oe1, fp1 - sc.e);
                 let (o2, x2) = (hprev_j - oe2, fp2 - sc.e2);
-                if x1 > o1 { t |= 1 << 5; }
-                if x2 > o2 { t |= 1 << 6; }
+                if x1 > o1 {
+                    t |= 1 << 5;
+                }
+                if x2 > o2 {
+                    t |= 1 << 6;
+                }
                 (o1.max(x1), o2.max(x2))
             } else {
                 (NEG, NEG)
@@ -1636,8 +2082,12 @@ fn dp_in(q: &[u8], r: &[u8], sc: &Score, ext: bool, n: usize, m: usize, full: bo
                 let hl = if j > lo { hc[j - 1] } else { NEG };
                 let (o1, x1) = (hl - oe1, e1 - sc.e);
                 let (o2, x2) = (hl - oe2, e2 - sc.e2);
-                if x1 > o1 { t |= 1 << 3; }
-                if x2 > o2 { t |= 1 << 4; }
+                if x1 > o1 {
+                    t |= 1 << 3;
+                }
+                if x2 > o2 {
+                    t |= 1 << 4;
+                }
                 e1 = o1.max(x1);
                 e2 = o2.max(x2);
             } else {
@@ -1649,13 +2099,29 @@ fn dp_in(q: &[u8], r: &[u8], sc: &Score, ext: bool, n: usize, m: usize, full: bo
                 h = 0;
                 t |= 7;
             } else {
-                let d = if i > 0 && j > 0 { hp[j - 1] + s(q[i - 1], r[j - 1]) } else { NEG };
+                let d = if i > 0 && j > 0 {
+                    hp[j - 1] + s(q[i - 1], r[j - 1])
+                } else {
+                    NEG
+                };
                 h = d;
                 let mut src = 0u8;
-                if e1 > h { h = e1; src = 1; }
-                if e2 > h { h = e2; src = 2; }
-                if nf1 > h { h = nf1; src = 3; }
-                if nf2 > h { h = nf2; src = 4; }
+                if e1 > h {
+                    h = e1;
+                    src = 1;
+                }
+                if e2 > h {
+                    h = e2;
+                    src = 2;
+                }
+                if nf1 > h {
+                    h = nf1;
+                    src = 3;
+                }
+                if nf2 > h {
+                    h = nf2;
+                    src = 4;
+                }
                 t |= src;
             }
             hc[j] = h;
@@ -1693,13 +2159,31 @@ fn dp_in(q: &[u8], r: &[u8], sc: &Score, ext: bool, n: usize, m: usize, full: bo
                 e1 = p1.max(y1);
                 e2 = p2.max(y2);
                 let rj = rr[k - 1];
-                let sv = if qn || rj == b'N' { -1 } else if rj == qi { a } else { -b };
+                let sv = if qn || rj == b'N' {
+                    -1
+                } else if rj == qi {
+                    a
+                } else {
+                    -b
+                };
                 let mut h = hpr[k - 1] + sv;
                 let mut src = 0u8;
-                if e1 > h { h = e1; src = 1; }
-                if e2 > h { h = e2; src = 2; }
-                if nf1 > h { h = nf1; src = 3; }
-                if nf2 > h { h = nf2; src = 4; }
+                if e1 > h {
+                    h = e1;
+                    src = 1;
+                }
+                if e2 > h {
+                    h = e2;
+                    src = 2;
+                }
+                if nf1 > h {
+                    h = nf1;
+                    src = 3;
+                }
+                if nf2 > h {
+                    h = nf2;
+                    src = 4;
+                }
                 hcr[k] = h;
                 f1r[k] = nf1;
                 f2r[k] = nf2;
@@ -1764,13 +2248,17 @@ fn dp_in(q: &[u8], r: &[u8], sc: &Score, ext: bool, n: usize, m: usize, full: bo
                 ops.push((b'D', 1));
                 let extd = t & (1 << (state + 2)) != 0;
                 j -= 1;
-                if !extd { state = 0; }
+                if !extd {
+                    state = 0;
+                }
             }
             _ => {
                 ops.push((b'I', 1));
                 let extd = t & (1 << (state + 2)) != 0;
                 i -= 1;
-                if !extd { state = 0; }
+                if !extd {
+                    state = 0;
+                }
             }
         }
     }
@@ -1804,7 +2292,9 @@ mod tests {
         let mut x = 12345u64;
         let r: Vec<u8> = (0..400)
             .map(|_| {
-                x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                x = x
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 b"ACGT"[(x >> 62) as usize]
             })
             .collect();
@@ -1818,10 +2308,15 @@ mod tests {
         let mut d = r[100..170].to_vec();
         d.extend_from_slice(&r[173..253]);
         let h = &idx.map(&d)[0];
-        assert_eq!(h.cs(&d, &r), format!(":70-{}:80", String::from_utf8_lossy(&r[170..173]).to_lowercase()));
+        assert_eq!(
+            h.cs(&d, &r),
+            format!(
+                ":70-{}:80",
+                String::from_utf8_lossy(&r[170..173]).to_lowercase()
+            )
+        );
     }
 }
 
 #[cfg(test)]
-#[path = "aln_props.rs"]
 mod props;

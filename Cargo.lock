@@ -677,6 +677,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "gc-panel"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "gc-sys",
+]
+
+[[package]]
+name = "gc-sys"
+version = "0.1.0"
+
+[[package]]
 name = "getrandom"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -901,10 +913,11 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hla-wgs"
-version = "1.1.3"
+version = "1.2.0"
 dependencies = [
  "ahash",
  "flate2",
+ "gc-panel",
  "noodles",
  "rayon",
  "serde",
