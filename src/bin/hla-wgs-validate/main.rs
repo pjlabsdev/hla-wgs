@@ -12,6 +12,7 @@ mod util;
 
 mod common;
 mod eval;
+mod long;
 mod misc;
 mod paper;
 mod pyrand;
@@ -27,6 +28,8 @@ evaluation (run in the work folder with db/, truth/ and the result folders):
   eval8-exons DIR [GENES] [v]     exon-level check of calls certain to three or more fields
   eval24 [2014|2018|any]          1000 Genomes laboratory types against hla-wgs and T1K (HLA_WORK; calls in HLA_OUT, default lab/out24)
   trio23 [DIR]                    consistency of the two GIAB trios
+  long DIR SAMPLES.txt [v]        long-read results: consensus vs assembly, exact and nearest calls (HLA_LTAG)
+  eval-res DIR                    certain calls right at two and three fields (depth study)
   sim-eval TRUTH.tsv ASSIGN.tsv   gene assignment of simulated read pairs
 truth from assemblies:
   truth4 / truth8                 best database alleles per haplotype and gene (SAMPLES, TRUTHSRC, T4OUT, T8OUT)
@@ -52,6 +55,8 @@ fn main() {
         Some("eval8-exons") if r.len() >= 2 => eval::eval8_exons(r[1], r.get(2).copied(), r.len() > 3),
         Some("eval24") => eval::eval24(r.get(1).copied().unwrap_or("2014")),
         Some("trio23") => eval::trio23(r.get(1).copied().unwrap_or("giab23")),
+        Some("long") if r.len() >= 3 => long::long(r[1], r[2], r.len() > 3),
+        Some("eval-res") if r.len() >= 2 => long::eval_res(r[1]),
         Some("sim-eval") if r.len() >= 3 => eval::sim_eval(r[1], r[2]),
         Some("truth4") => truth::truth4(false),
         Some("truth8") => truth::truth4(true),

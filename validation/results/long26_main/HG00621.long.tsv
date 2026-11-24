@@ -1,0 +1,60 @@
+gene	slot	allele	differences	exact	reads	spanning	unsure_sites	equal_alternatives	note
+A	1	A*02:01:01:01	0	yes	22	17	0	-	-
+A	2	A*11:01:01:01	0	yes	17	13	0	-	-
+B	1	B*51:01:01:06	0	yes	22	22	0	-	-
+B	2	B*56:01:01:04	0	yes	24	20	0	-	-
+C	1	C*07:02:01:01	0	yes	22	21	0	-	-
+C	2	C*15:02:01:06	0	yes	13	12	0	-	-
+DMA	1	DMA*01:01:01:01	0	yes	46	35	0	-	-
+DMB	1	DMB*01:02:01:01	0	yes	20	16	0	-	-
+DMB	2	DMB*01:01:01:01	0	yes	27	15	0	-	-
+DOA	1	DOA*01:01:02:45	0	yes	23	19	0	-	-
+DOA	2	DOA*01:01:02:02	0	yes	22	16	0	-	-
+DOB	1	DOB*01:04:01:02	0	yes	31	19	0	-	-
+DOB	2	DOB*01:01:01:24	0	yes	19	12	0	-	-
+DPA1	1	DPA1*02:02:02:01	0	yes	26	14	0	-	-
+DPA1	2	DPA1*01:03:01:15	0	yes	24	14	0	-	-
+DPA2	1	DPA2*01:01:01:02	0	yes	20	13	0	-	-
+DPB1	1	DPB1*05:01:01:01	0	yes	32	15	0	-	-
+DPB1	2	DPB1*04:02:01:02	0	yes	30	13	0	-	-
+DPB2	1	DPB2*03:02	8	no	33	2	2	-	-
+DPB2	2	DPB2*03:01:01:02	12	no	19	2	4	-	-
+DQA1	1	DQA1*03:02:01:04	0	yes	26	10	0	-	-
+DQA1	2	DQA1*05:05:01:02	2	no	17	10	2	-	-
+DQA2	1	DQA2*01:01:02:03	0	yes	30	23	0	-	-
+DQA2	2	DQA2*01:01:02:01	0	yes	23	17	0	-	-
+DQB1	1	DQB1*03:03:02:02	0	yes	31	21	0	-	-
+DQB1	2	DQB1*03:01:01:03	0	yes	21	9	0	-	-
+DQB2	1	DQB2*01:01:01:11	1	no	27	15	0	-	-
+DQB2	2	DQB2*01:01:01:01	0	yes	26	13	0	-	-
+DRA	1	DRA*01:01:01:12	0	yes	45	32	0	-	-
+DRB1	1	DRB1*11:01:01:03	0	yes, with unsure sites	19	6	1	-	-
+DRB1	2	DRB1*09:01:02:03	1	no	33	5	11	DRB1*09:01:02:08,DRB1*09:01:02:11	-
+DRB3	1	DRB3*02:02:01:115	3	no	24	11	0	DRB3*02:02:01:93	-
+DRB4	1	DRB4*01:03:02:01	0	yes, with unsure sites	22	3	1	-	-
+E	1	E*01:03:01:01	0	yes	30	24	0	-	-
+E	2	E*01:01:01:01	0	yes	21	19	0	-	-
+F	1	F*01:01:01:01	0	yes	25	21	0	-	-
+F	2	F*01:01:02:09	0	yes	17	17	0	-	-
+G	1	G*01:01:03:03	0	yes	20	20	0	-	-
+G	2	G*01:01:01:01	0	yes	25	19	0	-	-
+H	1	H*01:01:01:01	0	yes	28	27	0	-	-
+H	2	H*02:07:01:01	0	yes	28	24	0	-	-
+J	1	J*01:01:01:04	0	yes	36	29	0	-	-
+J	2	J*01:01:01:05	1	no	25	19	0	-	-
+K	1	K*01:02	0	yes	27	20	0	-	-
+K	2	K*02:01	1	no	17	13	0	-	-
+L	1	L*01:01:01:01	1	no	44	36	1	-	-
+MICA	1	MICA*009:01:06	0	yes, with unsure sites	19	7	1	-	-
+MICA	2	MICA*012:01:02	0	yes	14	7	0	-	-
+MICB	1	MICB*002:01:02	0	yes, with unsure sites	32	7	2	-	-
+MICB	2	MICB*004:01:01	1	no	21	6	1	-	-
+P	1	P*02:01:01:01	0	yes, with unsure sites	43	37	2	-	-
+T	1	T*01:01:01:05	0	yes	26	22	0	-	-
+T	2	T*03:01:01:01	10	no	23	22	0	-	-
+TAP1	1	TAP1*01:01:01:05	0	yes	50	22	0	-	-
+TAP2	1	TAP2*01:01:03:16	3	no	26	12	0	-	-
+TAP2	2	TAP2*02:01:03:03	0	yes	26	9	0	-	-
+V	1	V*01:01:01:01	0	yes, with unsure sites	32	31	2	-	-
+W	1	W*03:01:01:01	1	no	18	17	0	-	-
+W	2	W*01:01:01:02	19	no	14	12	0	-	-
