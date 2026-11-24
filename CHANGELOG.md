@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Figure 1 of the report (how hla-wgs works) drew arrows through boxes and labels: the arrow from the reference started beside its box, the arrow from "certainty" ran through the box "name" into the HiFi output, the arrow into the HiFi lane crossed its label, and a zero-length arrow left a stray head. `hla-wgs-validate paper` now draws reference to "own aligner", lets the HiFi lane end in `PREFIX.long.*` ("consensus" and "join" in one box) and leads "certainty" over a rail along the right edge to the four short-read outputs; no line crosses a box or a label. Only the figure changes; the text of the report is identical (compared page by page). The released 1.2.0 report stays as it is; `docs/paper/hla-wgs-report.pdf` is rebuilt with the next release.
 - The aligner is now the crate `gc-panel` of Genome 4, so that other tools of Genome use the same code. hla-wgs carries an exact copy of it and of its helper crate `gc-sys` in `crates/` (Genome 4 is not public); `tests/crates.rs` checks the copy against the checksums in `crates/README.md`. The code is the former `src/aln.rs`, except that two hot loops are compiled for AVX2 on processors that have it. All result files are byte-identical on 8 HPRC samples, and the 8 samples take 150 s instead of 178 s with 4 threads. CI now also runs the tests of the two crates.
 
 ## 1.2.0 (2026-11-24)
