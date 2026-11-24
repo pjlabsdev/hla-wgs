@@ -151,6 +151,12 @@ the natural killer cell receptors, read from the protein (residues 77 to 83 of t
 since 1970, UTC). `depth_estimate` is a rough depth over the HLA genes (read pairs of ten genes always present in two copies, scaled to their median at 30x in the validation); below 18 the page says that fewer fields are supported and the fourth field is somewhat less often exact. `database_release` is the IPD-IMGT/HLA release of the database (`null` for a database built
 before 1.1).
 
+## PREFIX.log.jsonl and PREFIX.log.txt
+
+The run log: header with versions, parameters and input checksums, every step with time, memory and
+counts, every automatic decision with its reason, progress, and errors with their code. Format in
+[manual/log.md](manual/log.md), error codes in [manual/errors.md](manual/errors.md).
+
 ## Environment switches
 
 For experiments; the defaults are the validated configuration.

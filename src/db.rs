@@ -82,14 +82,14 @@ fn load_genome_decoys(dbpath: &str) -> AHashMap<String, Vec<Vec<u8>>> {
 
 impl Db {
     pub fn load(path: &str) -> Db {
-        let f = std::fs::File::open(path).unwrap_or_else(|e| panic!("{path}: {e}"));
+        let f = std::fs::File::open(path).unwrap_or_else(|e| crate::errors::fail("HW-E003", &format!("{path}: {e}")));
         let mut s = String::new();
         if path.ends_with(".gz") {
-            flate2::read::GzDecoder::new(f).read_to_string(&mut s).unwrap();
+            flate2::read::GzDecoder::new(f).read_to_string(&mut s).unwrap_or_else(|e| crate::errors::fail("HW-E003", &format!("{path}: {e}")));
         } else {
-            std::io::BufReader::new(f).read_to_string(&mut s).unwrap();
+            std::io::BufReader::new(f).read_to_string(&mut s).unwrap_or_else(|e| crate::errors::fail("HW-E003", &format!("{path}: {e}")));
         }
-        let j: DbJ = serde_json::from_str(&s).expect("db json");
+        let j: DbJ = serde_json::from_str(&s).unwrap_or_else(|e| crate::errors::fail("HW-E003", &format!("{path}: not a hla-wgs database ({e})")));
         let mut genes = vec![];
         let mut ref_ = AHashMap::new();
         for g in j.genes {

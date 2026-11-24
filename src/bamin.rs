@@ -108,16 +108,16 @@ pub fn stream(path: &str, reference: Option<&str>, threads: usize, tx: SyncSende
                 // a pause does not help
                 let eof = e.kind() == std::io::ErrorKind::UnexpectedEof;
                 if crate::util::permanent(&e) || (eof && p.records == 0) {
-                    crate::util::die(&format!("{path}: not a valid or complete BAM/CRAM with index ({e})"));
+                    crate::errors::fail("HW-E014", &format!("{path}: not a valid or complete BAM/CRAM with index ({e})"));
                 }
                 // the same early end at the same record after a reopen: the file itself is cut short
                 if eof && last_eof == Some(p.records) {
-                    crate::util::die(&format!("{path}: file ends early after {} records ({e}); it is truncated or damaged", p.records));
+                    crate::errors::fail("HW-E014", &format!("{path}: file ends early after {} records ({e}); it is truncated or damaged", p.records));
                 }
                 last_eof = if eof { Some(p.records) } else { None };
                 attempt += 1;
                 if attempt > tries {
-                    crate::util::die(&format!("{path}: {e} (gave up after {tries} retries)"));
+                    crate::errors::fail("HW-E015", &format!("{path}: {e} (gave up after {tries} retries)"));
                 }
                 let wait = crate::util::backoff(attempt);
                 eprintln!("[input] {path}: I/O error after {} records: {e}; retry {attempt}/{tries} in {wait}s", p.records);
