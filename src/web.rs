@@ -15,7 +15,7 @@ pub fn init() {
         } else {
             "unknown error".to_string()
         };
-        let msg = msg.strip_prefix("error: ").map(str::to_string).unwrap_or(msg);
+        let msg = msg.strip_prefix("error: ").or_else(|| msg.strip_prefix("error ")).map(str::to_string).unwrap_or(msg);
         let at = info.location().map(|l| format!(" ({}:{})", l.file(), l.line())).unwrap_or_default();
         crate::vfs::log(&format!("error: {msg}{at}"));
     }));

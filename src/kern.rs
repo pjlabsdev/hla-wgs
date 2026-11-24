@@ -56,6 +56,59 @@ struct Index {
 
 impl Index {
     fn new(targets: &[Target]) -> Self {
+        let maxlen = targets.iter().map(|t| t.seq.len()).max().unwrap_or(0);
+        if targets.len() >= 1 << TBITS || maxlen >= 1 << PBITS {
+            return Self::new_tuples(targets);
+        }
+        // (k-mer, target, position) packed into one u64 that sorts in the same order as the tuple
+        let mut all: Vec<u64> = Vec::with_capacity(targets.iter().map(|t| t.seq.len()).sum());
+        let mask = (1u64 << (2 * K)) - 1;
+        for (ti, t) in targets.iter().enumerate() {
+            let (mut v, mut l) = (0u64, 0usize);
+            for (i, &c) in t.seq.iter().enumerate() {
+                if c > 3 {
+                    l = 0;
+                    continue;
+                }
+                v = ((v << 2) | c as u64) & mask;
+                l += 1;
+                if l >= K {
+                    all.push(v << (TBITS + PBITS) | (ti as u64) << PBITS | (i + 1 - K) as u64);
+                }
+            }
+        }
+        radix_sort(&mut all);
+        // k-mers occurring more than 8 times within one target are dropped: (k-mer, target) runs
+        let pm = (1u64 << PBITS) - 1;
+        let mut hits: Vec<(u32, u32)> = Vec::with_capacity(all.len());
+        let mut at = ahash::AHashMap::with_capacity(all.len() / 2 + 1);
+        let mut a = 0;
+        while a < all.len() {
+            let k = all[a] >> (TBITS + PBITS);
+            let st = hits.len();
+            let mut b = a;
+            while b < all.len() && all[b] >> (TBITS + PBITS) == k {
+                let kt = all[b] >> PBITS;
+                let mut c = b;
+                while c < all.len() && all[c] >> PBITS == kt {
+                    c += 1;
+                }
+                if c - b <= 8 {
+                    let t = (kt & ((1u64 << TBITS) - 1)) as u32;
+                    hits.extend(all[b..c].iter().map(|&x| (t, (x & pm) as u32)));
+                }
+                b = c;
+            }
+            if hits.len() > st {
+                at.insert(k, (st as u32, (hits.len() - st) as u32));
+            }
+            a = b;
+        }
+        Index { at, hits }
+    }
+
+    /// the same with tuples, for more than 4095 targets or targets of 4 Mb and more
+    fn new_tuples(targets: &[Target]) -> Self {
         let mut all: Vec<(u64, u32, u32)> = targets
             .par_iter()
             .enumerate()
@@ -102,6 +155,38 @@ impl Index {
             Some(&(a, n)) => &self.hits[a as usize..(a + n) as usize],
             None => &[],
         }
+    }
+}
+
+const TBITS: u32 = 12;
+const PBITS: u32 = 64 - 2 * K as u32 - TBITS;
+
+/// LSD radix sort of u64 values, 16 bits per pass (small inputs: comparison sort)
+fn radix_sort(v: &mut Vec<u64>) {
+    if v.len() < 1 << 14 {
+        v.sort_unstable();
+        return;
+    }
+    let mut tmp = vec![0u64; v.len()];
+    let mut cnt = vec![0usize; 1 << 16];
+    for pass in 0..4 {
+        let sh = pass * 16;
+        cnt.iter_mut().for_each(|c| *c = 0);
+        for &x in v.iter() {
+            cnt[(x >> sh & 0xffff) as usize] += 1;
+        }
+        let mut sum = 0;
+        for c in cnt.iter_mut() {
+            let n = *c;
+            *c = sum;
+            sum += n;
+        }
+        for &x in v.iter() {
+            let d = (x >> sh & 0xffff) as usize;
+            tmp[cnt[d]] = x;
+            cnt[d] += 1;
+        }
+        std::mem::swap(v, &mut tmp);
     }
 }
 
@@ -347,4 +432,46 @@ pub fn edit_matrix(reads: &crate::panel::Reads, qnames: &[usize], seqs: &[&[u8]]
         used.push(q);
     }
     if out.is_empty() { None } else { Some((out, used)) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// the packed radix index equals the tuple index (same k-mers, same hits in the same order)
+    #[test]
+    fn packed_index_equals_tuple_index() {
+        let mut x: u64 = 7;
+        let mut rnd = move || {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x
+        };
+        for case in 0..20 {
+            let nt = 1 + (rnd() % 40) as usize;
+            let base: Vec<u8> = (0..2000 + case * 300).map(|_| (rnd() % 4) as u8).collect();
+            let targets: Vec<Target> = (0..nt)
+                .map(|_| {
+                    let mut s = base.clone();
+                    for _ in 0..(rnd() % 30) {
+                        let i = (rnd() as usize) % s.len();
+                        s[i] = (rnd() % 5) as u8;
+                    }
+                    // a repeat so that the more-than-8 filter is used
+                    let r: Vec<u8> = s[100..115].to_vec();
+                    for _ in 0..(rnd() % 12) {
+                        s.extend_from_slice(&r);
+                    }
+                    Target { seq: s }
+                })
+                .collect();
+            let a = Index::new(&targets);
+            let b = Index::new_tuples(&targets);
+            assert_eq!(a.at.len(), b.at.len());
+            for (k, _) in b.at.iter() {
+                assert_eq!(a.get(*k), b.get(*k));
+            }
+        }
+    }
 }

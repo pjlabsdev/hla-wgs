@@ -9,6 +9,10 @@ use crate::prior::{Priors, PRIOR_IMPUTED, PRIOR_NULL};
 use crate::stagea::np_sum;
 use ahash::AHashMap;
 use rayon::prelude::*;
+static TFIT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static NFIT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static TNM: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static NNM: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 use std::sync::Mutex;
 
 pub const LAM: f64 = 3.0;
@@ -16,8 +20,30 @@ pub const BG_EDITS: f64 = 3.0;
 pub const TIE: f64 = 0.05;
 /// an allele at least this much shorter than a relative is padded with the relative's flanks
 static PAD_MIN: std::sync::LazyLock<usize> = std::sync::LazyLock::new(|| std::env::var("HLA_PAD_MIN").ok().and_then(|v| v.parse().ok()).unwrap_or(8));
+/// pad from the first-field group when the two-field group has no longer allele (HLA_PADF1=0: off)
+static PAD_F1: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| std::env::var("HLA_PADF1").map_or(true, |v| v != "0"));
 const NEAR: f64 = 60.0;
 const ALT2: usize = 3;
+
+fn first(name: &str) -> String {
+    name.split(':').next().unwrap_or("").to_string()
+}
+
+/// longest sequence of each two-field group of a gene over the whole database (not imputed, not
+/// extended), computed once per gene
+fn group_max(g: &str, al: &[Allele]) -> AHashMap<String, usize> {
+    static M: std::sync::LazyLock<Mutex<AHashMap<String, AHashMap<String, usize>>>> = std::sync::LazyLock::new(|| Mutex::new(AHashMap::new()));
+    if let Some(v) = M.lock().unwrap().get(g) {
+        return v.clone();
+    }
+    let mut m: AHashMap<String, usize> = AHashMap::new();
+    for a in al.iter().filter(|a| !a.imputed && !a.extended) {
+        let e = m.entry(two(&a.name)).or_insert(0);
+        *e = (*e).max(a.genomic.len());
+    }
+    M.lock().unwrap().insert(g.to_string(), m.clone());
+    m
+}
 
 pub fn decoys(g: &str) -> &'static [&'static str] {
     match g {
@@ -36,6 +62,24 @@ pub fn decoys(g: &str) -> &'static [&'static str] {
     }
 }
 
+/// FNV-1a: a hash that stays the same between program versions (key of the padding cache)
+fn fnv(b: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &c in b {
+        h ^= c as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+/// the padding cache belongs to one database file: its size and modification time
+fn cache_stamp(db: &str) -> String {
+    let m = std::fs::metadata(db).ok();
+    let len = m.as_ref().map_or(0, |m| m.len());
+    let t = m.and_then(|m| m.modified().ok()).and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs());
+    format!("#hla-wgs pad cache 1\t{len}\t{t}")
+}
+
 pub struct Ctx<'a> {
     pub db: &'a Db,
     pub reads: &'a Reads,
@@ -43,9 +87,13 @@ pub struct Ctx<'a> {
     pad: Mutex<AHashMap<(String, usize, usize), Vec<u8>>>,
     donor: Mutex<AHashMap<(String, usize, Vec<usize>), usize>>,
     /// differences of allele i against a longer allele j (gene, i, j), aligned once per run
-    pair_nm: Mutex<AHashMap<(String, usize, usize), Option<i64>>>,
-    /// where allele i lies in a donor sequence (gene, i, hash of the donor sequence), aligned once per run
-    fit: Mutex<AHashMap<(String, usize, u64), Option<(usize, usize)>>>,
+    /// (gene, i, j names); kept between runs in the reference folder (pad_cache.tsv.gz)
+    pair_nm: Mutex<AHashMap<(String, String, String), Option<i64>>>,
+    /// where allele i lies in a donor sequence (gene, i name, hash of the donor sequence), aligned
+    /// once and kept between runs like pair_nm
+    fit: Mutex<AHashMap<(String, String, u64), Option<(usize, usize)>>>,
+    /// entries aligned in this run, not yet in the cache file
+    fresh: std::sync::atomic::AtomicUsize,
     decoy: Mutex<AHashMap<String, AHashMap<usize, f64>>>,
 }
 
@@ -64,7 +112,95 @@ pub struct StageB {
 
 impl<'a> Ctx<'a> {
     pub fn new(db: &'a Db, reads: &'a Reads) -> Self {
-        Ctx { db, reads, pri: Priors::new(db), pad: Mutex::new(AHashMap::new()), donor: Mutex::new(AHashMap::new()), pair_nm: Mutex::new(AHashMap::new()), fit: Mutex::new(AHashMap::new()), decoy: Mutex::new(AHashMap::new()) }
+        Ctx { db, reads, pri: Priors::new(db), pad: Mutex::new(AHashMap::new()), donor: Mutex::new(AHashMap::new()), pair_nm: Mutex::new(AHashMap::new()), fit: Mutex::new(AHashMap::new()), fresh: std::sync::atomic::AtomicUsize::new(0), decoy: Mutex::new(AHashMap::new()) }
+    }
+
+    /// the padding cache next to the database (HLA_PAD_CACHE=FILE elsewhere, =0 off). Its entries
+    /// are alignments of database alleles against each other, so a run with the cache gives the same
+    /// result as one without; it only saves the alignments the first run on this database made.
+    fn cache_path(db: &str) -> Option<String> {
+        match std::env::var("HLA_PAD_CACHE") {
+            Ok(v) if v == "0" => None,
+            Ok(v) => Some(v),
+            Err(_) => Some(std::path::Path::new(db).with_file_name("pad_cache.tsv.gz").to_string_lossy().into_owned()),
+        }
+    }
+
+    fn read_cache(path: &str, stamp: &str) -> (Vec<((String, String, String), Option<i64>)>, Vec<((String, String, u64), Option<(usize, usize)>)>) {
+        let (mut nm, mut fit) = (vec![], vec![]);
+        let Ok(f) = std::fs::File::open(path) else { return (nm, fit) };
+        let mut t = String::new();
+        if std::io::Read::read_to_string(&mut flate2::read::GzDecoder::new(f), &mut t).is_err() {
+            return (nm, fit);
+        }
+        let mut lines = t.lines();
+        if lines.next() != Some(stamp) {
+            return (nm, fit);
+        }
+        for l in lines {
+            let r: Vec<&str> = l.split('\t').collect();
+            match (r.first().copied(), r.len()) {
+                (Some("N"), 5) => nm.push(((r[1].into(), r[2].into(), r[3].into()), r[4].parse().ok())),
+                (Some("F"), 6) => {
+                    if let Ok(h) = r[3].parse() {
+                        fit.push(((r[1].into(), r[2].into(), h), r[4].parse().ok().zip(r[5].parse().ok())));
+                    }
+                }
+                _ => {}
+            }
+        }
+        (nm, fit)
+    }
+
+    pub fn load_cache(&self, db: &str) {
+        let Some(p) = Self::cache_path(db) else { return };
+        let (nm, fit) = Self::read_cache(&p, &cache_stamp(db));
+        self.pair_nm.lock().unwrap().extend(nm);
+        self.fit.lock().unwrap().extend(fit);
+    }
+
+    /// add this run's alignments to the cache file; a file another run wrote meanwhile is merged,
+    /// and a folder without write access is left alone
+    pub fn save_cache(&self, db: &str) {
+        // the browser build keeps no files between runs
+        if cfg!(target_arch = "wasm32") {
+            return;
+        }
+        if self.fresh.load(std::sync::atomic::Ordering::Relaxed) == 0 {
+            return;
+        }
+        let Some(p) = Self::cache_path(db) else { return };
+        let stamp = cache_stamp(db);
+        let (nm0, fit0) = Self::read_cache(&p, &stamp);
+        let mut nm = self.pair_nm.lock().unwrap().clone();
+        let mut fit = self.fit.lock().unwrap().clone();
+        nm.extend(nm0);
+        fit.extend(fit0);
+        let mut o = String::with_capacity(64 * (nm.len() + fit.len()));
+        o.push_str(&stamp);
+        o.push('\n');
+        let mut nk: Vec<_> = nm.into_iter().collect();
+        nk.sort();
+        for ((g, a, b), v) in nk {
+            o.push_str(&format!("N\t{g}\t{a}\t{b}\t{}\n", v.map_or("-".to_string(), |x| x.to_string())));
+        }
+        let mut fk: Vec<_> = fit.into_iter().collect();
+        fk.sort();
+        for ((g, a, h), v) in fk {
+            let (x, y) = v.map_or(("-".to_string(), "-".to_string()), |(x, y)| (x.to_string(), y.to_string()));
+            o.push_str(&format!("F\t{g}\t{a}\t{h}\t{x}\t{y}\n"));
+        }
+        let tmp = format!("{p}.{}.tmp", std::process::id());
+        let ok = std::fs::File::create(&tmp).ok().and_then(|f| {
+            let mut z = flate2::write::GzEncoder::new(f, flate2::Compression::fast());
+            std::io::Write::write_all(&mut z, o.as_bytes()).ok()?;
+            z.finish().ok()
+        });
+        if ok.is_some() {
+            let _ = std::fs::rename(&tmp, &p);
+        } else {
+            let _ = std::fs::remove_file(&tmp);
+        }
     }
 
     pub fn al(&self, g: &str) -> &'a [Allele] {
@@ -99,18 +235,20 @@ impl<'a> Ctx<'a> {
         if donor != i {
             let d: Vec<u8> = if depth < 6 && std::env::var("HLA_PAD1").is_err() { self.padded(g, donor, pool, depth + 1) } else { al[donor].genomic.clone() };
             if d.len() > s_.len() + *PAD_MIN {
-                let mut dh = std::collections::hash_map::DefaultHasher::new();
-                d.hash(&mut dh);
-                let fk = (g.to_string(), i, dh.finish());
+                let fk = (g.to_string(), al[i].name.clone(), fnv(&d));
                 let cached = self.fit.lock().unwrap().get(&fk).copied();
                 let fit = cached.unwrap_or_else(|| {
+                    let tt = crate::vfs::Instant::now();
                     let a = aligner(&d, Preset::Asm10);
                     let hs = map(&a, s_);
+                    TFIT.fetch_add(tt.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
+                    NFIT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     let f = best_mlen(&hs).and_then(|h| {
                         let ls = s_.len() as i64;
                         (h.fwd && h.q_st < 30 && ls - h.q_en < 30).then(|| ((h.r_st - h.q_st).max(0) as usize, ((d.len() as i64).min(h.r_en + (ls - h.q_en))) as usize))
                     });
                     self.fit.lock().unwrap().insert(fk, f);
+                    self.fresh.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     f
                 });
                 if let Some((a0, b0)) = fit {
@@ -140,15 +278,19 @@ impl<'a> Ctx<'a> {
             let nm = match self.db.donor_nm.get(&ck) {
                 Some(v) => *v,
                 None => {
-                    let pk = (g.to_string(), i, j);
+                    let pk = ck.clone();
                     let cached = self.pair_nm.lock().unwrap().get(&pk).copied();
                     match cached {
                         Some(v) => v,
                         None => {
+                            let tt = crate::vfs::Instant::now();
                             let a = a.get_or_insert_with(|| aligner(s_, Preset::Asm10));
                             let hs = map(a, &al[j].genomic);
+                            TNM.fetch_add(tt.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
+                            NNM.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             let v = best_mlen(&hs).map(|h| h.nm + (s_.len() as i64 - (h.r_en - h.r_st)));
                             self.pair_nm.lock().unwrap().insert(pk, v);
+                            self.fresh.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             v
                         }
                     }
@@ -164,6 +306,10 @@ impl<'a> Ctx<'a> {
         best.1
     }
 
+    pub fn pad_stat() -> String {
+        let l = |x: &std::sync::atomic::AtomicU64| x.load(std::sync::atomic::Ordering::Relaxed);
+        format!("fit {} {:.2}s nm {} {:.2}s", l(&NFIT), l(&TFIT) as f64 / 1e6, l(&NNM), l(&TNM) as f64 / 1e6)
+    }
     pub fn cand_seqs(&self, g: &str, cand: &[usize]) -> Vec<Vec<u8>> {
         let al = self.al(g);
         let mut grp: AHashMap<String, Vec<usize>> = AHashMap::new();
@@ -172,9 +318,33 @@ impl<'a> Ctx<'a> {
                 grp.entry(two(&al[i].name)).or_default().push(i);
             }
         }
-        cand.iter()
+        // each candidate's padding aligns it against longer alleles of its group: in parallel, as
+        // the results are cached and do not depend on the order
+        // an allele whose two-field group has no longer member in the whole database (A*30:207
+        // starts at exon 1 and is its group's only allele) borrows the flanks of the longer alleles
+        // of its first field; unpadded, reads of a paralog that run past its start fit it at no
+        // cost (HG01891, HLA-Y reads). Only genes with paralogs among the decoys: elsewhere
+        // (TAP1, TAP2) the borrowed flanks made the fourth field worse
+        let mut grp1: AHashMap<String, Vec<usize>> = AHashMap::new();
+        let gmax = if *PAD_F1 { group_max(g, al) } else { AHashMap::new() };
+        if *PAD_F1 {
+            for &i in cand {
+                if !al[i].imputed && !al[i].extended {
+                    grp1.entry(first(&al[i].name)).or_default().push(i);
+                }
+            }
+            for v in grp1.values_mut() {
+                v.sort_by_key(|&j| std::cmp::Reverse(al[j].genomic.len()));
+            }
+        }
+        cand.par_iter()
             .map(|&i| {
-                let pool = grp.get(&two(&al[i].name)).map(|v| &v[..v.len().min(60)]).unwrap_or(&[]);
+                let mut pool = grp.get(&two(&al[i].name)).map(|v| &v[..v.len().min(60)]).unwrap_or(&[]);
+                if *PAD_F1 && al[i].extended && !decoys(g).is_empty() && gmax.get(&two(&al[i].name)).copied().unwrap_or(0) <= self.orig_seq(g, i).len() + *PAD_MIN {
+                    if let Some(v) = grp1.get(&first(&al[i].name)) {
+                        pool = &v[..v.len().min(60)];
+                    }
+                }
                 self.padded(g, i, pool, 0)
             })
             .collect()
@@ -236,8 +406,11 @@ impl<'a> Ctx<'a> {
         let al = self.al(g);
         let seqs = self.cand_seqs(g, cand);
         let sr: Vec<&[u8]> = seqs.iter().map(|s| s.as_slice()).collect();
+        let t0 = crate::vfs::Instant::now();
         let (e, used) = kern::edit_matrix(self.reads, qnames, &sr)?;
+        let t1 = t0.elapsed().as_secs_f64();
         let keep = self.keep_rows(g, qnames, &e, &used);
+        if std::env::var("HLA_TDBG").is_ok() { eprintln!("TDBG {g} cand {} edit {:.2}s keep {:.2}s lens {}", cand.len(), t1, t0.elapsed().as_secs_f64() - t1, sr.iter().map(|x| x.len()).max().unwrap_or(0)); }
         // debugging aid: HLA_CMP="GENE|alleleA|alleleB" lists the reads that tell two candidates apart
         if let Ok(v) = std::env::var("HLA_CMP") {
             let f: Vec<&str> = v.split('|').collect();
@@ -270,6 +443,7 @@ impl<'a> Ctx<'a> {
                 p[c * nr + r] = (-LAM * row[c].min(12.0)).exp();
             }
         }
+        let t2 = crate::vfs::Instant::now();
         let bg = (-LAM * BG_EDITS).exp();
         let prior: Vec<f64> = cand.iter().map(|&i| self.allele_prior(g, &al[i])).collect();
         let pairs: Vec<(usize, usize)> = (0..nc).flat_map(|i| (i..nc).map(move |j| (i, j))).collect();
@@ -286,6 +460,7 @@ impl<'a> Ctx<'a> {
                 },
             )
             .collect();
+        if std::env::var("HLA_TDBG").is_ok() { eprintln!("TDBG {g} pairs {} nr {} {:.2}s", pairs.len(), nr, t2.elapsed().as_secs_f64()); }
         let mut scores: AHashMap<(usize, usize), f64> = AHashMap::with_capacity(pairs.len());
         for (k, &pr) in pairs.iter().enumerate() {
             scores.insert(pr, lls[k]);
@@ -344,6 +519,7 @@ impl<'a> Ctx<'a> {
             }
             alts.extend(seen);
         }
+        if std::env::var("HLA_TDBG").is_ok() { eprintln!("TDBG {g} rest {:.2}s", t2.elapsed().as_secs_f64()); }
         Some(StageB { pair: best, ties, near, alts, bmargin, ll: ll0, gap: ll0 - second, nreads: nr, cand: cand.to_vec() })
     }
 }

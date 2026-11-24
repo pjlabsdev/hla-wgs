@@ -5,7 +5,15 @@ use crate::stageb::{Ctx, StageB};
 use ahash::AHashMap;
 use std::io::Write;
 
-const T: [f64; 3] = [6.0, 6.0, 4.0];
+pub const T: [f64; 3] = [6.0, 6.0, 4.0];
+
+/// lead that makes two or three fields certain when the fourth is not. At 10x the leads shrink with
+/// the reads, and most correct calls stopped at fewer fields than they deserved: on 80 HPRC samples
+/// thinned to 10x a lead of 4 adds about 200 certain two-field and 50 three-field calls, none wrong.
+/// A four-field call keeps the stricter leads of `T`. HLA_TGRP=6 restores the old value.
+pub fn t_group() -> f64 {
+    std::env::var("HLA_TGRP").ok().and_then(|v| v.parse().ok()).unwrap_or(4.0)
+}
 
 /// IPD-IMGT/HLA release of the database (file DBDIR/release, written by build-db)
 pub static DB_RELEASE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
@@ -36,8 +44,9 @@ pub fn write(
     grp: &crate::groups::Groups,
     log: &dyn Fn(String),
 ) {
-    let mut fh = crate::vfs::create(&format!("{prefix}.tsv")).unwrap();
-    let mut cf = crate::vfs::create(&format!("{prefix}.conf.tsv")).unwrap();
+    let werr = |f: &str, e: std::io::Error| -> ! { crate::errors::fail("HW-E020", &format!("{f}: {e}")) };
+    let mut fh = crate::vfs::create(&format!("{prefix}.tsv")).unwrap_or_else(|e| werr(&format!("{prefix}.tsv"), e));
+    let mut cf = crate::vfs::create(&format!("{prefix}.conf.tsv")).unwrap_or_else(|e| werr(&format!("{prefix}.conf.tsv"), e));
     writeln!(cf, "gene\tslot\tallele\tsafe_call\tresolution\tmargin2\tmargin3\tmargin4\talt2\talt3\talt4\tnew_sites\tnew_detail").unwrap();
     writeln!(fh, "gene\tallele1\tallele2\tcall1\tcall2\tgap\treads\tcopies").unwrap();
     let mut js: Vec<serde_json::Value> = vec![];
@@ -143,6 +152,17 @@ pub fn write(
                     }
                 }
             }
+            // DRB1: a competitor that differs in the first two fields differs in the exons, and the exon
+            // refinement judges it with the reads that the panel gave to DRB3/4/5 (main.rs). Stage B
+            // without them saw 01:01/07:01 as nearly homozygous 07:01 (lead 0.9, group withheld).
+            // 80 HPRC: 13 DRB1 calls one or two fields deeper, all right, nothing else changed.
+            if g == "DRB1" && crate::drb_rel() && rm.contains_key(&(if i != j { sl } else { 0 })) {
+                for ni in 0..2 {
+                    if !alt[ni].is_empty() && diff_level(&alt[ni], fin) <= 2 {
+                        m[ni] = 999.0;
+                    }
+                }
+            }
             if let Some((rmm, ralt)) = rm.get(&(if i != j { sl } else { 0 })) {
                 for ni in 0..2 {
                     if rmm[ni] < m[ni] {
@@ -162,9 +182,9 @@ pub fn write(
             let f401 = std::env::var("HLA_F401").map_or(true, |v| v != "0") && fields(shown).get(3).map_or(false, |x| x == "01") && m[2] >= 1.0;
             let res_full = if (m[2] >= T[2] || f401) && m[1] >= T[1] && m[0] >= T[0] {
                 4
-            } else if m[1] >= T[1] && m[0] >= T[0] {
+            } else if m[1] >= t_group() && m[0] >= t_group() {
                 3
-            } else if m[0] >= T[0] {
+            } else if m[0] >= t_group() {
                 2
             } else {
                 1
@@ -191,6 +211,34 @@ pub fn write(
                 res_ = 0;
             }
             let safe = if res_ == 0 { g.to_string() } else { format!("{}*{}", g, f[..res_.min(f.len()).max(1)].join(":")) };
+            {
+                // why the certain call stops where it does, with the leads and thresholds that decided it
+                let tg = t_group();
+                let lead = |k: usize| if m[k] >= 999.0 { "no competitor".to_string() } else { format!("{:.1}", m[k]) };
+                let why = if res_ == 0 {
+                    format!("allele group withheld: lead at field 2 {} below 1 against {} of another group", lead(0), alt[0])
+                } else if res_ < res_full && res_ == max_res(g) {
+                    format!("gene limit: {g} is reported to {} fields at most", max_res(g))
+                } else if res_ < res_full.min(max_res(g)) && res_ == new_cap {
+                    if new_cap == 1 { "new variant inside an exon: only the allele group holds".to_string() } else { "new variant outside the exons: three fields hold".to_string() }
+                } else if res_ < res_full && res_ == f.len().max(1) {
+                    format!("the allele name has {} fields", f.len())
+                } else {
+                    match res_full {
+                        4 => if f401 && m[2] < T[2] { format!("four fields: fourth field 01 with lead {} at field 4 (at least 1)", lead(2)) } else { "four fields: all leads above their thresholds".to_string() },
+                        3 => if m[1] < T[1] || m[0] < T[0] { format!("three fields: a four-field call needs leads of {} at fields 2 and 3, found {} and {}", T[0], lead(0), lead(1)) } else { format!("three fields: lead at field 4 {} below {} (best other: {})", lead(2), T[2], alt[2]) },
+                        2 => format!("two fields: lead at field 3 {} below {tg} (best other: {})", lead(1), alt[1]),
+                        _ => format!("allele group only: lead at field 2 {} below {tg} (best other: {})", lead(0), alt[0]),
+                    }
+                };
+                let mv = |x: f64| if x >= 999.0 { serde_json::Value::Null } else { serde_json::json!((x * 10.0).round() / 10.0) };
+                crate::runlog::decision("certainty", &format!("{g} slot {}", sl + 1), &format!("{safe} ({res_} fields)"), &why, serde_json::json!({
+                    "allele": shown, "renamed_from": if renamed { Some(fin.as_str()) } else { None }, "resolution": res_, "resolution_by_leads": res_full,
+                    "lead": {"2": mv(m[0]), "3": mv(m[1]), "4": mv(m[2])}, "alternative": {"2": alt[0], "3": alt[1], "4": alt[2]},
+                    "thresholds": {"2": tg, "3": tg, "4": T[2], "4_needs_2_3": T[0], "4_01": f401}, "gene_limit": max_res(g), "new_variant_limit": new_cap,
+                    "new_sites": ns.map(|v| v.len()),
+                }));
+            }
             // no competing allele at a level: print "-" / null instead of the internal 999
             let ms = |x: f64| if x >= 999.0 { "-".to_string() } else { format!("{x:.1}") };
             let mj = |x: f64| if x >= 999.0 { serde_json::Value::Null } else { serde_json::json!(x) };
@@ -245,7 +293,7 @@ pub fn write(
     }
     let rep = serde_json::json!({
         "tool": "hla-wgs", "version": env!("CARGO_PKG_VERSION"), "schema": "genome.hla.v1",
-        "thresholds": {"2": T[0], "3": T[1], "4": T[2], "4_01": if std::env::var("HLA_F401").map_or(true, |v| v != "0") { serde_json::json!(1.0) } else { serde_json::Value::Null }}, "genes": js,
+        "thresholds": {"2": t_group(), "3": t_group(), "4": T[2], "4_lead_2_3": T[0], "4_01": if std::env::var("HLA_F401").map_or(true, |v| v != "0") { serde_json::json!(1.0) } else { serde_json::Value::Null }}, "genes": js,
         "database_release": DB_RELEASE.get(),
         "input": INPUTS.get(),
         "analysis_time": crate::vfs::unix_time(),
@@ -265,17 +313,17 @@ pub fn write(
     });
     // files of the browser build are complete when their writer is dropped
     drop((fh, cf));
-    crate::vfs::write(&format!("{prefix}.json"), serde_json::to_string_pretty(&rep).unwrap().as_bytes()).unwrap();
+    crate::vfs::write(&format!("{prefix}.json"), serde_json::to_string_pretty(&rep).unwrap().as_bytes()).unwrap_or_else(|e| werr(&format!("{prefix}.json"), e));
     let sample = std::path::Path::new(prefix).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-    crate::vfs::write(&format!("{prefix}.html"), crate::html::render(&rep, &sample).as_bytes()).unwrap();
+    crate::vfs::write(&format!("{prefix}.html"), crate::html::render(&rep, &sample).as_bytes()).unwrap_or_else(|e| werr(&format!("{prefix}.html"), e));
     if !fasta.is_empty() {
-        crate::vfs::write(&format!("{prefix}.novel.fa"), fasta.as_bytes()).unwrap();
+        crate::vfs::write(&format!("{prefix}.novel.fa"), fasta.as_bytes()).unwrap_or_else(|e| werr(&format!("{prefix}.novel.fa"), e));
         let head = format!("# hla-wgs {}: candidates for new alleles, one line per difference from the nearest database allele\n\
 # pos counts from the first base of that allele's genomic sequence, cds_pos and the codon number from the start codon\n\
 # a proposal from short reads is not a confirmed allele: before a submission to IPD-IMGT/HLA the sequence normally has to be\n\
 # confirmed independently (for example by long reads or Sanger sequencing of the separated allele); see the database's current guidelines\n\
 gene\tslot\trecord\tnearest_allele\tpos\tchange\tregion\tcds_pos\teffect\treads\tdepth\tassignment\tin_sequence\tstatus\n", env!("CARGO_PKG_VERSION"));
-        crate::vfs::write(&format!("{prefix}.novel.tsv"), (head + &sheet).as_bytes()).unwrap();
+        crate::vfs::write(&format!("{prefix}.novel.tsv"), (head + &sheet).as_bytes()).unwrap_or_else(|e| werr(&format!("{prefix}.novel.tsv"), e));
     }
 }
 

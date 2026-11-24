@@ -106,5 +106,26 @@
       "homopolymer_or_str_only": 9,
       "other": 5
     }
+  },
+  "lab1000g": {
+    "note": "2018 laboratory set, differing alleles examined one by one",
+    "identical_in_typed_exons": 23,
+    "real": 13,
+    "old_name": 1,
+    "lab_file_parse_error": 2
+  },
+  "timing_main": {
+    "note": "4 threads, extracted MHC-region and unmapped reads of a 30x genome, mean over the samples, run one after the other on the same 4-core machine",
+    "samples": 8,
+    "hla-wgs": {
+      "wall_s": 17.0,
+      "cpu_s": 57.0,
+      "peak_gb": 1.2
+    },
+    "T1K_1.0.10": {
+      "wall_s": 197.1,
+      "cpu_s": 628.9,
+      "peak_gb": 3.5
+    }
   }
 }

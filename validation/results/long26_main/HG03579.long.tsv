@@ -1,0 +1,46 @@
+gene	slot	allele	differences	exact	reads	spanning	unsure_sites	equal_alternatives	note
+A	1	A*33:01:01:01	0	yes	20	18	0	-	-
+A	2	A*23:01:01:01	0	yes	20	15	0	-	-
+B	1	B*50:01:01:01	0	yes	39	28	0	-	-
+B	2	B*14:02:01:03	0	yes, with unsure sites	5	5	1	-	minor
+C	1	C*06:02:01:01	0	yes	23	20	0	-	-
+C	2	C*08:02:01:15	0	yes	12	9	0	-	-
+C	3	C*06:02:01:110	3	no	4	3	5	-	minor
+DMA	1	DMA*01:01:01:02	0	yes	38	22	0	-	-
+DMB	1	DMB*01:01:01:13	0	yes, with unsure sites	52	37	1	-	-
+DOA	1	DOA*01:01:11	0	yes	44	38	0	-	-
+DOB	1	DOB*01:01:01:23	0	yes	45	29	0	-	-
+DPA1	1	DPA1*02:01:08:03	0	yes	21	9	0	-	-
+DPA1	2	DPA1*02:02:02:12	0	yes	25	8	0	-	-
+DPB1	1	DPB1*01:01:01:01	0	yes	32	7	0	-	-
+DPB1	2	DPB1*01:01:01:02	0	yes	19	6	0	-	-
+DPB2	1	DPB2*03:01:01:01	18	no	55	6	2	-	-
+DQA1	1	DQA1*04:01:01:05	0	yes	65	44	0	-	-
+DQA2	1	DQA2*01:07	1	no	29	21	0	-	-
+DQB1	1	DQB1*04:02:01:08	0	yes	58	38	0	-	-
+DQB2	1	DQB2*01:01:01:10	0	yes, with unsure sites	46	30	2	-	-
+DRA	1	DRA*01:03	0	yes	34	25	0	-	-
+DRB1	1	DRB1*03:02:01:01	1	no	57	13	0	-	-
+DRB3	1	DRB3*01:62:01:01	0	yes	38	9	0	-	-
+E	1	E*01:01:01:01	0	yes	48	39	0	-	-
+F	1	F*01:03:01:03	0	yes	33	27	0	-	-
+F	2	F*01:01:02:07	0	yes	26	21	0	-	-
+G	1	G*01:04:04:01	0	yes	28	25	0	-	-
+G	2	G*01:03:01:02	0	yes	18	14	0	-	-
+H	1	H*02:09	0	yes	27	25	0	-	-
+J	1	J*01:01:01:13	0	yes	24	22	0	-	-
+J	2	J*01:01:01:15	0	yes	24	22	0	-	-
+K	1	K*01:04	2	no	12	7	1	-	-
+L	1	L*01:01:01:01	0	yes	40	34	0	-	-
+MICA	1	MICA*009:02:01	0	yes	27	9	0	-	-
+MICA	2	MICA*172	17	no	25	3	0	-	-
+MICB	1	MICB*005:06:01	2	no	29	11	0	-	-
+MICB	2	MICB*004:01:26	5	no	41	8	0	-	-
+R	1	R*01:01:01:02	0	yes	22	21	0	-	-
+T	1	T*03:01:01:02	3	no	26	24	1	-	-
+TAP1	1	TAP1*01:04	1	no	44	13	0	-	-
+TAP2	1	TAP2*01:01:03:18	0	yes, with unsure sites	49	18	2	-	-
+V	1	V*01:01:01:03	17	no	25	24	0	-	-
+W	1	W*01:01:01:02	5	no	22	18	0	-	-
+W	2	W*01:01:01:04	8	no	17	15	0	-	-
+Y	1	Y*02:01	1	no	23	23	0	-	-

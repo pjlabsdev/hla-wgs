@@ -62,7 +62,7 @@ pub fn intervals(counts: &[u32]) -> Vec<(usize, usize)> {
 
 fn read_panel(panel: &str) -> Vec<(String, Vec<u8>)> {
     let mut pan: Vec<(String, Vec<u8>)> = vec![];
-    let f = std::fs::File::open(panel).unwrap_or_else(|e| crate::util::die(&format!("{panel}: {e}")));
+    let f = std::fs::File::open(panel).unwrap_or_else(|e| crate::errors::fail("HW-E050", &format!("{panel}: {e}")));
     for l in BufReader::new(f).lines() {
         let l = l.unwrap();
         if let Some(n) = l.strip_prefix('>') {
@@ -84,14 +84,14 @@ fn transfer(dir: &str, old: &str) {
     let opan = read_panel(&format!("{old}/panel.fa"));
     let obed = format!("{old}/panel.fa.mask.bed");
     let mut iv: AHashMap<String, Vec<(usize, usize)>> = AHashMap::new();
-    for l in std::fs::read_to_string(&obed).unwrap_or_else(|e| crate::util::die(&format!("{obed}: {e}"))).lines() {
+    for l in std::fs::read_to_string(&obed).unwrap_or_else(|e| crate::errors::fail("HW-E050", &format!("{obed}: {e}"))).lines() {
         let f: Vec<&str> = l.split('\t').collect();
         if let (Some(n), Some(Ok(a)), Some(Ok(b))) = (f.first(), f.get(1).map(|x| x.parse::<usize>()), f.get(2).map(|x| x.parse::<usize>())) {
             iv.entry(n.to_string()).or_default().push((a, b));
         }
     }
     if iv.is_empty() {
-        crate::util::die(&format!("{obed}: no intervals"));
+        crate::errors::fail("HW-E050", &format!("{obed}: no intervals"));
     }
     // 21-mer -> true while every occurrence lies inside a masked interval
     let mut rep: AHashMap<u64, (u32, u32)> = AHashMap::new();
@@ -107,7 +107,7 @@ fn transfer(dir: &str, old: &str) {
     let panel = format!("{dir}/panel.fa");
     let pan = read_panel(&panel);
     let out = format!("{panel}.mask.bed");
-    let mut o = std::io::BufWriter::new(std::fs::File::create(&out).unwrap_or_else(|e| crate::util::die(&format!("{out}: {e}"))));
+    let mut o = std::io::BufWriter::new(std::fs::File::create(&out).unwrap_or_else(|e| crate::errors::fail("HW-E031", &format!("{out}: {e}"))));
     let (mut ni, mut na, mut unknown, mut total, mut same) = (0usize, 0usize, 0usize, 0usize, 0usize);
     let oseq: AHashMap<&str, &[u8]> = opan.iter().map(|(n, s)| (n.as_str(), s.as_slice())).collect();
     for (name, s) in &pan {
@@ -155,7 +155,7 @@ pub fn run(args: &[String]) {
     if args[1] == "--from" {
         match args.get(2) {
             Some(old) => return transfer(&args[0], old),
-            None => crate::util::die("build-mask DBDIR --from OLDDBDIR: the older database directory is missing"),
+            None => crate::errors::fail("HW-E050", "build-mask DBDIR --from OLDDBDIR: the older database directory is missing"),
         }
     }
     let (dir, genome) = (&args[0], &args[1]);

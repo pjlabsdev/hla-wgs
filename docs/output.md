@@ -46,7 +46,7 @@ Schema `genome.hla.v1`.
 ```json
 {
   "tool": "hla-wgs", "version": "1.0.0", "schema": "genome.hla.v1",
-  "thresholds": {"2": 6.0, "3": 6.0, "4": 4.0, "4_01": 1.0},
+  "thresholds": {"2": 4.0, "3": 4.0, "4": 4.0, "4_lead_2_3": 6.0, "4_01": 1.0},
   "genes": [
     {
       "gene": "DPB1", "called": true, "copies": 2, "reads": 1341, "gap": 1.52,
@@ -151,6 +151,12 @@ the natural killer cell receptors, read from the protein (residues 77 to 83 of t
 since 1970, UTC). `depth_estimate` is a rough depth over the HLA genes (read pairs of ten genes always present in two copies, scaled to their median at 30x in the validation); below 18 the page says that fewer fields are supported and the fourth field is somewhat less often exact. `database_release` is the IPD-IMGT/HLA release of the database (`null` for a database built
 before 1.1).
 
+## PREFIX.log.jsonl and PREFIX.log.txt
+
+The run log: header with versions, parameters and input checksums, every step with time, memory and
+counts, every automatic decision with its reason, progress, and errors with their code. Format in
+[manual/log.md](manual/log.md), error codes in [manual/errors.md](manual/errors.md).
+
 ## Environment switches
 
 For experiments; the defaults are the validated configuration.
@@ -165,9 +171,11 @@ For experiments; the defaults are the validated configuration.
 | `HLA_NOKNOWN` | do not rename a call to the database allele that its new sites describe |
 | `HLA_NOBIG` | count long insertions and deletions per base instead of as one event |
 | `HLA_UNPH` | also cut the fourth field when a sibling allele differs only at positions without phase information (fewer wrong, clearly fewer certain calls) |
+| `HLA_TGRP=6` | two and three fields need a lead of 6 as before 1.2 (`thresholds.2` and `.3`); a four-field call always needs leads of `thresholds.4_lead_2_3` at fields 2 and 3 |
 | `HLA_F401=0` | fourth field 01 needs the full lead of 4 like any other allele (`thresholds.4_01` is then null) |
 | `HLA_UNSTHIN=0` | old rule for unsupported database bases: also in stretches with fewer than half the usual reads |
 | `HLA_PAD_MIN` | a database allele more than this many bases shorter than another allele of its gene gets that allele's flank when alleles are compared (default 8; 1.0 used 20) |
+| `HLA_PAD_CACHE` | file for the padding cache (default `pad_cache.tsv.gz` next to `hladb.json.gz`; `0` switches it off). It keeps the alignments of database alleles against each other that the first run on a reference makes; later runs read them instead of aligning again. The result is the same with and without it. |
 | `HLA_NOV_EDGE` | distance from a gene end within which a new site needs 90 % of the reads (default 15) |
 | `HLA_WGS_LANG` | `de` or `en`: language of the start files and of the result page |
 | `HLA_WGS_NO_UPDATE=1` | the start files do not check GitHub for a newer release |

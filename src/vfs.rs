@@ -24,6 +24,9 @@ mod imp {
     pub fn create(p: &str) -> io::Result<Box<dyn io::Write>> {
         Ok(Box::new(std::fs::File::create(p)?))
     }
+    pub fn create_send(p: &str) -> io::Result<Box<dyn io::Write + Send>> {
+        Ok(Box::new(std::fs::File::create(p)?))
+    }
     pub fn write(p: &str, data: &[u8]) -> io::Result<()> {
         std::fs::write(p, data)
     }
@@ -226,6 +229,14 @@ mod imp {
     pub struct OneThread<T>(pub T);
     unsafe impl<T> Send for OneThread<T> {}
     unsafe impl<T> Sync for OneThread<T> {}
+    impl<T: io::Write> io::Write for OneThread<T> {
+        fn write(&mut self, b: &[u8]) -> io::Result<usize> {
+            self.0.write(b)
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            self.0.flush()
+        }
+    }
     impl<T: io::BufRead> io::BufRead for OneThread<T> {
         fn fill_buf(&mut self) -> io::Result<&[u8]> {
             self.0.fill_buf()
@@ -262,29 +273,34 @@ mod imp {
         Ok(s)
     }
 
+    /// writes go straight into the registered file, so that a file is complete at every moment
+    /// (also the run log, whose writer is never dropped)
     struct MemWriter {
         path: String,
-        buf: Vec<u8>,
     }
     impl io::Write for MemWriter {
         fn write(&mut self, b: &[u8]) -> io::Result<usize> {
-            self.buf.extend_from_slice(b);
-            Ok(b.len())
+            FILES.with(|f| match f.borrow_mut().get_mut(&self.path) {
+                Some(Src::Bytes(v)) => {
+                    Rc::make_mut(v).extend_from_slice(b);
+                    Ok(b.len())
+                }
+                _ => Err(io::Error::other(format!("{}: file was removed while written", self.path))),
+            })
         }
         fn flush(&mut self) -> io::Result<()> {
-            put_bytes(&self.path, self.buf.clone());
             Ok(())
-        }
-    }
-    impl Drop for MemWriter {
-        fn drop(&mut self) {
-            put_bytes(&self.path, std::mem::take(&mut self.buf));
         }
     }
     pub fn create(p: &str) -> io::Result<Box<dyn io::Write>> {
         let k = norm(p);
         put_bytes(&k, vec![]);
-        Ok(Box::new(MemWriter { path: k, buf: vec![] }))
+        Ok(Box::new(MemWriter { path: k }))
+    }
+    pub fn create_send(p: &str) -> io::Result<Box<dyn io::Write + Send>> {
+        let k = norm(p);
+        put_bytes(&k, vec![]);
+        Ok(Box::new(OneThread(MemWriter { path: k })))
     }
     pub fn write(p: &str, data: &[u8]) -> io::Result<()> {
         put_bytes(&norm(p), data.to_vec());

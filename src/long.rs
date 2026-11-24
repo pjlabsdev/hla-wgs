@@ -6,7 +6,8 @@
 //! 2. per gene family these parts are split into haplotypes at positions where two bases are each
 //!    carried by a good share of the reads (the reference for this is one of the reads itself);
 //! 3. per haplotype one read is lengthened with the overhang of others until it covers the gene and
-//!    corrected by majority at every position (consensus);
+//!    corrected at every position by the variant most reads carry (consensus; HLA_LPLUR=0: absolute
+//!    majority);
 //! 4. the consensus is compared with every full-length allele of the gene. Distance 0 is an exact
 //!    four-field result; otherwise the nearest allele and the number of differences are reported and
 //!    the consensus itself is written to `PREFIX.long.fa`.
@@ -190,14 +191,39 @@ fn extend(mut r: Vec<u8>, segs: &[Seg], ids: &[usize]) -> Vec<u8> {
     r
 }
 
-/// majority consensus; returns the sequence and the positions where a minority of 30 % or more disagrees
+/// plurality per position and kind: substitutions compete with each other, insertions and deletions
+/// with each other, and each group with the reads that keep the template there. In a single-base run
+/// the reads split over several lengths, so that the right length often has no absolute majority.
+fn plural(cnt: &AHashMap<Ev, u32>, d: &dyn Fn(usize) -> u32) -> Vec<Ev> {
+    let mut by: AHashMap<(usize, bool), Vec<(&Ev, u32)>> = AHashMap::new();
+    for (e, c) in cnt {
+        by.entry((e.0, e.1 == b'S')).or_default().push((e, *c));
+    }
+    let mut out = vec![];
+    for ((p, _), mut v) in by {
+        let dp = d(p);
+        if dp < 3 {
+            continue;
+        }
+        let alt: u32 = v.iter().map(|x| x.1).sum();
+        let keep = dp.saturating_sub(alt);
+        v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+        let (e, c) = v[0];
+        if c > keep && (v.len() == 1 || c > v[1].1) {
+            out.push(e.clone());
+        }
+    }
+    out
+}
+
+/// consensus by plurality (see `plural`); returns the sequence and the positions where a minority of 30 % or more disagrees
 fn polish(mut t: Vec<u8>, segs: &[Seg], ids: &[usize]) -> (Vec<u8>, Vec<usize>) {
     let mut unsure = vec![];
     for round in 0..5 {
         let aln = align(&t, segs, ids);
         let (cov, cnt) = tally(&aln, ids, t.len());
         let d = |p: usize| cov[p.min(t.len() - 1)];
-        let mut maj: Vec<Ev> = cnt.iter().filter(|(e, c)| d(e.0) >= 3 && 2 * **c > d(e.0)).map(|(e, _)| e.clone()).collect();
+        let mut maj: Vec<Ev> = if std::env::var("HLA_LPLUR").map_or(true, |v| v != "0") { plural(&cnt, &d) } else { cnt.iter().filter(|(e, c)| d(e.0) >= 3 && 2 * **c > d(e.0)).map(|(e, _)| e.clone()).collect() };
         if maj.is_empty() || round == 4 {
             unsure = cnt.iter().filter(|(e, c)| d(e.0) >= 4 && 10 * **c >= 3 * d(e.0)).map(|(e, _)| e.0).collect();
             unsure.sort();
@@ -207,6 +233,11 @@ fn polish(mut t: Vec<u8>, segs: &[Seg], ids: &[usize]) -> (Vec<u8>, Vec<usize>) 
         t = apply(&t, &mut maj);
     }
     (t, unsure)
+}
+
+/// new unsure sites that the joint consensus of two groups may have and still be one haplotype (HLA_LMU)
+fn lmu() -> usize {
+    std::env::var("HLA_LMU").ok().and_then(|v| v.parse().ok()).unwrap_or(2)
 }
 
 fn template(segs: &[Seg], ids: &[usize]) -> usize {
@@ -350,24 +381,51 @@ struct Call {
     names: Vec<String>,
     unsure: usize,
     seq: Vec<u8>,
+    ids: Vec<usize>,
 }
 
 pub fn run(args: &[String]) {
     if args.len() < 3 {
         eprintln!("usage: hla-wgs long DBDIR READS.fastq[.gz]|READS.bam OUTPREFIX [threads]");
         eprintln!("       accurate long reads (PacBio HiFi); of a BAM the MHC region is read (index needed)");
-        std::process::exit(2);
+        crate::errors::fail("HW-E001", "too few arguments");
     }
     let dir = args[0].trim_end_matches('/');
     let (input, out) = (&args[1], &args[2]);
     let threads: usize = args.get(3).and_then(|x| x.parse().ok()).unwrap_or(4);
     rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().ok();
+    if !std::path::Path::new(&format!("{dir}/hladb.json.gz")).is_file() {
+        crate::errors::fail("HW-E002", &format!("database not found: {dir}"));
+    }
+    match std::fs::metadata(input) {
+        Err(e) => crate::errors::fail("HW-E010", &format!("{input}: {e}")),
+        Ok(m) if m.is_dir() => crate::errors::fail("HW-E012", &format!("{input} is a folder")),
+        Ok(m) if m.len() == 0 => crate::errors::fail("HW-E011", &format!("{input} is empty")),
+        _ => {}
+    }
+    if let Err(e) = crate::runlog::start(out) {
+        crate::errors::fail("HW-E020", &format!("cannot write the run log {out}.log.jsonl: {e}"));
+    }
+    let mut cmd = vec!["hla-wgs".to_string(), "long".to_string()];
+    cmd.extend(args.iter().cloned());
+    crate::runlog::header(
+        "long reads",
+        &cmd,
+        serde_json::json!({"threads": threads, "input_type": if input.to_ascii_lowercase().ends_with(".bam") { "BAM" } else { "FASTQ" }}),
+        vec![crate::runlog::file_info(input)],
+        serde_json::json!({"database": crate::runlog::file_info(&format!("{dir}/hladb.json.gz")), "panel": crate::runlog::file_info(&format!("{dir}/panel.fa"))}),
+    );
     let t0 = std::time::Instant::now();
-    let log = |s: String| eprintln!("[{:6.1}s] {}", t0.elapsed().as_secs_f64(), s);
+    let log = |s: String| {
+        eprintln!("[{:6.1}s] {}", t0.elapsed().as_secs_f64(), s);
+        crate::runlog::note("long", &s);
+    };
+    let st = crate::runlog::begin("read");
     let (db, mut reads) = rayon::join(
         || Db::load(&format!("{dir}/hladb.json.gz")),
-        || if input.to_ascii_lowercase().ends_with(".bam") { read_bam(input, threads).unwrap_or_else(|e| panic!("{input}: {e}")) } else { read_fastq(input) },
+        || if input.to_ascii_lowercase().ends_with(".bam") { read_bam(input, threads).unwrap_or_else(|e| crate::errors::fail("HW-E014", &format!("{input}: {e}"))) } else { read_fastq(input) },
     );
+    st.end(serde_json::json!({"reads": reads.len(), "bases": reads.iter().map(|r| r.len()).sum::<usize>()}));
     for r in &mut reads {
         r.make_ascii_uppercase();
     }
@@ -426,7 +484,8 @@ pub fn run(args: &[String]) {
         let (t_split, mut t_pol, mut t_db) = (tf.elapsed().as_secs_f64(), 0.0, 0.0);
         let fgenes: Vec<&String> = db.genes.iter().filter(|g| family(g) == fam).collect();
         let mut found: Vec<Call> = vec![];
-        for cl in clusters.iter().filter(|c| c.len() >= 4) {
+        // consensus and nearest allele of one read group
+        let mut make = |cl: &[usize]| -> Option<Call> {
             let tp = std::time::Instant::now();
             let (cons, unsure) = polish(extend(segs[template(segs, cl)].seq.clone(), segs, cl), segs, cl);
             t_pol += tp.elapsed().as_secs_f64();
@@ -464,13 +523,27 @@ pub fn run(args: &[String]) {
                 })
                 .collect();
             best.sort();
-            t_db += tp.elapsed().as_secs_f64();
-            let Some(&(d0, n0, s0, e0)) = best.first() else { continue };
-            // parts of reads only, copies of pseudogenes and mixtures stay far from every allele
-            if d0 > 20.max((e0 - s0) as i64 / 200) {
-                continue;
+            let dmin = best.first().map_or(0, |b| b.0);
+            // No allele equals the consensus: the nearest by whole sequence can be an allele of another
+            // group that only shares the introns better (HG01928: DRB1*04:03 named for a 04:04 haplotype).
+            // The protein is read off the exons, so first the alleles whose exons the consensus holds
+            // unchanged, most of them first, then the distance. HLA_LEXON=0: distance only.
+            if best.first().map_or(false, |b| b.0 > 0) && std::env::var("HLA_LEXON").map_or(true, |v| v != "0") {
+                let byname: AHashMap<&str, &crate::db::Allele> = pick.iter().map(|a| (a.name.as_str(), *a)).collect();
+                let miss = |n: &str| -> usize { byname[n].exons.iter().filter(|(_, e)| !e.is_empty() && !cons.windows(e.len()).any(|w| w == e.as_slice())).count() };
+                // only among alleles at most 5 differences further away: pseudogenes such as HLA-K have
+                // alleles with exons that other alleles of the gene describe differently
+                let mut keyed: Vec<(usize, (i64, &str, usize, usize))> = best.iter().map(|b| (if b.0 <= dmin + 5 { miss(b.1) } else { usize::MAX }, *b)).collect();
+                keyed.sort();
+                best = keyed.into_iter().map(|x| x.1).collect();
             }
-            found.push(Call {
+            t_db += tp.elapsed().as_secs_f64();
+            let Some(&(d0, n0, s0, e0)) = best.first() else { return None };
+            // parts of reads only, copies of pseudogenes and mixtures stay far from every allele
+            if dmin > 20.max((e0 - s0) as i64 / 200) {
+                return None;
+            }
+            Some(Call {
                 gene: n0.split('*').next().unwrap().to_string(),
                 reads: cl.len(),
                 spanning: cl.iter().filter(|&&i| segs[i].span >= SPANNING).count(),
@@ -478,27 +551,61 @@ pub fn run(args: &[String]) {
                 names: best.iter().take_while(|b| b.0 == d0).map(|b| b.1.to_string()).collect(),
                 unsure: unsure.iter().filter(|&&u| s0 <= u && u < e0).count(),
                 seq: cons[s0..e0].to_vec(),
-            });
+                ids: cl.to_vec(),
+            })
+        };
+        for cl in clusters.iter().filter(|c| c.len() >= 4) {
+            if let Some(c) = make(cl) {
+                found.push(c);
+            }
+        }
+        // groups that name the same allele are mostly one haplotype split by read noise: their reads
+        // together give the consensus. Two haplotypes can share the nearest allele (HG02622 TAP1: 35 and
+        // 37 differences from TAP1*01:05); their joint consensus has new sites where the reads split, so
+        // such groups stay apart. HLA_LMERGE=0: old way, the larger group's sequence with all reads counted.
+        found.sort_by(|x, y| y.reads.cmp(&x.reads).then(x.names.cmp(&y.names)));
+        let joint_on = std::env::var("HLA_LMERGE").map_or(true, |v| v != "0");
+        let mut kept: Vec<Call> = vec![];
+        for c in found {
+            let Some(ki) = kept.iter().position(|k| k.gene == c.gene && k.names.iter().any(|n| c.names.contains(n))) else {
+                kept.push(c);
+                continue;
+            };
+            let k = &mut kept[ki];
+            let mut ids: Vec<usize> = k.ids.iter().chain(c.ids.iter()).copied().collect();
+            ids.sort();
+            ids.dedup();
+            if !joint_on {
+                k.reads = ids.len();
+                k.spanning = ids.iter().filter(|&&i| segs[i].span >= SPANNING).count();
+                k.ids = ids;
+                continue;
+            }
+            match make(&ids) {
+                Some(j) if j.gene == k.gene && j.unsure <= k.unsure.max(c.unsure) + lmu() => *k = j,
+                Some(j) if j.gene == k.gene => kept.push(c),
+                _ => {
+                    k.reads = ids.len();
+                    k.spanning = ids.iter().filter(|&&i| segs[i].span >= SPANNING).count();
+                    k.ids = ids;
+                }
+            }
         }
         if std::env::var("HLA_LONG_TIME").is_ok() {
             log(format!("{fam}: {} groups, split {t_split:.1}s, consensus {t_pol:.1}s, naming {t_db:.1}s", clusters.len()));
         }
-        // groups that name the same allele are one haplotype split by read noise
-        found.sort_by(|x, y| y.reads.cmp(&x.reads).then(x.names.cmp(&y.names)));
-        let mut kept: Vec<Call> = vec![];
-        for c in found {
-            if let Some(k) = kept.iter_mut().find(|k| k.gene == c.gene && k.names.iter().any(|n| c.names.contains(n))) {
-                k.reads += c.reads;
-                k.spanning += c.spanning;
-            } else {
-                kept.push(c);
-            }
-        }
         calls.append(&mut kept);
     }
-    calls.sort_by(|x, y| x.gene.cmp(&y.gene).then(y.reads.cmp(&x.reads)));
-    let mut tsv = std::io::BufWriter::new(std::fs::File::create(format!("{out}.long.tsv")).unwrap());
-    let mut fa = std::io::BufWriter::new(std::fs::File::create(format!("{out}.long.fa")).unwrap());
+    // haplotypes first: a group whose reads mostly stop inside the gene is a mixture or a fragment,
+    // also when it has more reads than a real haplotype with reads across the whole gene
+    // (HG02630: 9 reads, 2 spanning, 12 differences before C*17:01:01:30 with 8 reads, 7 spanning)
+    if std::env::var("HLA_LSPAN").map_or(true, |v| v != "0") {
+        calls.sort_by(|x, y| x.gene.cmp(&y.gene).then(y.spanning.cmp(&x.spanning)).then(y.reads.cmp(&x.reads)));
+    } else {
+        calls.sort_by(|x, y| x.gene.cmp(&y.gene).then(y.reads.cmp(&x.reads)));
+    }
+    let mut tsv = std::io::BufWriter::new(std::fs::File::create(format!("{out}.long.tsv")).unwrap_or_else(|e| crate::errors::fail("HW-E020", &format!("{out}.long.tsv: {e}"))));
+    let mut fa = std::io::BufWriter::new(std::fs::File::create(format!("{out}.long.fa")).unwrap_or_else(|e| crate::errors::fail("HW-E020", &format!("{out}.long.fa: {e}"))));
     writeln!(tsv, "gene\tslot\tallele\tdifferences\texact\treads\tspanning\tunsure_sites\tequal_alternatives\tnote").unwrap();
     let mut n = 0;
     let mut gene_slot: AHashMap<String, (usize, usize)> = AHashMap::new();
@@ -507,6 +614,13 @@ pub fn run(args: &[String]) {
         e.0 += 1;
         let (slot, top) = *e;
         let note = if slot > 2 || c.reads < 5.max(top / 5) { "minor" } else { "" };
+        crate::runlog::decision(
+            "long",
+            &format!("{} slot {slot}", c.gene),
+            &format!("{} ({} differences)", c.names[0], c.dist),
+            if !note.is_empty() { "minor read group: fewer reads than 5 or a fifth of the largest group, or a third group" } else if c.dist == 0 { "consensus equals a database allele" } else { "nearest database allele of a new sequence" },
+            serde_json::json!({"reads": c.reads, "spanning": c.spanning, "unsure_sites": c.unsure, "minor": !note.is_empty(), "equal_alternatives": c.names.len().saturating_sub(1)}),
+        );
         writeln!(
             tsv,
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
@@ -528,6 +642,9 @@ pub fn run(args: &[String]) {
         }
     }
     log(format!("{n} sequences written to {out}.long.fa, table {out}.long.tsv"));
+    drop(tsv);
+    drop(fa);
+    crate::runlog::finish(true, vec![format!("{}.long.tsv", out.rsplit(['/', '\\']).next().unwrap_or(out)), format!("{}.long.fa", out.rsplit(['/', '\\']).next().unwrap_or(out))]);
 }
 
 #[cfg(test)]

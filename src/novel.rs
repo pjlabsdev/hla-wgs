@@ -444,7 +444,7 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
             }
             eprintln!("THIN\t{g}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{med}", k + 1, a.name, c[0], c[1], c[2], c[3], c[4], c[5], own_e - own_s);
         }
-        v.sort_by_key(|s| s.pos);
+        v.sort_by(|a, b| a.pos.cmp(&b.pos).then_with(|| a.what.cmp(&b.what)));
         out[k] = v;
         if na == 2 {
             for ((p, w), (cs, _)) in &alt[k] {

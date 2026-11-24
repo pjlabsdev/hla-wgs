@@ -52,7 +52,7 @@ html{scroll-padding-top:20px}
 <div class="band">
 <h1>hla-wgs: vom Download der Datenbank bis zum Befund</h1>
 <p class="lead">Was das Programm im Einzelnen tut. Die Einrichtung läuft einmal, beim ersten Start; danach geht jede Probe denselben Weg durch Lesen, Ausrichten, Zuordnen und Typisieren von 26 Genen. Alles läuft in einem einzigen Rust-Programm, ohne weitere Werkzeuge.</p>
-<nav class="scroll"><a href="#schema">Gesamtschema</a><a href="#einrichtung">Einrichtung</a><a href="#lauf">Lauf je Probe</a><a href="#aligner">Eigener Aligner</a><a href="#ausgabe">Ausgabe</a></nav>
+<nav class="scroll"><a href="#schema">Gesamtschema</a><a href="#einrichtung">Einrichtung</a><a href="#lauf">Lauf je Probe</a><a href="#hifi">HiFi</a><a href="#aligner">Eigener Aligner</a><a href="#ausgabe">Ausgabe</a></nav>
 
 <figure id="schema">
 <div class="wide">
@@ -133,7 +133,7 @@ html{scroll-padding-top:20px}
 <text x="32" y="358" font-weight="500">Eingabe</text>
 <text x="32" y="376" font-size="11" opacity=".7">BAM, CRAM oder</text>
 <text x="32" y="391" font-size="11" opacity=".7">FASTQ R1+R2</text>
-<text x="32" y="406" font-size="11" opacity=".7">(HiFi: long)</text>
+<text x="32" y="406" font-size="11" opacity=".7">(HiFi: long, unten)</text>
 <text x="217" y="358" font-weight="500">Lesen</text>
 <text x="217" y="376" font-size="11" opacity=".7">BAM/CRAM: nur MHC</text>
 <text x="217" y="391" font-size="11" opacity=".7">21-mer-Vorfilter</text>
@@ -227,7 +227,16 @@ html{scroll-padding-top:20px}
 <li><span>Stufe B</span><span>Jedes Read-Paar gegen jeden Kandidaten mit bitparalleler Editdistanz (Myers). Ein Mischmodell mit Priors wählt das Allelpaar, das alle Reads zusammen am besten erklärt. Pass 2 wiederholt das mit allen Allelen der besten Drei-Feld-Gruppen.</span></li>
 <li><span>Exon-Verfeinerung</span><span>Reads über den Exons entscheiden zwischen Allelen, die sich nur dort unterscheiden; ein Phasencheck prüft, ob ein anderes Paar dieselben Varianten anders verteilt.</span></li>
 <li><span>Neue Stellen</span><span>Wo die Reads stetig vom gewählten Allel abweichen, liegt ein neues Allel vor: Stelle, Region, Wirkung aufs Protein und welche Kopie sie trägt. Homopolymere und kurze Tandemwiederholungen werden gesondert behandelt.</span></li>
-<li><span>Sicherheit je Feld</span><span>Für jedes Feld der Vorsprung vor dem nächsten Konkurrenten gegen eine Schwelle; gemeldet werden nur die Felder, die die Reads tragen. DMB und TAP2 höchstens drei Felder.</span></li>
+<li><span>Sicherheit je Feld</span><span>Für jedes Feld der Vorsprung vor dem nächsten Konkurrenten gegen eine Schwelle; gemeldet werden nur die Felder, die die Reads tragen. Feld 2 und 3 sind ab einem Vorsprung von 4 sicher. Vier Felder brauchen 6 bei Feld 2 und 3 und 4 beim vierten Feld (1, wenn das vierte Feld 01 ist). DMB und TAP2 höchstens drei Felder.</span></li>
+</ul>
+
+<h2 id="hifi">Lange Reads (HiFi)</h2>
+<p>Mit <code>hla-wgs long</code> liest das Programm PacBio-HiFi-Reads des MHC-Bereichs und baut jedes Allel selbst zusammen, statt es nur zuzuordnen.</p>
+<ul class="steps">
+<li><span>Haplotypen</span><span>Die Reads jedes Gens werden nach ihren Unterschieden in Gruppen geteilt, eine Gruppe je Genkopie.</span></li>
+<li><span>Konsens</span><span>Je Gruppe wird die Sequenz verlängert und Stelle für Stelle nach der Mehrheit der Reads geglättet, die die Stelle ganz überspannen. Unsichere Stellen werden markiert.</span></li>
+<li><span>Zusammenführen</span><span>Benennen zwei Gruppen dasselbe Allel, wird ihr gemeinsamer Konsens aus allen Reads gebildet. Bekommt er mehr als zwei neue unsichere Stellen, bleiben es zwei Haplotypen.</span></li>
+<li><span>Benennen</span><span>Das nächste Datenbank-Allel wird zuerst über die Exons gesucht, dann über die ganze Länge. Ausgabe: <code>PREFIX.long.tsv</code> (Allel, Abstand, exakt, Reads) und <code>PREFIX.long.fa</code> (die Sequenzen).</span></li>
 </ul>
 
 <h2 id="aligner">Der eigene Aligner</h2>

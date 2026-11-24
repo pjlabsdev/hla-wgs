@@ -102,8 +102,8 @@ the own aligner sees and therefore reports to three fields only.
 Simulated reads: 16,767 read pairs from 47 genes, half of them from alleles that are not in the
 panel (as a new allele would be), 0.3 % substitutions. Pairs assigned to their own gene only:
 93.0 % with minimap2 and 92.96 % with the own aligner; to a wrong gene 0.52 % and 0.54 %; the rest
-are left out by the repeat mask or lie in genes outside the panel in both. The script is
-`validation/sim/sim.py`.
+are left out by the repeat mask or lie in genes outside the panel in both. The simulator is
+`hla-wgs-validate sim` (scoring: `hla-wgs-validate sim-eval`).
 
 ## Self-checks
 
@@ -117,7 +117,7 @@ not depend on the number of threads. `HLA_PROPS=n` runs n times as many random c
 found one error, now fixed: the shortcut for an ungapped read end missed a better alignment with a
 gap when the end bonus paid for it.
 
-`validation/sim/sim.py` simulates read pairs from IPD-IMGT/HLA alleles with profiles `illumina`,
+`hla-wgs-validate sim` simulates read pairs from IPD-IMGT/HLA alleles with profiles `illumina`,
 `lowq` (errors rising to 4 % at the read end), `mgi` (DNB-like) and `hard` (plus 2 % chimeric pairs),
 and `--div` adds divergence to every source allele, as for a new allele far from the panel.
 

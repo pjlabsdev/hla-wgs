@@ -62,14 +62,17 @@ All scripts and result tables are in [`validation/`](validation/).
 | 45 further 1000 Genomes samples with laboratory typing (A, B, C, DRB1, DQB1) | 438 / 450 at two fields; of 12 differences 5 are resolution limits of the laboratory method, 3 are probable laboratory errors (B\*27:05 against 27:03), 4 are open |
 | GIAB trios (Ashkenazi, Han Chinese), 60x to 100x | no Mendelian conflict at two or three fields in any gene; none at four fields among calls reported as certain |
 
-With the 1.1 development version (this branch):
+With the current version (unreleased, this branch; tables in `validation/results/dev80_main`, `hgsvc59_main`, `depth_lead4`, `lab1000g`, `long26_main`):
 
 | Test | Result |
 |---|---|
-| 80 HPRC samples, 18 genes | two fields 2,486 / 2,489, three fields 2,482 / 2,489; certain at four fields 1,752, of these 1,731 exact (98.8 %) |
-| 59 HGSVC3 samples never used at any stage, assembly truth, 18 genes | two fields 1,833 / 1,833, three fields 1,830 / 1,833; certain at four fields 1,206, of these 1,191 exact (98.8 %) |
+| 80 HPRC samples, 18 genes | two fields 2,486 / 2,489, three fields 2,482 / 2,489; certain at four fields 1,799, of these 1,780 exact (98.9 %); 1,604 of 1,701 reported new sites true |
+| 59 HGSVC3 samples never used at any stage, assembly truth, 18 genes | two fields 1,833 / 1,833, three fields 1,830 / 1,833; certain at four fields 1,350, of these 1,334 exact (98.8 %); 869 of 973 reported new sites true |
 | Eight added genes (DMA, DMB, DOA, DOB, MICA, MICB, TAP1, TAP2), 80 HPRC samples | calls certain to three fields or more with every exon equal to the assembly: 988 / 999; fourth field DMA 153 / 153, DOA 112 / 115, DOB 134 / 136, TAP1 40 / 41; DMB and TAP2 are reported to three fields at most, MICA and MICB do not reach four |
 | Same 80 samples thinned to 20x, 15x, 10x | two fields 2,485 / 2,481 / 2,476 of 2,489; certain at four fields 1,660 / 1,539 / 1,082, of these exact 98.8 / 98.6 / 97.9 % (`validation/results/depth`) |
+| Same 80 samples at 30x, 15x, 10x, calls certain to two / three fields | right 2,353 / 2,262, 2,306 / 2,206, 2,218 / 2,073; wrong 6 / 17, 4 / 16, 4 / 15 (`validation/results/depth_lead4`) |
+| 1,101 laboratory-typed 1000 Genomes samples (2018 set, A, B, C, DQB1, DRB1) | 9,051 / 9,090 at the typed resolution; of the differences 23 are identical in the typed exons, 13 real; on the 776 alleles also typed by T1K 774 against 764 (`validation/results/lab1000g`) |
+| PacBio HiFi, 26 HPRC samples (`hla-wgs long`) | consensus equal to the assembled haplotype 1,434 / 1,519; exact four-field calls 607 / 609; nearest-allele calls right at two fields 129 / 131 (`validation/results/long26_main`) |
 | Second assembly truth (Lai et al. 2024), 40 shared samples, 11 genes | two fields equal in 489 / 492 allele calls of the two truths; no difference traced to an error of ours (`validation/results/lai2024`) |
 
 The figures below belong to release 1.0.0. The 22 certain four-field calls that are not exact: 9 differ only in the length of a homopolymer or
@@ -80,7 +83,7 @@ The 80 HPRC samples were used to develop the four-field logic. On 30 further HPR
 no part in developing these rules (they had been the first held-out round of the two-field typer),
 607 of 621 alleles reported as certain at four fields were exact (97.7 %), two fields 935 / 935 and
 three fields 934 / 935. The test on genomes never used at any stage is the HGSVC3 row above
-([`validation/results/hgsvc3_v1.1/`](validation/results/hgsvc3_v1.1/)); the frequency table may
+([`validation/results/hgsvc59_main/`](validation/results/hgsvc59_main/)); the frequency table may
 include laboratory types of some of these samples.
 
 The full report is in [`docs/paper/hla-wgs-report.pdf`](docs/paper/hla-wgs-report.pdf).
@@ -182,7 +185,7 @@ serological antigens (the start file fetches all four).
 `hla-wgs html PREFIX.json` writes the result page again from the JSON, for example after an update.
 
 `data/freq_1000g_2field.json` holds two-field allele frequencies of A, B, C, DRB1 and DQB1 counted
-from the public 1000 Genomes laboratory typing (`data/build_freq.py`). They serve as a weak prior
+from the public 1000 Genomes laboratory typing (`hla-wgs-validate build-freq`). They serve as a weak prior
 between otherwise equal candidates.
 
 ## Run
