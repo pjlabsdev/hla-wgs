@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 (2026-11-24)
+
+Also contains the changes of 1.1.3, which was not released on its own.
 
 - Report part for Genome: every typing run also writes `PREFIX.report.json` (schema `genome.report.v1`), and `hla-wgs report PREFIX.json [--text de|en]` writes it again from the result. It holds the presentation derived from `PREFIX.json`: head (version, commit, inputs with checksums, IPD-IMGT/HLA release, run time), key findings per clinical locus with certainty and nearest alternative, pharmacogenetic alleles with the CPIC recommendation, possible new alleles, tables and a chart as data, run quality, method, validation, limits of the method and of the sample, references with DOI, and every text in German and English as Fluent messages, with a checksum. The overall report of Genome assembles such parts without computing anything. The validation numbers of the result page come from the same place now and are those of `validation/results` (before, the page still showed 1778 / 1801 and 1337 / 1354 instead of 1780 / 1799 and 1334 / 1350); a test keeps them equal. See `docs/manual/report.md`. The other result files are unchanged (checked byte for byte on HG00126).
 - Manual: `docs/manual` now has one page per command (typing, long, build-db, build-mask, html, diag, mcp, unzip), the database folder, all environment switches, the start file and common procedures, with an index (`docs/manual/README.md`). Every page is also an MCP resource. A test checks that every command has its page, every environment variable the programs read is documented, every link resolves, and that every switch that can change a result is listed with its default in the run log header (23 switches added there). `hla-wgs-validate` commands and variables are listed in `validation/README.md`.
@@ -21,7 +23,7 @@
 - `hla-wgs unzip` checks the length and CRC-32 of every entry (a damaged `hla.dat.zip` is refused instead of building a wrong reference) and refuses names with a drive letter or a leading backslash on Windows.
 - The validation and the software report no longer need Python: `hla-wgs-validate` (built with `cargo build --release`) replaces the evaluation, truth, simulation and report scripts with byte-identical output, including `hla-wgs-validate paper` for `docs/paper/hla-wgs-report.html`. The shell scripts call it; the Python files are removed.
 
-## 1.1.3 (2026-11-22)
+## 1.1.3 (2026-11-22, not released, part of 1.2.0)
 
 - Fresh systems: the start file and the installer need neither curl nor unzip. They download with curl or, where it is missing (some minimal Linux installations), with wget; a ZIP is unpacked by `unzip` or, without it, by hla-wgs itself (new command `hla-wgs unzip ZIP DIR`). Installer line for systems without curl: `wget -qO- https://github.com/pjlabsdev/hla-wgs/releases/latest/download/install.sh | bash`.
 - The macOS and Linux packages are also attached as `.tar.gz` (`hla-wgs-macos.tar.gz`, `hla-wgs-linux-x86_64.tar.gz`); the installer takes them when `unzip` is missing.
