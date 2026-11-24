@@ -1,4 +1,4 @@
-//! single-sequence alignments with the own aligner (src/aln.rs)
+//! single-sequence alignments with the own aligner (crate gc-panel, crates/gc-panel)
 use crate::aln::{Index, Opts};
 
 pub struct Hit {

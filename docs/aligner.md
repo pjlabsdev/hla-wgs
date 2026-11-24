@@ -1,8 +1,9 @@
 # The aligner of hla-wgs
 
-From 1.1 on, hla-wgs aligns reads with its own aligner in Rust (`src/aln.rs`) instead of the C
-library minimap2. The program is now Rust only: building it needs no C compiler, and the binary
-links only the system libraries (libc, libm and on Linux libgcc_s).
+From 1.1 on, hla-wgs aligns reads with its own aligner in Rust instead of the C library minimap2.
+Since 1.2.1 the aligner is the crate `gc-panel` of Genome 4, of which hla-wgs carries an exact copy
+in [`crates/`](../crates/README.md) (before: `src/aln.rs`). The program is Rust only: building it
+needs no C compiler, and the binary links only the system libraries (libc, libm and on Linux libgcc_s).
 
 The aligner is written for the one job it has here: reads against many very similar sequences of
 the same gene family (the 1195 allele-group sequences of the panel, and alleles against each other

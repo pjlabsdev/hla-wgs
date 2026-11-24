@@ -3,9 +3,7 @@
 //! The typing program `hla-wgs` itself does not need it. Every command keeps the input files,
 //! environment variables and output format of the script it replaces, so earlier result files stay
 //! comparable.
-#[path = "../../aln.rs"]
-#[allow(dead_code)]
-mod aln;
+use gc_panel as aln;
 #[path = "../../util.rs"]
 #[allow(dead_code)]
 mod util;
