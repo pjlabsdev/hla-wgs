@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The aligner is now the crate `gc-panel` of Genome 4, so that other tools of Genome use the same code. hla-wgs carries an exact copy of it and of its helper crate `gc-sys` in `crates/` (Genome 4 is not public); `tests/crates.rs` checks the copy against the checksums in `crates/README.md`. The code is the former `src/aln.rs`, except that two hot loops are compiled for AVX2 on processors that have it. All result files are byte-identical on 8 HPRC samples, and the 8 samples take 150 s instead of 178 s with 4 threads. CI now also runs the tests of the two crates.
+
 ## 1.2.0 (2026-11-24)
 
 Also contains the changes of 1.1.3, which was not released on its own.

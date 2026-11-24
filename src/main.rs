@@ -1,5 +1,6 @@
 mod align;
-mod aln;
+/// the panel aligner (crate gc-panel, a copy of the Genome 4 crate, see crates/README.md), formerly src/aln.rs
+use gc_panel as aln;
 mod bamin;
 mod builddb;
 mod db;

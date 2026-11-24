@@ -1,0 +1,11 @@
+[package]
+name = "gc-panel"
+description = "Genome 4.0: panel aligner (copy, see crates/README.md)"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+ahash = "0.8.12"
+gc-sys = { path = "../gc-sys" }

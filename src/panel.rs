@@ -1,4 +1,4 @@
-//! Stage 0: map the extracted read pairs to the gene panel (own aligner, src/aln.rs) and
+//! Stage 0: map the extracted read pairs to the gene panel (own aligner, crate gc-panel) and
 //! assign every pair to the gene(s) with the best summed alignment score.
 use crate::util::open_reader;
 use ahash::AHashMap;
