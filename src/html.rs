@@ -367,7 +367,7 @@ fn gene_tech(g: &Value, t: &dyn Fn(&'static str, &'static str) -> &'static str) 
 }
 
 /// the loci of a clinical HLA typing (transplantation, platelet and donor matching), in report order
-const CLINICAL: [&str; 11] = ["A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1"];
+pub(crate) const CLINICAL: [&str; 11] = ["A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1"];
 
 /// resolution in the words of an HLA laboratory
 fn res_word(res: u64, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> &'static str {
@@ -402,7 +402,7 @@ fn report_id(rep: &Value) -> String {
 
 /// Genotype List String (GL String, the exchange format of typing results): "+" joins the two copies
 /// of a gene, "^" the genes; only supported fields are written
-fn gl_string(genes: &[Value]) -> String {
+pub(crate) fn gl_string(genes: &[Value]) -> String {
     let mut loci = vec![];
     for name in CLINICAL {
         let Some(g) = genes.iter().find(|g| g["gene"] == name) else { continue };
@@ -448,7 +448,7 @@ fn new_allele_note(a: &Value, i: usize, either: &std::collections::BTreeSet<i64>
 }
 
 /// CPIC recommendation for a carrier, in one sentence, with the guideline
-fn pgx_rec(allele: &str, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> (&'static str, &'static str, &'static str) {
+pub(crate) fn pgx_rec(allele: &str, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> (&'static str, &'static str, &'static str) {
     match allele {
         "B*57:01" => (t("Abacavir nicht anwenden (Überempfindlichkeitsreaktion).", "Do not use abacavir (hypersensitivity reaction)."), "CPIC 2014", "https://pmc.ncbi.nlm.nih.gov/articles/PMC3994233"),
         "B*15:02" => (t("Carbamazepin und Oxcarbazepin bei Erstgabe nicht anwenden, Phenytoin und Fosphenytoin nicht neu beginnen (SJS/TEN).", "Do not start carbamazepine or oxcarbazepine, do not start phenytoin or fosphenytoin (SJS/TEN)."), "CPIC 2017, 2020", "https://pmc.ncbi.nlm.nih.gov/articles/PMC5847474"),
@@ -459,7 +459,7 @@ fn pgx_rec(allele: &str, t: &dyn Fn(&'static str, &'static str) -> &'static str)
 }
 
 /// drug names in the page language (the JSON carries the English names)
-fn drugs_text(d: &str, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> String {
+pub(crate) fn drugs_text(d: &str, t: &dyn Fn(&'static str, &'static str) -> &'static str) -> String {
     let mut o = d.to_string();
     for (en, de) in [("carbamazepine", "Carbamazepin"), ("oxcarbazepine", "Oxcarbazepin"), ("fosphenytoin", "Fosphenytoin"), ("phenytoin", "Phenytoin"), ("abacavir", "Abacavir"), ("allopurinol", "Allopurinol")] {
         o = o.split(", ").map(|w| if w == en { t(de, en).to_string() } else { w.to_string() }).collect::<Vec<_>>().join(", ");
@@ -528,8 +528,14 @@ fn methods(t: &dyn Fn(&'static str, &'static str) -> &'static str) -> String {
         t("Methode und Grenzen", "Method and limits"),
         t("Reads aus der Gesamtgenom-Sequenzierung werden gegen alle Allele der IPD-IMGT/HLA-Datenbank verglichen. Für jedes Gen wählt das Programm das Allelpaar, das die Reads am besten erklärt, und gibt je Allel nur die Felder an, bei denen der Vorsprung vor dem nächsten Konkurrenten eine feste, an Assemblies geprüfte Schwelle erreicht. Abweichungen, die die Reads einheitlich zeigen, werden als mögliches neues Allel gemeldet.",
           "Reads from whole-genome sequencing are compared with all alleles of the IPD-IMGT/HLA database. For each gene the program chooses the allele pair that explains the reads best and reports, per allele, only the fields where the lead over the nearest competitor reaches a fixed threshold validated on assemblies. Differences the reads show consistently are reported as a possible new allele."),
-        t("Prüfung an 80 Genomen mit vollständig assemblierten Haplotypen (HPRC, 30x): zwei Felder 2486 von 2489 Allelen richtig, gesicherte vier Felder 1778 von 1801 exakt. Prüfung an 59 weiteren, beim Entwickeln nicht verwendeten Genomen (HGSVC3): zwei Felder 1833 von 1833 richtig, gesicherte vier Felder 1337 von 1354 exakt.",
-          "Validation on 80 genomes with fully assembled haplotypes (HPRC, 30x): two fields right for 2486 of 2489 alleles, supported four fields exact for 1778 of 1801. Validation on 59 further genomes not used during development (HGSVC3): two fields right for 1833 of 1833, supported four fields exact for 1337 of 1354."),
+        {
+            let [d, u] = &crate::report::VALIDATION;
+            if t("de", "en") == "de" {
+                format!("Prüfung an {} Genomen mit vollständig assemblierten Haplotypen (HPRC, 30x): zwei Felder {} von {} Allelen richtig, gesicherte vier Felder {} von {} exakt. Prüfung an {} weiteren, beim Entwickeln nicht verwendeten Genomen (HGSVC3): zwei Felder {} von {} richtig, gesicherte vier Felder {} von {} exakt.", d.samples, d.two, d.alleles, d.safe4_exact, d.safe4, u.samples, u.two, u.alleles, u.safe4_exact, u.safe4)
+            } else {
+                format!("Validation on {} genomes with fully assembled haplotypes (HPRC, 30x): two fields right for {} of {} alleles, supported four fields exact for {} of {}. Validation on {} further genomes not used during development (HGSVC3): two fields right for {} of {}, supported four fields exact for {} of {}.", d.samples, d.two, d.alleles, d.safe4_exact, d.safe4, u.samples, u.two, u.alleles, u.safe4_exact, u.safe4)
+            }
+        },
         t("Grenzen kurzer Reads: Welche Allele verschiedener Gene auf demselben Chromosom liegen (Haplotyp), lässt sich nicht bestimmen. Die Länge langer Einzelbasen-Läufe und Wiederholungen ist nicht messbar; Strecken ohne eindeutig zuordenbare Reads bleiben ungeprüft. Ob ein Allel exprimiert wird, folgt nur aus dem Namen in der Datenbank. Neue Allele sollten mit langen Reads oder Sanger-Sequenzierung bestätigt werden.",
           "Limits of short reads: which alleles of different genes lie on the same chromosome (haplotype) cannot be determined. The length of long single-base runs and repeats cannot be measured; stretches without uniquely placed reads stay unchecked. Whether an allele is expressed follows only from its name in the database. New alleles should be confirmed with long reads or Sanger sequencing.")
     )

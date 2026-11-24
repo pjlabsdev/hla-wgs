@@ -38,7 +38,8 @@ Each step, its counts and every automatic decision are in the [run log](log.md).
 
 ## Output
 
-`PREFIX.tsv`, `PREFIX.conf.tsv`, `PREFIX.json`, `PREFIX.html`, and when new alleles were found
+`PREFIX.tsv`, `PREFIX.conf.tsv`, `PREFIX.json`, `PREFIX.html`, the report part `PREFIX.report.json`
+([report](report.md)), and when new alleles were found
 `PREFIX.novel.fa` and `PREFIX.novel.tsv`; formats in [output](../output.md). The run log
 `PREFIX.log.jsonl` and `PREFIX.log.txt` is written next to them.
 
