@@ -412,13 +412,20 @@ fn fig_workflow() -> String {
         }
         x += 144;
     }
-    arrow(&mut b, 584 + 63, 74, 584 + 63, 105);
-    // lane 3: long reads
-    b.push(text(8.0, 182.0, "EVERY SAMPLE  HiFi reads (hla-wgs long)", N::F(7.6), &lane_t));
-    let lr: [(&str, [&str; 2]); 4] = [
+    // the reference feeds the read mapping: from below the reference box to the top of "own aligner",
+    // above the lane label of the short reads
+    let line = |b: &mut Vec<String>, x1: i64, y1: i64, x2: i64, y2: i64| {
+        b.push(format!(r#"<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{SUB}" stroke-width="0.9"/>"#));
+    };
+    line(&mut b, 440 + 63, 73, 440 + 63, 86);
+    line(&mut b, 440 + 63, 86, 152 + 63, 86);
+    arrow(&mut b, 152 + 63, 86, 152 + 63, 105);
+    // lane 3: long reads, ending in its own output; the label starts above its first box so that the
+    // arrow from "input" does not cross it
+    b.push(text(152.0, 182.0, "EVERY SAMPLE  HiFi reads (hla-wgs long)", N::F(7.6), &lane_t));
+    let lr: [(&str, [&str; 2]); 3] = [
         ("haplotypes", ["reads grouped", "per gene copy"]),
-        ("consensus", ["extended, polished", "by plurality vote"]),
-        ("join", ["groups naming one", "allele polished jointly"]),
+        ("consensus", ["plurality vote; groups", "of one allele joined"]),
         ("name", ["nearest allele,", "exons first"]),
     ];
     let mut x = 152;
@@ -429,17 +436,23 @@ fn fig_workflow() -> String {
         }
         x += 144;
     }
-    arrow(&mut b, 71, 157, 71, 214);
-    arrow(&mut b, 71, 214, 151, 214);
-    // output
-    b.push(text(8.0, 266.0, "OUTPUT", N::F(7.6), &lane_t));
+    bx(&mut b, 584, 190, "PREFIX.long.*", &["allele sequences", "of the HiFi path"], true);
+    arrow(&mut b, 584 - 18, 215, 584 - 1, 215);
+    line(&mut b, 71, 157, 71, 215);
+    arrow(&mut b, 71, 215, 151, 215);
+    // output of the short-read path: from "certainty" along the right edge to a rail above the outputs
+    b.push(text(8.0, 266.0, "OUTPUT  short reads", N::F(7.6), &lane_t));
     bx(&mut b, 8, 274, "PREFIX.tsv", &["safe call and", "resolution per allele"], true);
     bx(&mut b, 152, 274, "conf.tsv / json", &["leads, groups,", "copy number, sites"], true);
     bx(&mut b, 296, 274, "novel.tsv", &["every new site with", "region and effect"], true);
     bx(&mut b, 440, 274, "PREFIX.html", &["result page, German", "and English, DOI"], true);
-    bx(&mut b, 584, 274, "PREFIX.long.*", &["allele sequences", "of the HiFi path"], true);
-    arrow(&mut b, 584 + 63, 157, 584 + 63, 273);
-    arrow(&mut b, 728 - 1, 240, 728 - 1, 240);
+    line(&mut b, 711, 131, 716, 131);
+    line(&mut b, 716, 131, 716, 254);
+    // the rail ends right of the lane label, so the arrow into PREFIX.tsv does not cross it
+    line(&mut b, 716, 254, 111, 254);
+    for x in [111, 152 + 63, 296 + 63, 440 + 63] {
+        arrow(&mut b, x, 254, x, 273);
+    }
     b.push(text(8.0, 342.0, "Research use only. A call must be confirmed by an accredited HLA laboratory before any medical use.", N::F(7.0), &T { fill: SUB, mono: true, ..T0 }));
     svg(720, 350, &b)
 }
