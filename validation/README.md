@@ -20,6 +20,9 @@ are fetched.
 | `results/hgsvc3_v1.1/` | 59 unseen HGSVC3 samples (assembly truth), 1.1 development version |
 | `results/dev80_v1.1/` | the 80 development samples with the 1.1 development version, including the eight added genes |
 | `results/heldout_vs_t1k/` | `strata.tsv`: hla-wgs and T1K against assembly truth by population and gene, 150 held-out samples of rounds 1 to 3 (round 4 added 34 samples: two fields 543/543 against 541/543, copy number 102/102 against 64/102) |
+| `results/lab1000g/` | 1101 laboratory-typed 1000 Genomes samples: all calls (`calls.tar.gz`), `eval24` output for the 2018 and 2014 laboratory sets, the differences checked one by one |
+| `results/long26_main/` | long-read (HiFi) calls of the 26 samples of `results/long26/` with the current development version; `hla-wgs-validate long` output (consensus against assembly, exact and nearest-allele calls) |
+| `results/depth_lead4/` | certain two- and three-field calls at 30x, 15x and 10x before and after the lead-of-4 rule; `hla-wgs-validate eval-res` output |
 | `results/giab/`, `results/lab/` | calls of the trio members and of the 45 laboratory-typed samples |
 
 ## How the truth is defined
