@@ -88,6 +88,10 @@ include laboratory types of some of these samples.
 
 The full report is in [`docs/paper/hla-wgs-report.pdf`](docs/paper/hla-wgs-report.pdf).
 
+## Manual
+
+One page per command, file format, switch and procedure: [`docs/manual`](docs/manual/README.md).
+
 ## Download and start
 
 Ready-to-run packages are attached to every [release](https://github.com/pjlabsdev/hla-wgs/releases/latest):
