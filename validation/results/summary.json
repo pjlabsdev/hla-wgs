@@ -106,5 +106,12 @@
       "homopolymer_or_str_only": 9,
       "other": 5
     }
+  },
+  "lab1000g": {
+    "note": "2018 laboratory set, differing alleles examined one by one",
+    "identical_in_typed_exons": 23,
+    "real": 13,
+    "old_name": 1,
+    "lab_file_parse_error": 2
   }
 }
