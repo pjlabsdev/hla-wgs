@@ -37,8 +37,8 @@ release.
 |---|---|---|
 | Two-field accuracy, A, B, C, DRB1, DQA1, DQB1, DPA1, DPB1, 184 held-out samples | 2,937 / 2,941 (99.86 %) | 2,921 / 2,941 (99.32 %) |
 | DRB3/4/5 copy number (0, 1 or 2), same samples | 551 / 552 | 348 / 552 |
-| Wall time, 4 cores, extracted MHC reads of a 30x genome | about 40 s | about 150 s |
-| Peak memory | 1.4 GB | 3.2 GB |
+| Wall time, 4 cores, extracted MHC reads of a 30x genome (mean of 8 samples, `validation/results/timing_main.tsv`) | 17 s | 197 s |
+| Peak memory | 1.2 GB | 3.5 GB |
 | Per-allele certainty | resolution 1 to 4 with margin and nearest alternative | quality score |
 | New alleles | positions and changes listed, call cut accordingly | variants of the allele in a VCF |
 | Genes | 18 incl. DRA, E, F, G, H, K, V | all genes of the chosen reference |
