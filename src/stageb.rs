@@ -20,8 +20,30 @@ pub const BG_EDITS: f64 = 3.0;
 pub const TIE: f64 = 0.05;
 /// an allele at least this much shorter than a relative is padded with the relative's flanks
 static PAD_MIN: std::sync::LazyLock<usize> = std::sync::LazyLock::new(|| std::env::var("HLA_PAD_MIN").ok().and_then(|v| v.parse().ok()).unwrap_or(8));
+/// pad from the first-field group when the two-field group has no longer allele (HLA_PADF1=0: off)
+static PAD_F1: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| std::env::var("HLA_PADF1").map_or(true, |v| v != "0"));
 const NEAR: f64 = 60.0;
 const ALT2: usize = 3;
+
+fn first(name: &str) -> String {
+    name.split(':').next().unwrap_or("").to_string()
+}
+
+/// longest sequence of each two-field group of a gene over the whole database (not imputed, not
+/// extended), computed once per gene
+fn group_max(g: &str, al: &[Allele]) -> AHashMap<String, usize> {
+    static M: std::sync::LazyLock<Mutex<AHashMap<String, AHashMap<String, usize>>>> = std::sync::LazyLock::new(|| Mutex::new(AHashMap::new()));
+    if let Some(v) = M.lock().unwrap().get(g) {
+        return v.clone();
+    }
+    let mut m: AHashMap<String, usize> = AHashMap::new();
+    for a in al.iter().filter(|a| !a.imputed && !a.extended) {
+        let e = m.entry(two(&a.name)).or_insert(0);
+        *e = (*e).max(a.genomic.len());
+    }
+    M.lock().unwrap().insert(g.to_string(), m.clone());
+    m
+}
 
 pub fn decoys(g: &str) -> &'static [&'static str] {
     match g {
@@ -294,9 +316,31 @@ impl<'a> Ctx<'a> {
         }
         // each candidate's padding aligns it against longer alleles of its group: in parallel, as
         // the results are cached and do not depend on the order
+        // an allele whose two-field group has no longer member in the whole database (A*30:207
+        // starts at exon 1 and is its group's only allele) borrows the flanks of the longer alleles
+        // of its first field; unpadded, reads of a paralog that run past its start fit it at no
+        // cost (HG01891, HLA-Y reads). Only genes with paralogs among the decoys: elsewhere
+        // (TAP1, TAP2) the borrowed flanks made the fourth field worse
+        let mut grp1: AHashMap<String, Vec<usize>> = AHashMap::new();
+        let gmax = if *PAD_F1 { group_max(g, al) } else { AHashMap::new() };
+        if *PAD_F1 {
+            for &i in cand {
+                if !al[i].imputed && !al[i].extended {
+                    grp1.entry(first(&al[i].name)).or_default().push(i);
+                }
+            }
+            for v in grp1.values_mut() {
+                v.sort_by_key(|&j| std::cmp::Reverse(al[j].genomic.len()));
+            }
+        }
         cand.par_iter()
             .map(|&i| {
-                let pool = grp.get(&two(&al[i].name)).map(|v| &v[..v.len().min(60)]).unwrap_or(&[]);
+                let mut pool = grp.get(&two(&al[i].name)).map(|v| &v[..v.len().min(60)]).unwrap_or(&[]);
+                if *PAD_F1 && al[i].extended && !decoys(g).is_empty() && gmax.get(&two(&al[i].name)).copied().unwrap_or(0) <= self.orig_seq(g, i).len() + *PAD_MIN {
+                    if let Some(v) = grp1.get(&first(&al[i].name)) {
+                        pool = &v[..v.len().min(60)];
+                    }
+                }
                 self.padded(g, i, pool, 0)
             })
             .collect()
