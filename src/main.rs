@@ -20,6 +20,7 @@ mod util;
 mod unzip;
 mod errors;
 mod runlog;
+mod mcp;
 mod vfs;
 #[cfg(target_arch = "wasm32")]
 mod web;
@@ -119,6 +120,7 @@ pub fn cli(mut a: Vec<String>) {
     runlog::set_trace(trace.clone());
     match a.get(1).map(|x| x.as_str()) {
         Some("diag") => return runlog::diag(&a[2..]),
+        Some("mcp") => return mcp::run(),
         Some("build-db") => return builddb::run(&a[2..]),
         Some("build-mask") => return mask::run(&a[2..]),
         Some("long") => return long::run(&a[2..]),
@@ -172,6 +174,7 @@ pub fn cli(mut a: Vec<String>) {
         eprintln!("       hla-wgs build-db hla.dat freq.json DBDIR");
         eprintln!("       hla-wgs build-mask DBDIR GENOME.fa [EXCLUDE.bed]");
         eprintln!("       hla-wgs diag OUTPREFIX   (run log and version as OUTPREFIX.diag.tar for a bug report)");
+        eprintln!("       hla-wgs mcp   (MCP server over stdio for Claude and other agents)");
         eprintln!("       (DBDIR may also be given as its two files: hladb.json.gz panel.fa; --trace GENE logs one gene in detail)");
         errors::fail("HW-E001", "too few arguments");
     }
