@@ -18,6 +18,8 @@ mod paper;
 mod pyrand;
 mod sim;
 mod truth;
+#[cfg(feature = "paper")]
+mod typ;
 
 const USAGE: &str = "hla-wgs-validate COMMAND ...
 
@@ -42,7 +44,7 @@ helpers:
   sim DBDIR OUTPREFIX [--per N] [--cov X] [--seed S] [--profile P] [--div D]
   thin-pairs IN_PREFIX FRAC OUT_PREFIX
   build-freq OUT.json EXCLUDE...
-  paper [--fonts DIR] [--version V] [--date D] [--doi DOI]   software report (HTML) to stdout
+  paper [--version V] [--date D] [--doi DOI] [--typ OUT.typ]   software report (PDF, Typst) to stdout; needs --features paper
 ";
 
 fn main() {

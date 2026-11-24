@@ -17,6 +17,12 @@ jobs:
         run: cargo build --release --locked
       - name: Unit tests
         run: cargo test --release --locked
+      - name: Software report builds from the result tables (Typst)
+        if: runner.os == 'Linux'
+        run: |
+          cargo build --release --locked --features paper --bin hla-wgs-validate
+          ./target/release/hla-wgs-validate paper > /tmp/report.pdf
+          test "$(head -c 5 /tmp/report.pdf)" = "%PDF-"
       - name: Usage text
         shell: bash
         run: ./target/release/hla-wgs --version
