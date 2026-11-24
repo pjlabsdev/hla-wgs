@@ -9,6 +9,12 @@ mod aln;
 #[path = "../../util.rs"]
 #[allow(dead_code)]
 mod util;
+#[path = "../../errors.rs"]
+#[allow(dead_code)]
+mod errors;
+#[path = "../../runlog.rs"]
+#[allow(dead_code)]
+mod runlog;
 
 mod common;
 mod eval;

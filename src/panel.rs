@@ -19,7 +19,20 @@ impl Reads {
     }
 }
 
+/// read pairs at each stage of the panel step, for the run log (the counts add up)
+#[derive(Default)]
+pub struct PanelStats {
+    pub pairs_in: u64,
+    pub no_kmer: u64,
+    pub no_hit: u64,
+    /// every hit only inside the repeat mask
+    pub in_mask: u64,
+    /// dropped by the mate rule (HLA_PAIR)
+    pub mate_rule: u64,
+}
+
 pub struct PanelResult {
+    pub stats: PanelStats,
     pub reads: Reads,
     /// gene -> read ids in first-hit order
     pub assign: AHashMap<String, Vec<usize>>,
@@ -125,7 +138,13 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
         };
         (w(1), w(2))
     });
+    let mut stats = PanelStats::default();
+    let no_hit = std::sync::atomic::AtomicU64::new(0);
+    let no_kmer = std::sync::atomic::AtomicU64::new(0);
+    let in_mask = std::sync::atomic::AtomicU64::new(0);
+    let mate_rule = std::sync::atomic::AtomicU64::new(0);
     for (b1, b2) in rx {
+        stats.pairs_in += b1.len() as u64;
         if let Some((w1, w2)) = cache.as_mut() {
             use std::io::Write;
             let keep: Vec<bool> = b1.par_iter().zip(b2.par_iter()).map(|(x, y)| has_kmer(&x.seq, &set) || has_kmer(&y.seq, &set)).collect();
@@ -143,6 +162,7 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
             .zip(b2.par_iter())
             .map(|(x, y)| {
                 if !has_kmer(&x.seq, &set) && !has_kmer(&y.seq, &set) {
+                    no_kmer.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     return None;
                 }
                 // a mate clipped by more than `clip` bases where the gene sequence goes on is part of
@@ -183,6 +203,7 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
                 };
                 let (m1, m2) = (keep(&x.seq, mapq(x)), keep(&y.seq, mapq(y)));
                 if m1.is_empty() && m2.is_empty() {
+                    no_hit.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     return None;
                 }
                 if std::env::var("DBG0").map_or(false, |v| v == x.name) {
@@ -308,6 +329,7 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
                     gs.retain(|_| { let a = k.next().unwrap(); a[0] || a[1] });
                     room.retain(|_| { let a = k2.next().unwrap(); a[0] || a[1] });
                     if gs.is_empty() {
+                        in_mask.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         return None;
                     }
                 }
@@ -323,6 +345,7 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
                     let mut k = keep.iter();
                     gs.retain(|_| *k.next().unwrap());
                     if gs.is_empty() {
+                        mate_rule.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         return None;
                     }
                 }
@@ -362,7 +385,11 @@ pub fn run(panel: &str, input: &Input, threads: usize) -> PanelResult {
             assign.entry(gs[i].0.clone()).or_default().push(q);
         }
     }
-    PanelResult { reads: Reads { names, seq: seqs }, assign }
+    stats.no_kmer = no_kmer.into_inner();
+    stats.no_hit = no_hit.into_inner();
+    stats.in_mask = in_mask.into_inner();
+    stats.mate_rule = mate_rule.into_inner();
+    PanelResult { stats, reads: Reads { names, seq: seqs }, assign }
 }
 
 const KF: usize = 21;

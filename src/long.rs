@@ -388,18 +388,44 @@ pub fn run(args: &[String]) {
     if args.len() < 3 {
         eprintln!("usage: hla-wgs long DBDIR READS.fastq[.gz]|READS.bam OUTPREFIX [threads]");
         eprintln!("       accurate long reads (PacBio HiFi); of a BAM the MHC region is read (index needed)");
-        std::process::exit(2);
+        crate::errors::fail("HW-E001", "too few arguments");
     }
     let dir = args[0].trim_end_matches('/');
     let (input, out) = (&args[1], &args[2]);
     let threads: usize = args.get(3).and_then(|x| x.parse().ok()).unwrap_or(4);
     rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().ok();
+    if !std::path::Path::new(&format!("{dir}/hladb.json.gz")).is_file() {
+        crate::errors::fail("HW-E002", &format!("database not found: {dir}"));
+    }
+    match std::fs::metadata(input) {
+        Err(e) => crate::errors::fail("HW-E010", &format!("{input}: {e}")),
+        Ok(m) if m.is_dir() => crate::errors::fail("HW-E012", &format!("{input} is a folder")),
+        Ok(m) if m.len() == 0 => crate::errors::fail("HW-E011", &format!("{input} is empty")),
+        _ => {}
+    }
+    if let Err(e) = crate::runlog::start(out) {
+        crate::errors::fail("HW-E020", &format!("cannot write the run log {out}.log.jsonl: {e}"));
+    }
+    let mut cmd = vec!["hla-wgs".to_string(), "long".to_string()];
+    cmd.extend(args.iter().cloned());
+    crate::runlog::header(
+        "long reads",
+        &cmd,
+        serde_json::json!({"threads": threads, "input_type": if input.to_ascii_lowercase().ends_with(".bam") { "BAM" } else { "FASTQ" }}),
+        vec![crate::runlog::file_info(input)],
+        serde_json::json!({"database": crate::runlog::file_info(&format!("{dir}/hladb.json.gz")), "panel": crate::runlog::file_info(&format!("{dir}/panel.fa"))}),
+    );
     let t0 = std::time::Instant::now();
-    let log = |s: String| eprintln!("[{:6.1}s] {}", t0.elapsed().as_secs_f64(), s);
+    let log = |s: String| {
+        eprintln!("[{:6.1}s] {}", t0.elapsed().as_secs_f64(), s);
+        crate::runlog::note("long", &s);
+    };
+    let st = crate::runlog::begin("read");
     let (db, mut reads) = rayon::join(
         || Db::load(&format!("{dir}/hladb.json.gz")),
-        || if input.to_ascii_lowercase().ends_with(".bam") { read_bam(input, threads).unwrap_or_else(|e| panic!("{input}: {e}")) } else { read_fastq(input) },
+        || if input.to_ascii_lowercase().ends_with(".bam") { read_bam(input, threads).unwrap_or_else(|e| crate::errors::fail("HW-E014", &format!("{input}: {e}"))) } else { read_fastq(input) },
     );
+    st.end(serde_json::json!({"reads": reads.len(), "bases": reads.iter().map(|r| r.len()).sum::<usize>()}));
     for r in &mut reads {
         r.make_ascii_uppercase();
     }
@@ -578,8 +604,8 @@ pub fn run(args: &[String]) {
     } else {
         calls.sort_by(|x, y| x.gene.cmp(&y.gene).then(y.reads.cmp(&x.reads)));
     }
-    let mut tsv = std::io::BufWriter::new(std::fs::File::create(format!("{out}.long.tsv")).unwrap());
-    let mut fa = std::io::BufWriter::new(std::fs::File::create(format!("{out}.long.fa")).unwrap());
+    let mut tsv = std::io::BufWriter::new(std::fs::File::create(format!("{out}.long.tsv")).unwrap_or_else(|e| crate::errors::fail("HW-E020", &format!("{out}.long.tsv: {e}"))));
+    let mut fa = std::io::BufWriter::new(std::fs::File::create(format!("{out}.long.fa")).unwrap_or_else(|e| crate::errors::fail("HW-E020", &format!("{out}.long.fa: {e}"))));
     writeln!(tsv, "gene\tslot\tallele\tdifferences\texact\treads\tspanning\tunsure_sites\tequal_alternatives\tnote").unwrap();
     let mut n = 0;
     let mut gene_slot: AHashMap<String, (usize, usize)> = AHashMap::new();
@@ -588,6 +614,13 @@ pub fn run(args: &[String]) {
         e.0 += 1;
         let (slot, top) = *e;
         let note = if slot > 2 || c.reads < 5.max(top / 5) { "minor" } else { "" };
+        crate::runlog::decision(
+            "long",
+            &format!("{} slot {slot}", c.gene),
+            &format!("{} ({} differences)", c.names[0], c.dist),
+            if !note.is_empty() { "minor read group: fewer reads than 5 or a fifth of the largest group, or a third group" } else if c.dist == 0 { "consensus equals a database allele" } else { "nearest database allele of a new sequence" },
+            serde_json::json!({"reads": c.reads, "spanning": c.spanning, "unsure_sites": c.unsure, "minor": !note.is_empty(), "equal_alternatives": c.names.len().saturating_sub(1)}),
+        );
         writeln!(
             tsv,
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
@@ -609,6 +642,9 @@ pub fn run(args: &[String]) {
         }
     }
     log(format!("{n} sequences written to {out}.long.fa, table {out}.long.tsv"));
+    drop(tsv);
+    drop(fa);
+    crate::runlog::finish(true, vec![format!("{}.long.tsv", out.rsplit(['/', '\\']).next().unwrap_or(out)), format!("{}.long.fa", out.rsplit(['/', '\\']).next().unwrap_or(out))]);
 }
 
 #[cfg(test)]

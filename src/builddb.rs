@@ -52,12 +52,12 @@ fn note_release(line: &str) {
 }
 
 fn parse(dat: &str) -> Vec<Al> {
-    let f = std::fs::File::open(dat).unwrap_or_else(|e| crate::util::die(&format!("{dat}: {e}")));
+    let f = std::fs::File::open(dat).unwrap_or_else(|e| crate::errors::fail("HW-E030", &format!("{dat}: {e}")));
     let mut rd = std::io::BufReader::with_capacity(1 << 20, f);
     // an EMBL flat file starts with "ID   HLA....."; anything else is the wrong file
-    let head = std::io::BufRead::fill_buf(&mut rd).unwrap_or_else(|e| crate::util::die(&format!("{dat}: {e}")));
+    let head = std::io::BufRead::fill_buf(&mut rd).unwrap_or_else(|e| crate::errors::fail("HW-E030", &format!("{dat}: {e}")));
     if !head.starts_with(b"ID   HLA") {
-        crate::util::die(&format!("not an IPD-IMGT/HLA hla.dat file: {dat} (its first line must start with \"ID   HLA\"; unpack hla.dat.zip first)"));
+        crate::errors::fail("HW-E030", &format!("not an IPD-IMGT/HLA hla.dat file: {dat} (its first line must start with \"ID   HLA\"; unpack hla.dat.zip first)"));
     }
     let mut out: Vec<Al> = vec![];
     let mut cur: Option<(Option<String>, bool, Vec<Feat>, String)> = None;
@@ -77,7 +77,7 @@ fn parse(dat: &str) -> Vec<Al> {
         }
     };
     for line in rd.lines() {
-        let line = line.unwrap_or_else(|e| crate::util::die(&format!("{dat}: {e}")));
+        let line = line.unwrap_or_else(|e| crate::errors::fail("HW-E030", &format!("{dat}: {e}")));
         let tag = line.get(..2).unwrap_or("");
         if tag == "ID" {
             flush(&mut cur, &mut out);
@@ -434,11 +434,11 @@ pub fn run(args: &[String]) {
     serde_json::to_writer(&mut gz, &donor_j).unwrap();
     gz.write_all(b"}").unwrap();
     gz.finish().unwrap();
-    std::fs::write(format!("{outdir}/format"), format!("{DB_FORMAT}\n")).unwrap_or_else(|e| crate::util::die(&format!("{outdir}/format: {e}")));
+    std::fs::write(format!("{outdir}/format"), format!("{DB_FORMAT}\n")).unwrap_or_else(|e| crate::errors::fail("HW-E031", &format!("{outdir}/format: {e}")));
     let r = *RELEASE.lock().unwrap();
     if r.0 > 0 {
         let rel = format!("{}.{}.{}", r.0, r.1, r.2);
-        std::fs::write(format!("{outdir}/release"), format!("{rel}\n")).unwrap_or_else(|e| crate::util::die(&format!("{outdir}/release: {e}")));
+        std::fs::write(format!("{outdir}/release"), format!("{rel}\n")).unwrap_or_else(|e| crate::errors::fail("HW-E031", &format!("{outdir}/release: {e}")));
         eprintln!("[{:.0}s] IPD-IMGT/HLA release {rel}", t.elapsed().as_secs_f64());
     }
     eprintln!("[{:.0}s] wrote {outdir}/hladb.json.gz and {outdir}/panel.fa", t.elapsed().as_secs_f64());

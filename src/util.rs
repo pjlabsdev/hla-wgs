@@ -10,12 +10,6 @@ pub fn open_reader(p: &str) -> Box<dyn BufRead> {
     }
 }
 
-/// end the run with a plain message (no panic trace) and exit code 1
-pub fn die(msg: &str) -> ! {
-    eprintln!("error: {msg}");
-    std::process::exit(1)
-}
-
 /// errors that a pause cannot cure: the content itself is wrong
 pub fn permanent(e: &std::io::Error) -> bool {
     matches!(e.kind(), std::io::ErrorKind::InvalidData | std::io::ErrorKind::InvalidInput)
@@ -154,12 +148,12 @@ impl PairedFq {
                 Ok(x) => return x,
                 Err(e) => {
                     if permanent(&e) || e.kind() == std::io::ErrorKind::UnexpectedEof {
-                        die(&format!("{} / {}: {e}", self.paths[0], self.paths[1]));
+                        crate::errors::fail("HW-E016", &format!("{} / {}: {e}", self.paths[0], self.paths[1]));
                     }
                     self.rd = None;
                     attempt += 1;
                     if attempt > tries {
-                        die(&format!("{}: {e} (gave up after {tries} retries)", self.paths[0]));
+                        crate::errors::fail("HW-E015", &format!("{}: {e} (gave up after {tries} retries)", self.paths[0]));
                     }
                     let wait = backoff(attempt);
                     eprintln!("[input] {}: I/O error after {} pairs: {e}; retry {attempt}/{tries} in {wait}s", self.paths[0], self.done);
