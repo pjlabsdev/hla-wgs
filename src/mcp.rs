@@ -18,6 +18,18 @@ pub const PAGES: &[(&str, &str)] = &[
     ("log", include_str!("../docs/manual/log.md")),
     ("errors", include_str!("../docs/manual/errors.md")),
     ("output", include_str!("../docs/output.md")),
+    ("index", include_str!("../docs/manual/README.md")),
+    ("typing", include_str!("../docs/manual/typing.md")),
+    ("long", include_str!("../docs/manual/long.md")),
+    ("build-db", include_str!("../docs/manual/build-db.md")),
+    ("build-mask", include_str!("../docs/manual/build-mask.md")),
+    ("html", include_str!("../docs/manual/html.md")),
+    ("diag", include_str!("../docs/manual/diag.md")),
+    ("unzip", include_str!("../docs/manual/unzip.md")),
+    ("database", include_str!("../docs/manual/database.md")),
+    ("switches", include_str!("../docs/manual/switches.md")),
+    ("start-file", include_str!("../docs/manual/start-file.md")),
+    ("procedures", include_str!("../docs/manual/procedures.md")),
 ];
 
 struct Run {

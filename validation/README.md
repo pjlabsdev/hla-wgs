@@ -25,6 +25,43 @@ are fetched.
 | `results/depth_lead4/` | certain two- and three-field calls at 30x, 15x and 10x before and after the lead-of-4 rule; `hla-wgs-validate eval-res` output |
 | `results/giab/`, `results/lab/` | calls of the trio members and of the 45 laboratory-typed samples |
 
+## Commands of hla-wgs-validate
+
+| Command | What it does |
+|---|---|
+| `eval23 DIR` | two- and three-field agreement with the assembly truth (`T4OUT`) |
+| `eval6 DIR [v]` | exact evaluation of the 18 genes against both haplotypes |
+| `eval8 DIR [v]` | the same for the eight added genes (DMA to TAP2; truth `T4OUT=truth/truth8.tsv`) |
+| `eval8-exons DIR [GENES] [v]` | exon-level check of calls certain to three or more fields |
+| `eval24 [2014\|2018\|any]` | 1000 Genomes laboratory types against hla-wgs and T1K |
+| `trio23 [DIR]` | Mendelian consistency of the two GIAB trios |
+| `long DIR SAMPLES.txt [v]` | long-read results: consensus against assembly, exact and nearest calls |
+| `eval-res DIR` | certain calls right at two and three fields (depth study) |
+| `sim-eval TRUTH.tsv ASSIGN.tsv` | gene assignment of simulated read pairs |
+| `truth4`, `truth8` | best database alleles per haplotype and gene |
+| `truth-exon x\|y\|z FA...` | exon projection of the database alleles onto haplotype assemblies |
+| `truth-table x\|y\|z` | `truth/truthX.tsv` from the exon projections |
+| `mhc-crop FA...` | MHC window of the MHC contigs (HLA-A to DPB1 plus 300 kb) |
+| `allele-vs-assembly S HAP GENE PREFIX...` | one allele against one assembled haplotype |
+| `mhc-contigs OUT.fa < ASSEMBLY.fa` | the MHC contigs of an assembly |
+| `sim DBDIR OUTPREFIX [--per N] [--cov X] [--seed S] [--profile P] [--div D]` | simulated read pairs from database alleles |
+| `thin-pairs IN_PREFIX FRAC OUT_PREFIX` | a random fraction of the read pairs (depth study) |
+| `build-freq OUT.json EXCLUDE...` | the two-field frequency prior from the laboratory types |
+| `paper [--version V] [--date D] [--doi DOI] [--typ OUT.typ]` | the software report as PDF (Typst) on stdout; needs `--features paper` |
+
+Environment variables:
+
+| Variable | Meaning |
+|---|---|
+| `HLA_WORK` | work folder (default: current folder) |
+| `HLA_DB` | database for the truth commands (default `HLA_WORK/db/hladb.json.gz`) |
+| `HLA_DAT` | `hla.dat` for the exon features (default `HLA_WORK/hla.dat`) |
+| `HLA_OUT` | calls for `eval24` (default `HLA_WORK/lab/out24`) |
+| `HLA_LTAG` | `long`: read `DIR/SAMPLE.TAG.long.*` |
+| `HLA_RESULTS` | `paper`: result folder (default `validation/results`) |
+| `SAMPLES`, `TRUTHSRC`, `T4OUT`, `T8OUT` | sample list, truth sources and truth tables of the truth and evaluation commands |
+| `DUMP` | `eval6`, `eval8`: file for one row per call |
+
 ## How the truth is defined
 
 For each assembled haplotype the gene sequence is cut out and compared with every IPD-IMGT/HLA
