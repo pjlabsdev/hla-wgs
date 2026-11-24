@@ -271,7 +271,7 @@ CC BY-ND 3.0; this repository contains no sequences from it, only allele names i
 ## Citation
 
 Jungwirth P. hla-wgs: HLA typing from whole-genome sequencing with a per-allele statement of what is
-certain. Version 1.2.0, 2026. https://doi.org/10.5281/zenodo.24367469 (all versions; 1.0.0:
-https://doi.org/10.5281/zenodo.24367470)
+certain. Version 1.2.0, 2026. https://doi.org/10.5281/zenodo.24509395 (this version; all versions:
+https://doi.org/10.5281/zenodo.24367469; 1.0.0: https://doi.org/10.5281/zenodo.24367470)
 
 See also [CITATION.cff](CITATION.cff).

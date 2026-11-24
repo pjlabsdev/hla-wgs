@@ -9,6 +9,13 @@ authors:
 repository-code: "https://github.com/pjlabsdev/hla-wgs"
 license: MIT
 doi: 10.5281/zenodo.24367469
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.24367469
+    description: all versions
+  - type: doi
+    value: 10.5281/zenodo.24509395
+    description: version 1.2.0
 version: 1.2.0
 date-released: 2026-11-24
 keywords: [HLA, MHC, whole-genome sequencing, HLA typing, IPD-IMGT/HLA, Rust]
