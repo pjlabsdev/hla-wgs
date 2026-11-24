@@ -66,8 +66,8 @@ With the current version (unreleased, this branch; tables in `validation/results
 
 | Test | Result |
 |---|---|
-| 80 HPRC samples, 18 genes | two fields 2,485 / 2,489, three fields 2,481 / 2,489; certain at four fields 1,798, of these 1,779 exact (98.9 %); 1,604 of 1,701 reported new sites true |
-| 59 HGSVC3 samples never used at any stage, assembly truth, 18 genes | two fields 1,833 / 1,833, three fields 1,830 / 1,833; certain at four fields 1,349, of these 1,333 exact (98.8 %); 869 of 973 reported new sites true |
+| 80 HPRC samples, 18 genes | two fields 2,486 / 2,489, three fields 2,482 / 2,489; certain at four fields 1,799, of these 1,780 exact (98.9 %); 1,604 of 1,701 reported new sites true |
+| 59 HGSVC3 samples never used at any stage, assembly truth, 18 genes | two fields 1,833 / 1,833, three fields 1,830 / 1,833; certain at four fields 1,350, of these 1,334 exact (98.8 %); 869 of 973 reported new sites true |
 | Eight added genes (DMA, DMB, DOA, DOB, MICA, MICB, TAP1, TAP2), 80 HPRC samples | calls certain to three fields or more with every exon equal to the assembly: 988 / 999; fourth field DMA 153 / 153, DOA 112 / 115, DOB 134 / 136, TAP1 40 / 41; DMB and TAP2 are reported to three fields at most, MICA and MICB do not reach four |
 | Same 80 samples thinned to 20x, 15x, 10x | two fields 2,485 / 2,481 / 2,476 of 2,489; certain at four fields 1,660 / 1,539 / 1,082, of these exact 98.8 / 98.6 / 97.9 % (`validation/results/depth`) |
 | Same 80 samples at 30x, 15x, 10x, calls certain to two / three fields | right 2,353 / 2,262, 2,306 / 2,206, 2,218 / 2,073; wrong 6 / 17, 4 / 16, 4 / 15 (`validation/results/depth_lead4`) |
