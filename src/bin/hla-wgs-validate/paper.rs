@@ -412,34 +412,41 @@ fn fig_workflow() -> String {
         }
         x += 144;
     }
-    arrow(&mut b, 584 + 63, 74, 584 + 63, 105);
-    // lane 3: long reads
-    b.push(text(8.0, 182.0, "EVERY SAMPLE  HiFi reads (hla-wgs long)", N::F(7.6), &lane_t));
-    let lr: [(&str, [&str; 2]); 4] = [
-        ("haplotypes", ["reads grouped", "per gene copy"]),
-        ("consensus", ["extended, polished", "by plurality vote"]),
-        ("join", ["groups naming one", "allele polished jointly"]),
-        ("name", ["nearest allele,", "exons first"]),
+    // the reference is what the aligner maps to (and what every later step compares with)
+    b.push(format!(r#"<polyline points="503,73 503,88 215,88" fill="none" stroke="{SUB}" stroke-width="0.9"/>"#));
+    arrow(&mut b, 215, 88, 215, 105);
+    // output of the short-read path: the certainty step writes all result files
+    b.push(text(8.0, 184.0, "OUTPUT", N::F(7.6), &lane_t));
+    b.push(format!(r#"<polyline points="647,157 647,172 71,172" fill="none" stroke="{SUB}" stroke-width="0.9"/>"#));
+    let out: [(&str, [&str; 2]); 4] = [
+        ("PREFIX.tsv", ["safe call and", "resolution per allele"]),
+        ("conf.tsv / json", ["leads, groups,", "copy number, sites"]),
+        ("novel.tsv", ["every new site with", "region and effect"]),
+        ("PREFIX.html", ["result page, German", "and English, DOI"]),
     ];
-    let mut x = 152;
+    let mut x = 8;
+    for (t, s) in out.iter() {
+        bx(&mut b, x, 190, t, s, true);
+        arrow(&mut b, x + 63, 172, x + 63, 189);
+        x += 144;
+    }
+    // lane 3: long reads, a path of its own from its own input to its own output
+    b.push(text(8.0, 266.0, "EVERY SAMPLE  HiFi reads (hla-wgs long)", N::F(7.6), &lane_t));
+    let lr: [(&str, [&str; 2]); 5] = [
+        ("HiFi input", ["PacBio HiFi reads,", "FASTQ or BAM"]),
+        ("haplotypes", ["reads grouped", "per gene copy"]),
+        ("consensus", ["plurality vote; groups", "of one allele joined"]),
+        ("name", ["nearest allele,", "exons first"]),
+        ("PREFIX.long.*", ["allele sequences", "and names"]),
+    ];
+    let mut x = 8;
     for (i, (t, s)) in lr.iter().enumerate() {
-        bx(&mut b, x, 190, t, s, false);
+        bx(&mut b, x, 274, t, s, i == 4);
         if i > 0 {
-            arrow(&mut b, x - 18, 215, x - 1, 215);
+            arrow(&mut b, x - 18, 299, x - 1, 299);
         }
         x += 144;
     }
-    arrow(&mut b, 71, 157, 71, 214);
-    arrow(&mut b, 71, 214, 151, 214);
-    // output
-    b.push(text(8.0, 266.0, "OUTPUT", N::F(7.6), &lane_t));
-    bx(&mut b, 8, 274, "PREFIX.tsv", &["safe call and", "resolution per allele"], true);
-    bx(&mut b, 152, 274, "conf.tsv / json", &["leads, groups,", "copy number, sites"], true);
-    bx(&mut b, 296, 274, "novel.tsv", &["every new site with", "region and effect"], true);
-    bx(&mut b, 440, 274, "PREFIX.html", &["result page, German", "and English, DOI"], true);
-    bx(&mut b, 584, 274, "PREFIX.long.*", &["allele sequences", "of the HiFi path"], true);
-    arrow(&mut b, 584 + 63, 157, 584 + 63, 273);
-    arrow(&mut b, 728 - 1, 240, 728 - 1, 240);
     b.push(text(8.0, 342.0, "Research use only. A call must be confirmed by an accredited HLA laboratory before any medical use.", N::F(7.0), &T { fill: SUB, mono: true, ..T0 }));
     svg(720, 350, &b)
 }

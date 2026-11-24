@@ -76,11 +76,11 @@ html{scroll-padding-top:20px}
 <rect x="215" y="70" width="190" height="74" rx="5"/>
 <rect x="450" y="70" width="150" height="74" rx="5"/>
 <rect x="645" y="62" width="250" height="90" rx="5" stroke="#c9a000" stroke-width="2"/>
-<rect x="955" y="62" width="265" height="200" rx="5" stroke-width="2"/>
+<rect x="955" y="62" width="265" height="212" rx="5" stroke-width="2"/>
 <rect x="215" y="180" width="190" height="34" rx="5" stroke-dasharray="4 3"/>
-<rect x="215" y="222" width="190" height="34" rx="5" stroke-dasharray="4 3"/>
-<rect x="450" y="180" width="150" height="34" rx="5" stroke-dasharray="4 3"/>
-<rect x="450" y="222" width="150" height="34" rx="5" stroke-dasharray="4 3"/>
+<rect x="450" y="176" width="150" height="30" rx="5" stroke-dasharray="4 3"/>
+<rect x="450" y="212" width="150" height="30" rx="5" stroke-dasharray="4 3"/>
+<rect x="450" y="248" width="150" height="30" rx="5" stroke-dasharray="4 3"/>
 </g>
 <text x="32" y="94" font-weight="500">Startdatei</text>
 <text x="32" y="112" font-size="11" opacity=".7">hla-wgs-start</text>
@@ -107,18 +107,18 @@ html{scroll-padding-top:20px}
 <text x="967" y="230" font-size="11" opacity=".7">wird nur bei neuem Format</text>
 <text x="967" y="246" font-size="11" opacity=".7">neu gebaut</text>
 <text x="227" y="201" font-size="11">Häufigkeiten 1000G</text>
-<text x="227" y="243" font-size="11">Wiederholungsmaske</text>
-<text x="462" y="201" font-size="11">G/P-Gruppen WMDA</text>
-<text x="462" y="243" font-size="11">Serologie WMDA</text>
+<text x="462" y="195" font-size="11">G/P-Gruppen WMDA</text>
+<text x="462" y="231" font-size="11">Serologie WMDA</text>
+<text x="462" y="267" font-size="11">Wiederholungsmaske</text>
 <g stroke="currentColor" stroke-width="1.2" fill="none">
 <line x1="170" y1="107" x2="213" y2="107" marker-end="url(#ar)"/>
 <line x1="405" y1="107" x2="448" y2="107" marker-end="url(#ar)"/>
 <line x1="600" y1="107" x2="643" y2="107" marker-end="url(#ar)"/>
 <line x1="895" y1="107" x2="953" y2="107" marker-end="url(#ar)"/>
 <polyline points="405,197 425,197 425,166 770,166 770,154" marker-end="url(#ar)" stroke-opacity=".6"/>
-<polyline points="600,197 930,197 953,197" marker-end="url(#ar)" stroke-opacity=".6"/>
-<polyline points="600,239 953,239" marker-end="url(#ar)" stroke-opacity=".6"/>
-<polyline points="405,239 430,239 430,262 940,262 940,226 953,226" marker-end="url(#ar)" stroke-opacity=".6"/>
+<line x1="600" y1="191" x2="953" y2="191" marker-end="url(#ar)" stroke-opacity=".6"/>
+<line x1="600" y1="227" x2="953" y2="227" marker-end="url(#ar)" stroke-opacity=".6"/>
+<line x1="600" y1="263" x2="953" y2="263" marker-end="url(#ar)" stroke-opacity=".6"/>
 </g>
 
 
@@ -170,15 +170,15 @@ html{scroll-padding-top:20px}
 </g>
 <!-- database feeds run -->
 <g stroke="#c9a000" stroke-width="1.4" fill="none" stroke-dasharray="5 4">
-<polyline points="1000,262 1000,290 515,290 515,325" marker-end="url(#ag)"/>
-<polyline points="1150,262 1150,325" marker-end="url(#ag)"/>
+<polyline points="1000,274 1000,290 515,290 515,325" marker-end="url(#ag)"/>
+<polyline points="1150,274 1150,325" marker-end="url(#ag)"/>
 </g>
-<text x="522" y="284" font-size="11" fill="#c9a000">panel.fa + Maske</text>
+<text x="640" y="284" font-size="11" fill="#c9a000">panel.fa + Maske</text>
 <text x="1158" y="300" font-size="11" fill="#c9a000">alle Allele</text>
 
 <text x="400" y="460" font-size="11" opacity=".7">Testprobe HG00438, 4 Threads:</text>
-<text x="400" y="476" font-size="11" opacity=".7">32.433 Read-Paare zu HLA-Genen</text>
-<text x="400" y="492" font-size="11" opacity=".7">gesamt etwa 22 s</text>
+<text x="400" y="476" font-size="11" opacity=".7">32.739 Read-Paare zu HLA-Genen</text>
+<text x="400" y="492" font-size="11" opacity=".7">gesamt etwa 16 s</text>
 
 <!-- outputs -->
 <g stroke="currentColor" fill="none" stroke-width="1.2">
@@ -191,12 +191,20 @@ html{scroll-padding-top:20px}
 </g>
 <text x="32" y="696" font-weight="500">PREFIX.tsv</text><text x="32" y="714" font-size="11" opacity=".7">Allele + sichere Felder</text>
 <text x="234" y="696" font-weight="500">.conf.tsv</text><text x="234" y="714" font-size="11" opacity=".7">Vorsprung je Feld</text>
-<text x="436" y="696" font-weight="500">.json</text><text x="436" y="714" font-size="11" opacity=".7">alles, für Genome</text>
+<text x="436" y="696" font-weight="500">.json</text><text x="436" y="714" font-size="11" opacity=".7">alles; .report.json</text><text x="436" y="728" font-size="11" opacity=".7">für Genome</text>
 <text x="638" y="696" font-weight="500">.html</text><text x="638" y="714" font-size="11" opacity=".7">Laborbefund DE/EN</text>
 <text x="840" y="696" font-weight="500">.novel.tsv</text><text x="840" y="714" font-size="11" opacity=".7">neue Allele</text>
-<text x="1042" y="696" font-weight="500">.log</text><text x="1042" y="714" font-size="11" opacity=".7">jeder Schritt mit Zeit</text>
+<text x="1042" y="696" font-weight="500">.log.txt/.jsonl</text><text x="1042" y="714" font-size="11" opacity=".7">jeder Schritt mit Zeit,</text><text x="1042" y="728" font-size="11" opacity=".7">Fehlercodes</text>
 <g stroke="currentColor" stroke-width="1.2" fill="none">
-<polyline points="1055,597 1055,620 620,620 620,648" marker-end="url(#ar)"/>
+<polyline points="1055,597 1055,622"/>
+<line x1="113" y1="622" x2="1125" y2="622"/>
+<line x1="113" y1="622" x2="113" y2="670" marker-end="url(#ar)"/>
+<line x1="315" y1="622" x2="315" y2="670" marker-end="url(#ar)"/>
+<line x1="517" y1="622" x2="517" y2="670" marker-end="url(#ar)"/>
+<line x1="719" y1="622" x2="719" y2="670" marker-end="url(#ar)"/>
+<line x1="921" y1="622" x2="921" y2="670" marker-end="url(#ar)"/>
+<line x1="1125" y1="622" x2="1125" y2="670" marker-end="url(#ar)"/>
+
 </g>
 </g>
 </svg>
@@ -285,7 +293,7 @@ html{scroll-padding-top:20px}
 <figcaption>Der Read wird nicht Base für Base gegen jedes Allel gerechnet: exakte Anker legen die Lage fest, gerechnet wird nur zwischen ihnen und an den Enden.</figcaption>
 </figure>
 <div>
-<p>Bis Version 1.1 richtete minimap2 (C) die Reads aus. Ab 1.1 übernimmt das ein eigener Aligner in Rust (<code>src/aln.rs</code>), der auf die HLA-Aufgabe zugeschnitten ist: viele sehr ähnliche Sequenzen derselben Genfamilie.</p>
+<p>Bis Version 1.1 richtete minimap2 (C) die Reads aus. Ab 1.1 übernimmt das ein eigener Aligner in Rust, der auf die HLA-Aufgabe zugeschnitten ist: viele sehr ähnliche Sequenzen derselben Genfamilie. Nach 1.2.0 ist er das Paket <code>gc-panel</code> von Genome 4; hla-wgs trägt eine geprüfte Kopie in <code>crates/</code>, mit byte-gleichen Ergebnissen.</p>
 <p>Wo er schneller ist: Wird eine schwierige Stelle zwischen zwei Allelen einmal gerechnet, kennt er sie für alle Allele, die dieselbe Strecke teilen. Minimizer verringern die Anker, und ein Read, der nicht fast genau passt, wird sicherheitshalber mit allen k-meren neu gesucht.</p>
 <table>
 <thead><tr><th>Messung</th><th class="n">minimap2</th><th class="n">eigener</th></tr></thead>
@@ -311,7 +319,9 @@ html{scroll-padding-top:20px}
 <tr><td><code>PREFIX.json</code></td><td>alles zusammen, mit Serologie, Liganden, Datenbank-Release und Tiefe; Grundlage für die Genome-App</td></tr>
 <tr><td><code>PREFIX.html</code></td><td>Laborbefund auf Deutsch und Englisch: 11 klinische Loci, GL-String, Pharmakogenetik, Druck A4 mit Seitenzahlen</td></tr>
 <tr><td><code>PREFIX.novel.tsv</code></td><td>Kandidaten für neue Allele mit Region, Wirkung und stützenden Reads</td></tr>
-<tr><td><code>PREFIX.log</code></td><td>jeder Schritt mit Zeitstempel</td></tr>
+<tr><td><code>PREFIX.novel.fa</code></td><td>Sequenzen der neuen Allele</td></tr>
+<tr><td><code>PREFIX.report.json</code></td><td>Berichtsteil für Genome (<code>genome.report.v1</code>), Texte auf Deutsch und Englisch</td></tr>
+<tr><td><code>PREFIX.log.txt</code>, <code>PREFIX.log.jsonl</code></td><td>Lauf-Protokoll: jeder Schritt mit Zeit und Zählern, Fehlercodes <code>HW-E…</code></td></tr>
 </tbody></table>
 <p style="margin-top:18px;color:var(--mut);font-size:13px">hla-wgs · PJ Labs · DOI 10.5281/zenodo.24367469 · nur für Forschungszwecke</p>
 </div>
