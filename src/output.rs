@@ -7,6 +7,14 @@ use std::io::Write;
 
 const T: [f64; 3] = [6.0, 6.0, 4.0];
 
+/// lead that makes two or three fields certain when the fourth is not. At 10x the leads shrink with
+/// the reads, and most correct calls stopped at fewer fields than they deserved: on 80 HPRC samples
+/// thinned to 10x a lead of 4 adds about 200 certain two-field and 50 three-field calls, none wrong.
+/// A four-field call keeps the stricter leads of `T`. HLA_TGRP=6 restores the old value.
+fn t_group() -> f64 {
+    std::env::var("HLA_TGRP").ok().and_then(|v| v.parse().ok()).unwrap_or(4.0)
+}
+
 /// IPD-IMGT/HLA release of the database (file DBDIR/release, written by build-db)
 pub static DB_RELEASE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 /// names of the input files, without folders
@@ -173,9 +181,9 @@ pub fn write(
             let f401 = std::env::var("HLA_F401").map_or(true, |v| v != "0") && fields(shown).get(3).map_or(false, |x| x == "01") && m[2] >= 1.0;
             let res_full = if (m[2] >= T[2] || f401) && m[1] >= T[1] && m[0] >= T[0] {
                 4
-            } else if m[1] >= T[1] && m[0] >= T[0] {
+            } else if m[1] >= t_group() && m[0] >= t_group() {
                 3
-            } else if m[0] >= T[0] {
+            } else if m[0] >= t_group() {
                 2
             } else {
                 1
@@ -256,7 +264,7 @@ pub fn write(
     }
     let rep = serde_json::json!({
         "tool": "hla-wgs", "version": env!("CARGO_PKG_VERSION"), "schema": "genome.hla.v1",
-        "thresholds": {"2": T[0], "3": T[1], "4": T[2], "4_01": if std::env::var("HLA_F401").map_or(true, |v| v != "0") { serde_json::json!(1.0) } else { serde_json::Value::Null }}, "genes": js,
+        "thresholds": {"2": t_group(), "3": t_group(), "4": T[2], "4_lead_2_3": T[0], "4_01": if std::env::var("HLA_F401").map_or(true, |v| v != "0") { serde_json::json!(1.0) } else { serde_json::Value::Null }}, "genes": js,
         "database_release": DB_RELEASE.get(),
         "input": INPUTS.get(),
         "analysis_time": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
