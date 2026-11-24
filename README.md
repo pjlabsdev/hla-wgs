@@ -62,7 +62,7 @@ All scripts and result tables are in [`validation/`](validation/).
 | 45 further 1000 Genomes samples with laboratory typing (A, B, C, DRB1, DQB1) | 438 / 450 at two fields; of 12 differences 5 are resolution limits of the laboratory method, 3 are probable laboratory errors (B\*27:05 against 27:03), 4 are open |
 | GIAB trios (Ashkenazi, Han Chinese), 60x to 100x | no Mendelian conflict at two or three fields in any gene; none at four fields among calls reported as certain |
 
-With the current version (unreleased, this branch; tables in `validation/results/dev80_main`, `hgsvc59_main`, `depth_lead4`, `lab1000g`, `long26_main`):
+With version 1.2.0 (tables in `validation/results/dev80_main`, `hgsvc59_main`, `depth_lead4`, `lab1000g`, `long26_main`):
 
 | Test | Result |
 |---|---|
@@ -251,8 +251,8 @@ A technical picture of every step, from the database download to the result page
 
 ## Limits
 
-- Short reads only (2x100 to 2x150, about 15x or more; validated at 30x and above). No RNA-seq, no
-  exome or amplicon data, no long reads.
+- Short reads (2x100 to 2x150, about 15x or more; validated at 30x and above). PacBio HiFi reads
+  only with the experimental `hla-wgs long`. No RNA-seq, no exome or amplicon data.
 - A four-field call reported as certain was exact in 98.6 % (development samples) and 97.7 % (30
   further samples) of cases, not in all. Homopolymer and
   repeat lengths and the phase of variants at the far 3' end of HLA-B are the known weak points.
@@ -271,7 +271,7 @@ CC BY-ND 3.0; this repository contains no sequences from it, only allele names i
 ## Citation
 
 Jungwirth P. hla-wgs: HLA typing from whole-genome sequencing with a per-allele statement of what is
-certain. Version 1.1.0, 2026. https://doi.org/10.5281/zenodo.24367469 (all versions; 1.0.0:
+certain. Version 1.2.0, 2026. https://doi.org/10.5281/zenodo.24367469 (all versions; 1.0.0:
 https://doi.org/10.5281/zenodo.24367470)
 
 See also [CITATION.cff](CITATION.cff).
