@@ -147,7 +147,60 @@ pub fn repeats(s: &[u8]) -> Vec<(usize, usize)> {
 }
 
 /// sites per called allele (index 0 = first name, 1 = second; identical names share one entry)
+/// Repeats in which `x` and `y` differ in length, when they differ in nothing else where both have
+/// sequence: (index into `reps`, length of y minus length of x). None when they differ elsewhere too,
+/// Some(empty) when the shared stretch is identical.
+pub fn repeat_only_diffs(x: &[u8], y: &[u8], reps: &[(usize, usize)]) -> Option<Vec<(usize, i64)>> {
+    const K: usize = 32;
+    if x.len() < K || y.len() < K {
+        return None;
+    }
+    let find = |h: &[u8], n: &[u8]| h.windows(n.len()).position(|w| w == n);
+    let (mut i, mut j) = match find(y, &x[..K]) {
+        Some(p) => (0, p),
+        None => (find(x, &y[..K])?, 0),
+    };
+    let mut out = vec![];
+    while i < x.len() && j < y.len() {
+        if x[i] == y[j] {
+            i += 1;
+            j += 1;
+            continue;
+        }
+        // a mismatch must sit in a repeat of x (or right after it): find where x continues in y
+        let ri = reps.iter().position(|&(rs, re)| rs <= i && i <= re)?;
+        let (rs, re) = reps[ri];
+        let flank = &x[re..(re + 12).min(x.len())];
+        if flank.len() < 12 {
+            return Some(out);
+        }
+        let ys = j - (i - rs);
+        let lim = (ys + (re - rs) * 2 + 60).min(y.len());
+        if ys >= lim {
+            return None;
+        }
+        let ye = ys + find(&y[ys..lim], flank)?;
+        let d = (ye - ys) as i64 - (re - rs) as i64;
+        if d == 0 {
+            return None;
+        }
+        out.push((ri, d));
+        i = re;
+        j = ye;
+    }
+    Some(out)
+}
+
 pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Site>; 2] {
+    sites_with(ctx, g, qnames, names, [&[], &[]])
+}
+
+/// `rivals`: per slot the alleles that stand against the call at the fourth field. When the call
+/// differs from one of them only in the length of a repeat, the reads that span that repeat must
+/// show the length of the call: at least three of them, and three times as many as show the
+/// rival's length. Otherwise the length is not verified and neither is the fourth field
+/// (`repunverified`, three fields hold). HLA_REP4=0: off.
+pub fn sites_with(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2], rivals: [&[String]; 2]) -> [Vec<Site>; 2] {
     let al = ctx.al(g);
     let find = |n: &str| al.iter().find(|a| a.name == n);
     let hom = names[0] == names[1] || names[1] == "-";
@@ -460,7 +513,75 @@ pub fn sites(ctx: &Ctx, g: &str, qnames: &[usize], names: [&str; 2]) -> [Vec<Sit
         out[1] = out[0].iter().map(|s| Site { pos: s.pos, what: s.what.clone(), alt: s.alt, depth: s.depth, exon: s.exon, either: false }).collect();
         out[0].retain(|s| s.alt as f64 >= if (s.what.starts_with("del") || s.what.starts_with("ins")) && s.what.len() >= 8 { 0.5 } else { 0.75 } * s.depth as f64);
     }
+    if std::env::var("HLA_REP4").map_or(true, |v| v != "0") {
+        for slot in 0..2 {
+            let k = if hom { 0 } else { slot };
+            // the first-described allele of a three-field group (fourth field 01) keeps the rule of
+            // output.rs: against a rarer sibling a small lead is enough (HLA_F401)
+            if std::env::var("HLA_F401").map_or(true, |v| v != "0") && names[k].split(':').nth(3).map_or(false, |f| f.trim_end_matches(|c: char| c.is_ascii_alphabetic()) == "01") {
+                continue;
+            }
+            // compare the sequences as described, without the flanks borrowed from other alleles
+            let own = |a: &crate::db::Allele| -> Vec<u8> { if a.extended { a.orig.clone().unwrap_or_else(|| a.genomic.clone()) } else { a.genomic.clone() } };
+            let ak = if k == 0 { a0 } else { a1 };
+            let xo = own(ak);
+            let lo = if xo.len() >= 32 { seqs[k].windows(32).position(|w| w == &xo[..32]).unwrap_or(0) } else { 0 };
+            let hi = (lo + xo.len()).min(seqs[k].len());
+            let x = &seqs[k][lo..hi];
+            let rmap: Vec<usize> = (0..reps[k].len()).filter(|&ri| reps[k][ri].0 >= lo && reps[k][ri].1 <= hi).collect();
+            let rloc: Vec<(usize, usize)> = rmap.iter().map(|&ri| (reps[k][ri].0 - lo, reps[k][ri].1 - lo)).collect();
+            for yname in rivals[slot].iter().chain(if hom { rivals[1 - slot].iter() } else { [].iter() }) {
+                let Some(y) = find(yname) else { continue };
+                if y.name == names[k] {
+                    continue;
+                }
+                let dd = repeat_only_diffs(x, &own(y), &rloc).map(|v| v.into_iter().map(|(i, d)| (rmap[i], d)).collect::<Vec<_>>());
+                if std::env::var("HLA_REP4DBG").is_ok() {
+                    eprintln!("REP4\t{g}\t{slot}\t{}\t{}\t{}\t{}\t{:?}", names[k], y.name, x.len(), y.genomic.len(), dd);
+                }
+                let Some(dd) = dd else { continue };
+                for (ri, d) in dd {
+                    let (rs, re) = reps[k][ri];
+                    let tot: u32 = replen[k][ri].values().map(|(a, b)| a + b).sum();
+                    let c0 = replen[k][ri].get(&0).map_or(0, |(a, b)| a + b);
+                    let cd = replen[k][ri].get(&d).map_or(0, |(a, b)| a + b);
+                    if c0 >= 3 && c0 >= 3 * cd {
+                        continue;
+                    }
+                    if out[slot].iter().any(|s| s.pos + 1 >= rs && s.pos <= re) {
+                        continue;
+                    }
+                    out[slot].push(Site { pos: rs, what: format!("repunverified{}bp", re - rs), alt: c0 as usize, depth: tot as usize, exon: false, either: false });
+                    out[slot].sort_by(|a, b| a.pos.cmp(&b.pos).then_with(|| a.what.cmp(&b.what)));
+                }
+            }
+        }
+    }
     out
+}
+
+#[cfg(test)]
+mod rep_tests {
+    use super::*;
+
+    #[test]
+    fn rivals_that_differ_only_in_repeat_length() {
+        let x = b"ACGTTGCAAGGCTTACCGATGCATGCAGTACCGATTTTTTTTTTTTGACGATCGATCGGATCCATGCAAGTCGATCGA";
+        let mut y = x.to_vec();
+        y.insert(40, b'T');
+        let reps = repeats(x);
+        let d = repeat_only_diffs(x, &y, &reps).unwrap();
+        assert_eq!(d.len(), 1);
+        assert_eq!(d[0].1, 1);
+        // a substitution outside a repeat: not a repeat-only difference
+        let mut z = x.to_vec();
+        z[60] = if z[60] == b'A' { b'C' } else { b'A' };
+        assert!(repeat_only_diffs(x, &z, &reps).is_none());
+        // longer at the start only: identical where both have sequence
+        let mut w = b"GGGGCCCCAAAATTTT".to_vec();
+        w.extend_from_slice(x);
+        assert_eq!(repeat_only_diffs(x, &w, &reps), Some(vec![]));
+    }
 }
 
 /// A new variant in a stretch where the two called alleles are identical is seen only in pairs that

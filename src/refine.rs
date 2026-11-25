@@ -113,7 +113,8 @@ pub fn exon_refine(ctx: &Ctx, g: &str, qnames: &[usize], r: &StageB, rmarg: &mut
             near2.push(a.clone());
         }
     }
-    let fr: &[(String, f64)] = ctx.db.freq.get(g).map(|v| v.as_slice()).unwrap_or(&[]);
+    // the common groups of the population data join the candidates (not with HLA_NOFREQ)
+    let fr: &[(String, f64)] = if std::env::var("HLA_NOFREQ").map_or(false, |v| v != "0") { &[] } else { ctx.db.freq.get(g).map(|v| v.as_slice()).unwrap_or(&[]) };
     for &w in &win {
         let fam = al[w].name.split('*').nth(1).unwrap().split(':').next().unwrap().to_string();
         let mut common: Vec<&(String, f64)> = fr.iter().filter(|(k, _)| k.split(':').next().unwrap() == fam).collect();
