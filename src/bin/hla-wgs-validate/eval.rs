@@ -317,13 +317,46 @@ pub enum SiteHit {
     NotASite,
 }
 
+/// the tandem repeat that starts at `p`: (unit length, end), unit of 1 to 6 bases repeated at
+/// least twice; the shortest unit wins
+pub fn tandem_at(a: &[u8], p: usize) -> Option<(usize, usize)> {
+    for u in 1..=6usize {
+        if p + 2 * u > a.len() {
+            break;
+        }
+        let mut j = p + u;
+        while j < a.len() && a[j] == a[j - u] {
+            j += 1;
+        }
+        if j - p >= 2 * u {
+            return Some((u, j));
+        }
+    }
+    None
+}
+
 pub fn site_hit(a: &[u8], d: &Det, this: &[Var], other: &[Var]) -> SiteHit {
     let w = d.what.split('(').next().unwrap_or("");
     if let Some(n) = w.strip_prefix("rep") {
         let Ok(n) = n.parse::<i64>() else { return SiteHit::NotASite };
         let p = (d.pos - 1).max(0) as usize;
-        let near = |v: &&Var| v.pos + 5 >= p && v.pos <= p + 120 && v.ins.len() as i64 - v.del as i64 == n;
-        return if this.iter().any(|v| near(&v)) { SiteHit::RepLength } else { SiteHit::False };
+        let Some((u, end)) = tandem_at(a, p) else { return SiteHit::False };
+        // the haplotype must carry this repeat with n more or fewer bases: a change inside the
+        // repeat that gives the same sequence as adding or removing copies of its unit
+        let hit = |t: &Var| {
+            if t.ins.len() as i64 - t.del as i64 != n || t.pos + 1 < p || t.pos > end + 1 {
+                return false;
+            }
+            let at = t.pos.clamp(p, end);
+            let unit = &a[p..p + u];
+            let c = if n > 0 {
+                Var { pos: at, del: 0, ins: unit.iter().cycle().skip((at - p) % u).take(n as usize).copied().collect() }
+            } else {
+                Var { pos: at.min(end.saturating_sub((-n) as usize)), del: (-n) as usize, ins: vec![] }
+            };
+            same_change(a, &c, t)
+        };
+        return if this.iter().any(hit) { SiteHit::RepLength } else { SiteHit::False };
     }
     let Some(v) = det_var(d) else { return SiteHit::NotASite };
     if this.iter().any(|t| same_change(a, &v, t)) {
@@ -346,9 +379,20 @@ fn int_list(v: &[i64]) -> String {
 pub fn eval6(dir: &str, verbose: bool, eight: bool) {
     let db = db("db/hladb.json.gz");
     let mut seq: HashMap<String, String> = HashMap::new();
+    let mut off: HashMap<String, i64> = HashMap::new();
     for g in genes(&db) {
         for a in alleles(g) {
             seq.insert(s(a, "name").to_string(), own_seq(a).to_string());
+            // sites are reported on the padded sequence; the truth is compared on the allele as
+            // described, so positions move by the length of a borrowed 5' flank
+            let (g, o) = (s(a, "genomic").as_bytes(), own_seq(a).as_bytes());
+            if o.len() >= 32 && g.len() > o.len() {
+                if let Some(k) = g.windows(32).position(|w| w == &o[..32]) {
+                    if k > 0 {
+                        off.insert(s(a, "name").to_string(), k as i64);
+                    }
+                }
+            }
         }
     }
     let dmin = truth_table(&env_or("T4OUT", "truth/truth4.tsv"));
@@ -378,6 +422,7 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
             }
         }
         for r in conf_lines(&cf) {
+            let sh = off.get(&r[2]).copied().unwrap_or(0);
             let mut det = HashSet::new();
             let mut either = HashSet::new();
             let mut sites: Vec<Det> = vec![];
@@ -386,7 +431,7 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
                 let src = if r[12].starts_with("known:") { "" } else { r[12].as_str() };
                 for x in src.split(',') {
                     if !x.is_empty() && !x.contains("blind") && !x.contains("unphased") && !x.contains("repunverified") {
-                        let p = x.split(':').next().unwrap().parse::<i64>().unwrap();
+                        let p = x.split(':').next().unwrap().parse::<i64>().unwrap() - sh;
                         det.insert(p);
                         sites.push(Det { pos: p, what: x.split(':').nth(1).unwrap_or("").to_string(), either: x.ends_with(":either") });
                         if x.ends_with(":either") {
@@ -396,9 +441,11 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
                 }
                 let listed = src.split(',').filter(|x| !x.is_empty()).count() as i64;
                 if !src.is_empty() && nn > listed {
-                    let shown: HashSet<i64> = src.split(',').filter_map(|x| x.split(':').next()?.parse().ok()).collect();
+                    let shown: HashSet<i64> = src.split(',').filter_map(|x| x.split(':').next()?.parse::<i64>().ok()).collect();
                     for (p, unsure, what) in novel.get(&(r[0].clone(), r[1].clone())).into_iter().flatten() {
-                        if !shown.contains(p) && !what.contains("blind") && !what.contains("unphased") && !what.contains("repunverified") {
+                        let raw = *p;
+                        let p = &(raw - sh);
+                        if !shown.contains(&raw) && !what.contains("blind") && !what.contains("unphased") && !what.contains("repunverified") {
                             sites.push(Det { pos: *p, what: what.clone(), either: *unsure });
                             det.insert(*p);
                             if *unsure {
@@ -936,6 +983,22 @@ mod tests {
         let ti = vec![Var { pos: 8, del: 0, ins: b"A".to_vec() }];
         assert_eq!(site_hit(a, &d(5, "insA", false), &ti, &[]), SiteHit::This);
         assert_eq!(site_hit(a, &d(5, "insC", false), &ti, &[]), SiteHit::False);
+    }
+
+    #[test]
+    fn repeat_length_must_change_the_reported_repeat() {
+        // T8 at 20..28; an unrelated C insertion further on does not confirm rep+1
+        let mut a = b"ACGTACGTACGTACGTACGA".to_vec();
+        a.extend_from_slice(b"TTTTTTTT");
+        a.extend_from_slice(&b"GCAGCATGCA".repeat(10));
+        let far = vec![Var { pos: 90, del: 0, ins: b"C".to_vec() }];
+        assert_eq!(site_hit(&a, &d(21, "rep+1", false), &far, &[]), SiteHit::False);
+        let inside = vec![Var { pos: 24, del: 0, ins: b"T".to_vec() }];
+        assert_eq!(site_hit(&a, &d(21, "rep+1", false), &inside, &[]), SiteHit::RepLength);
+        let wrong_base = vec![Var { pos: 24, del: 0, ins: b"G".to_vec() }];
+        assert_eq!(site_hit(&a, &d(21, "rep+1", false), &wrong_base, &[]), SiteHit::False);
+        let shorter = vec![Var { pos: 22, del: 1, ins: vec![] }];
+        assert_eq!(site_hit(&a, &d(21, "rep-1", false), &shorter, &[]), SiteHit::RepLength);
     }
 
     #[test]

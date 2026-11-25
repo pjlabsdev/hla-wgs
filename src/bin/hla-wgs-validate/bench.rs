@@ -188,8 +188,11 @@ pub fn evaluate(truth: &Truth, samples: &[String], genes: &[&str], calls: &dyn F
                 let mut v = 0i64;
                 for (ci, ei) in pm.iter().enumerate() {
                     if let (Some(cr), Some((_, Some((d, names))))) = (c.get(ci), exp.get(*ei)) {
+                        // right candidate fields first; among equal pairings the one with more
+                        // right released fields, so that haplotype order cannot decide precision
                         for k in LEVELS {
-                            v += right(&cr.allele, k, &ref_at(*d, names, k)) as i64;
+                            let ok = right(&cr.allele, k, &ref_at(*d, names, k)) as i64;
+                            v += 100 * ok + ok * (cr.res >= k) as i64;
                         }
                     }
                 }
@@ -380,6 +383,16 @@ mod tests {
         }
         let r = line(&out, "ALL", 1);
         assert_eq!((r[5], r[6], r[10], r[11]), ("2", "2", "100.0", "33.3"));
+    }
+
+    #[test]
+    fn equal_candidates_pair_by_released_fields() {
+        // both candidates name h2's allele; the four-field one must go to h2 whatever the order
+        let truth = parse_truth("S1\th1\t_done\nS1\th2\t_done\nS1\th1\tA\t0\tA*01:01:01:01\nS1\th2\tA\t0\tA*01:01:01:02\n");
+        let calls = |_: &str| Some(conf(&[("A", "A*01:01:01:02", "A*01:01:01:02", 4), ("A", "A*01:01:01:02", "A*01:01:01", 3)]));
+        let b = evaluate(&truth, &["S1".to_string()], &["A"], &calls);
+        let r = line(&render(&b, &["A"]), "A", 4).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        assert_eq!((r[5].as_str(), r[6].as_str(), r[10].as_str()), ("1", "1", "100.0"));
     }
 
     #[test]
