@@ -15,6 +15,8 @@ the [start file](start-file.md) page, and that every switch of the first table i
 | `HLA_F401=0` | fourth field 01 needs the full lead of 4 like any other allele |
 | `HLA_FIELD1=0` | the allele group is not withheld when a competitor of another group is nearly as good |
 | `HLA_DRBREL=0` | the DRB1 exon refinement does not see the reads of DRB3/4/5 |
+| `HLA_REP4=0` | a fourth field that differs from its nearest four-field rival only in the length of a repeat is released even without reads that span the repeat (the behaviour of 1.2.0); with the rule on, it needs at least 3 spanning reads with its length and three times as many as with the rival's, except for a fourth field 01 while `HLA_F401` is on |
+| `HLA_NOFREQ=1` | no population frequency prior: every two-field group starts equal, and the common groups of the population data do not join the exon refinement |
 | `HLA_PADF1=0` | an allele stored without its ends gets no flank from its first-field group |
 | `HLA_PAD_MIN` | an allele more than this many bases shorter than another allele of its gene gets that allele's flank (default 8; 1.0 used 20) |
 | `HLA_PAD1` | flanks are borrowed in one step only, not from an allele that was padded itself |
@@ -82,6 +84,7 @@ the [start file](start-file.md) page, and that every switch of the first table i
 | `HLA_DRBDUMP` | per read the DRB allele that explains it best |
 | `HLA_NOVDBG` | `GENE:POS`: the evidence for one position of the new-site examination |
 | `HLA_REPDUMP` | every repeat with the length changes seen in reads |
+| `HLA_REP4DBG` | per called allele the fourth-field rival and the repeats in which the two differ only in length |
 | `HLA_THINDBG` | coverage classes of the thin-stretch rule |
 | `HLA_LONG_TIME` | long reads: time per gene family |
 

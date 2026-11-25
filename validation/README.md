@@ -29,7 +29,7 @@ are fetched.
 
 | Command | What it does |
 |---|---|
-| `eval23 DIR` | two- and three-field agreement with the assembly truth (`T4OUT`) |
+| `eval23 DIR [--legacy]` | per gene and one to four fields: best candidate right, released calls, precision and call rate against every expected allele copy (see below); `--legacy` prints the two-/three-field table of 1.2.0 and earlier |
 | `eval6 DIR [v]` | exact evaluation of the 18 genes against both haplotypes |
 | `eval8 DIR [v]` | the same for the eight added genes (DMA to TAP2; truth `T4OUT=truth/truth8.tsv`) |
 | `eval8-exons DIR [GENES] [v]` | exon-level check of calls certain to three or more fields |
@@ -59,7 +59,8 @@ Environment variables:
 | `HLA_OUT` | calls for `eval24` (default `HLA_WORK/lab/out24`) |
 | `HLA_LTAG` | `long`: read `DIR/SAMPLE.TAG.long.*` |
 | `HLA_RESULTS` | `paper`: result folder (default `validation/results`) |
-| `SAMPLES`, `TRUTHSRC`, `T4OUT`, `T8OUT` | sample list, truth sources and truth tables of the truth and evaluation commands |
+| `SAMPLES`, `TRUTHSRC`, `T4OUT`, `T8OUT` | sample list, truth sources and truth tables of the truth and evaluation commands (`eval23`: `SAMPLES` fixes the denominator; default every sample of the truth table) |
+| `GENES` | `eval23`: `18` (default), `8`, `26` or a comma list |
 | `DUMP` | `eval6`, `eval8`: file for one row per call |
 
 ## How the truth is defined
@@ -73,8 +74,43 @@ only if the assembled sequence is identical to the named allele.
 This definition favours shorter database entries when two alleles are equally near, which explains
 single truth entries such as a null allele whose own sequence is identical to the common allele.
 
+## Reading the per-field table (`eval23`)
+
+The denominator is fixed before any result is read. Every sample of `SAMPLES` with a finished truth
+for both haplotypes contributes one expected allele copy per haplotype that carries the gene. A copy
+is evaluable at k fields when the truth names it to k fields without ambiguity; tied truth names
+that differ at k fields (`ref_ambiguous`), truth names with fewer than k fields (`ref_short`) and, at
+four fields, haplotypes that are no database allele (`ref_new`) are counted but not evaluable.
+Calls and haplotypes are paired so that the best candidates agree on the most fields.
+
+Per gene and number of fields k:
+
+- `expected`: evaluable allele copies; a missing result file, a gene without a call and a missing
+  copy all stay in it as no call;
+- `candidate_ok`, `candidate_pct`: the best candidate (`allele`) is right to k fields;
+- `released`, `released_ok`: `safe_call` names k fields or more, and is right;
+- `released_extra`: released calls of a copy the truth does not have (wrong copy number);
+- `released_on_new`: four-field calls released on a haplotype that is no database allele;
+- `released_unjudged`: released calls whose truth is ambiguous or too short (not in the precision);
+- `precision_pct` = released_ok / (released + released_extra + released_on_new), `n/a` without
+  released calls; `call_rate_pct` = released / expected; `right_of_expected_pct` = released_ok /
+  expected.
+
+A second table counts per gene the expected and called copies, missing result files, samples with
+a wrong copy number, genes without a call and haplotypes the assembly does not resolve. The last
+block lists every missing file, copy number difference and wrong released call.
+
 ## Reading the four-field table
 
 `hla-wgs-validate eval6` prints per gene: haplotypes, exact calls, known alleles and how many of them were called
 exactly, new alleles, alleles reported as certain at four fields (`safe4`) and how many of those are
 exact, and how many reported new sites are true.
+
+The `site_*` columns compare positions only (within two bases). The `site_x_*` columns are strict:
+a reported SNV is true when the haplotype carries the same base change at the same position; a
+reported insertion or deletion is true when it gives the same sequence as a difference of the
+haplotype (another placement in a repeat counts); a repeat length change (`rep+N`) is matched by a
+difference of the same net length in that repeat (`site_x_rep_length`, kept apart). A site marked
+as possibly on the other allele (`:either`) that only the other haplotype carries is counted apart
+(`site_x_other_phase`). `site_x_snv`/`site_x_indel` count the differences of the haplotypes from
+the called alleles and how many of them were reported exactly.

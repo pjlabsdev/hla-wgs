@@ -9,6 +9,7 @@ const W3: f64 = 1.0;
 const W4: f64 = 0.3;
 pub const PRIOR_NULL: f64 = 3.0;
 pub const PRIOR_IMPUTED: f64 = 1.0;
+static NOFREQ: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| std::env::var("HLA_NOFREQ").map_or(false, |v| v != "0"));
 
 pub struct Priors<'a> {
     db: &'a Db,
@@ -28,6 +29,10 @@ impl<'a> Priors<'a> {
     }
 
     pub fn freq_prior(&self, gene: &str, name: &str) -> f64 {
+        // HLA_NOFREQ=1: no population prior at all (every two-field group equal), to measure its effect
+        if *NOFREQ {
+            return 0.0;
+        }
         let fr = self.freq.get(gene).filter(|f| !f.is_empty());
         let two = two_nogene(name);
         match fr {

@@ -37,8 +37,9 @@ release.
 |---|---|---|
 | Two-field accuracy, A, B, C, DRB1, DQA1, DQB1, DPA1, DPB1, 184 held-out samples | 2,937 / 2,941 (99.86 %) | 2,921 / 2,941 (99.32 %) |
 | DRB3/4/5 copy number (0, 1 or 2), same samples | 551 / 552 | 348 / 552 |
-| Wall time, 4 cores, extracted MHC reads of a 30x genome | about 40 s | about 150 s |
-| Peak memory | 1.4 GB | 3.2 GB |
+| Wall time, 4 threads, extracted MHC reads of a 30x genome, median of 8 samples | 17 s | 194 s |
+| Peak memory, same runs | 1.2 GB | 3.5 GB |
+| Wall time from a whole-genome BAM / CRAM / FASTQ (Apple M5, 4 threads) | 20 s / 16 s / 10 to 13 min | not measured |
 | Per-allele certainty | resolution 1 to 4 with margin and nearest alternative | quality score |
 | New alleles | positions and changes listed, call cut accordingly | variants of the allele in a VCF |
 | Genes | 18 incl. DRA, E, F, G, H, K, V | all genes of the chosen reference |
@@ -48,6 +49,10 @@ release.
 The held-out rounds were run with the prototype of the same algorithm (Python driver with the Rust
 kernel, versions 8 to 16); the 1.0.0 program reproduces them. T1K does more than this table shows
 (KIR, RNA-seq, single cell); the comparison covers only HLA from WGS.
+
+Run times, call rates and precision per gene and field, with the commands and the origin of every
+number, are in [`validation/results/short_read_2026_11`](validation/results/short_read_2026_11/README.md).
+The earlier figures of about 40 s and 150 s came from the prototype before 1.0.0 and are explained there.
 
 ## Validation in short
 

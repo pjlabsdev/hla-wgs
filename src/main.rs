@@ -380,7 +380,12 @@ fn main() {
                 None => [al[r.cand[r.pair.0]].name.clone(), al[r.cand[r.pair.1]].name.clone()],
             };
             if tdbg { log(format!("{g} novel start")); }
-            let nv = if std::env::var("HLA_NONOVEL").is_ok() { None } else { Some(novel::sites(&ctx, g, &qn, [fin[0].as_str(), fin[1].as_str()])) };
+            let nv = if std::env::var("HLA_NONOVEL").is_ok() { None } else { {
+                // the fourth-field rivals of stage B: a call that differs from its rival only in a
+                // repeat length needs reads that span the repeat (novel::sites_with)
+                let rv: [Vec<String>; 2] = [vec![r.bmargin[0].1[2].clone()], vec![r.bmargin[1].1[2].clone()]];
+                Some(novel::sites_with(&ctx, g, &qn, [fin[0].as_str(), fin[1].as_str()], [&rv[0], &rv[1]]))
+            } };
             if let Some(n) = &nv {
                 for (k, v) in n.iter().enumerate() {
                     if !v.is_empty() {

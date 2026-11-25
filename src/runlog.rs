@@ -184,6 +184,8 @@ pub const KNOBS: &[(&str, &str)] = &[
     ("HLA_F401", "on (fourth field 01 with a lead of 1)"),
     ("HLA_FIELD1", "on (group withheld on near ties)"),
     ("HLA_DRBREL", "on (DRB1 exon refinement sees DRB3/4/5 reads)"),
+    ("HLA_REP4", "on (a fourth field resting on a repeat length needs spanning reads)"),
+    ("HLA_NOFREQ", "off (population frequency prior used)"),
     ("HLA_PADF1", "on (flanks from the first field for alleles stored without their ends)"),
     ("HLA_PAD_MIN", "8"),
     ("HLA_PAD_CACHE", "on"),

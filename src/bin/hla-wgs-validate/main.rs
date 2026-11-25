@@ -14,6 +14,7 @@ mod errors;
 #[allow(dead_code)]
 mod runlog;
 
+mod bench;
 mod common;
 mod eval;
 mod long;
@@ -28,7 +29,10 @@ mod typ;
 const USAGE: &str = "hla-wgs-validate COMMAND ...
 
 evaluation (run in the work folder with db/, truth/ and the result folders):
-  eval23 DIR                      2- and 3-field agreement with the assembly truth (T4OUT)
+  eval23 DIR [--legacy]           per gene and 1 to 4 fields: right best candidates, released calls (call rate,
+                                  precision) against every expected allele copy of the truth (T4OUT); samples
+                                  from SAMPLES, default all of the truth; genes GENES=18|8|26|A,B,...;
+                                  --legacy: the 2-/3-field table of 1.2.0 and earlier
   eval6 DIR [v]                   exact evaluation of the 18 genes against both haplotypes
   eval8 DIR [v]                   the same for the eight added genes (DMA ... TAP2)
   eval8-exons DIR [GENES] [v]     exon-level check of calls certain to three or more fields
@@ -55,7 +59,17 @@ fn main() {
     let a: Vec<String> = std::env::args().skip(1).collect();
     let r: Vec<&str> = a.iter().map(|s| s.as_str()).collect();
     match r.first().copied() {
-        Some("eval23") if r.len() >= 2 => eval::eval23(r[1]),
+        Some("eval23") if r.len() >= 3 && r[2] == "--legacy" => eval::eval23(r[1]),
+        Some("eval23") if r.len() >= 2 => {
+            let gl = std::env::var("GENES").unwrap_or_default();
+            let genes: Vec<&str> = match gl.as_str() {
+                "" | "18" => eval::G18.to_vec(),
+                "8" => eval::G8.to_vec(),
+                "26" => eval::G18.iter().chain(eval::G8.iter()).copied().collect(),
+                x => x.split(',').collect(),
+            };
+            bench::run(r[1], &genes)
+        }
         Some("eval6") if r.len() >= 2 => eval::eval6(r[1], r.len() > 2, false),
         Some("eval8") if r.len() >= 2 => eval::eval6(r[1], r.len() > 2, true),
         Some("eval8-exons") if r.len() >= 2 => eval::eval8_exons(r[1], r.get(2).copied(), r.len() > 3),
