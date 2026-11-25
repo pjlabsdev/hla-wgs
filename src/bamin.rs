@@ -50,6 +50,10 @@ struct Pairer {
     tx: SyncSender<(Vec<Fq>, Vec<Fq>)>,
     pub records: u64,
     pub pairs: u64,
+    /// mates waiting for their partner: current bytes, and the largest count and bytes seen
+    open_bytes: usize,
+    pub peak_open: usize,
+    pub peak_bytes: usize,
 }
 
 impl Pairer {
@@ -67,10 +71,14 @@ impl Pairer {
         } else {
             seq
         };
+        let sz = name.len() + seq.len() + qual.len();
         let e = self.open.entry(name.to_vec()).or_insert([None, None]);
         e[mate] = Some((seq, qual));
+        self.open_bytes += sz;
         if e[0].is_some() && e[1].is_some() {
             let [a, b] = self.open.remove(name).unwrap();
+            let done = |x: &Option<(Vec<u8>, Vec<u8>)>| x.as_ref().map_or(0, |(s, q)| name.len() + s.len() + q.len());
+            self.open_bytes -= done(&a) + done(&b);
             let nm = String::from_utf8_lossy(name).into_owned();
             let ((s1, q1), (s2, q2)) = (a.unwrap(), b.unwrap());
             self.b1.push(Fq { name: nm.clone(), seq: s1, qual: q1 });
@@ -79,7 +87,10 @@ impl Pairer {
             if self.b1.len() >= 50_000 {
                 self.flush();
             }
+        } else if self.open.len() > self.peak_open {
+            self.peak_open = self.open.len();
         }
+        self.peak_bytes = self.peak_bytes.max(self.open_bytes);
     }
     fn flush(&mut self) {
         if !self.b1.is_empty() {
@@ -95,7 +106,7 @@ impl Pairer {
 /// file is reopened after a pause and reading resumes after the last record already consumed.
 /// Records arrive in the same order as in an uninterrupted pass, so results are unchanged.
 pub fn stream(path: &str, reference: Option<&str>, threads: usize, tx: SyncSender<(Vec<Fq>, Vec<Fq>)>) -> (u64, u64, usize) {
-    let mut p = Pairer { open: AHashMap::new(), b1: vec![], b2: vec![], tx, records: 0, pairs: 0 };
+    let mut p = Pairer { open: AHashMap::new(), b1: vec![], b2: vec![], tx, records: 0, pairs: 0, open_bytes: 0, peak_open: 0, peak_bytes: 0 };
     let tries = crate::util::io_retries();
     let mut attempt = 0;
     let mut last_eof: Option<u64> = None;
@@ -126,6 +137,7 @@ pub fn stream(path: &str, reference: Option<&str>, threads: usize, tx: SyncSende
         }
     }
     p.flush();
+    eprintln!("[input] mates waiting for their partner: at most {} reads, {:.1} MB of names, bases and qualities", p.peak_open, p.peak_bytes as f64 / 1e6);
     (p.records, p.pairs, p.open.len())
 }
 
