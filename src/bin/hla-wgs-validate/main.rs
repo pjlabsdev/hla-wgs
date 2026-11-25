@@ -13,6 +13,9 @@ mod errors;
 #[path = "../../runlog.rs"]
 #[allow(dead_code)]
 mod runlog;
+#[path = "../../vfs.rs"]
+#[allow(dead_code, unused_macros)]
+mod vfs;
 
 mod bench;
 mod common;

@@ -152,7 +152,7 @@ fn crc(bytes: &[u8]) -> String {
 
 /// the header of the run log next to the result, when there is one: (header, last time stamp)
 fn log_info(prefix: &str) -> (Option<Value>, Option<f64>, Option<Value>) {
-    let Ok(t) = std::fs::read_to_string(format!("{prefix}.log.jsonl")) else { return (None, None, None) };
+    let Ok(t) = crate::vfs::read_to_string(&format!("{prefix}.log.jsonl")) else { return (None, None, None) };
     let ev: Vec<Value> = t.lines().filter_map(|l| serde_json::from_str(l).ok()).collect();
     let head = ev.iter().find(|e| e["kind"] == "header").cloned();
     let end = ev.iter().filter_map(|e| e["t"].as_f64()).fold(None, |a: Option<f64>, x| Some(a.map_or(x, |a| a.max(x))));
@@ -162,7 +162,7 @@ fn log_info(prefix: &str) -> (Option<Value>, Option<f64>, Option<Value>) {
 
 /// the report part from the result `PREFIX.json` (read from `prefix`)
 pub fn build(prefix: &str) -> Result<Value, String> {
-    let raw = std::fs::read(format!("{prefix}.json")).map_err(|e| format!("{prefix}.json: {e}"))?;
+    let raw = crate::vfs::read_to_string(&format!("{prefix}.json")).map(String::into_bytes).map_err(|e| format!("{prefix}.json: {e}"))?;
     let rep: Value = serde_json::from_slice(&raw).map_err(|e| format!("{prefix}.json: {e}"))?;
     if rep["schema"] != "genome.hla.v1" {
         return Err(format!("{prefix}.json is not a hla-wgs result"));
@@ -355,7 +355,7 @@ pub fn build(prefix: &str) -> Result<Value, String> {
 pub fn write(prefix: &str) -> Result<String, String> {
     let part = build(prefix)?;
     let out = format!("{prefix}.report.json");
-    std::fs::write(&out, serde_json::to_string_pretty(&part).unwrap() + "\n").map_err(|e| format!("{out}: {e}"))?;
+    crate::vfs::write(&out, (serde_json::to_string_pretty(&part).unwrap() + "\n").as_bytes()).map_err(|e| format!("{out}: {e}"))?;
     Ok(out)
 }
 

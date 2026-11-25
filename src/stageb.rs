@@ -162,6 +162,10 @@ impl<'a> Ctx<'a> {
     /// add this run's alignments to the cache file; a file another run wrote meanwhile is merged,
     /// and a folder without write access is left alone
     pub fn save_cache(&self, db: &str) {
+        // the browser build keeps no files between runs
+        if cfg!(target_arch = "wasm32") {
+            return;
+        }
         if self.fresh.load(std::sync::atomic::Ordering::Relaxed) == 0 {
             return;
         }
@@ -234,7 +238,7 @@ impl<'a> Ctx<'a> {
                 let fk = (g.to_string(), al[i].name.clone(), fnv(&d));
                 let cached = self.fit.lock().unwrap().get(&fk).copied();
                 let fit = cached.unwrap_or_else(|| {
-                    let tt = std::time::Instant::now();
+                    let tt = crate::vfs::Instant::now();
                     let a = aligner(&d, Preset::Asm10);
                     let hs = map(&a, s_);
                     TFIT.fetch_add(tt.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
@@ -279,7 +283,7 @@ impl<'a> Ctx<'a> {
                     match cached {
                         Some(v) => v,
                         None => {
-                            let tt = std::time::Instant::now();
+                            let tt = crate::vfs::Instant::now();
                             let a = a.get_or_insert_with(|| aligner(s_, Preset::Asm10));
                             let hs = map(a, &al[j].genomic);
                             TNM.fetch_add(tt.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
@@ -402,7 +406,7 @@ impl<'a> Ctx<'a> {
         let al = self.al(g);
         let seqs = self.cand_seqs(g, cand);
         let sr: Vec<&[u8]> = seqs.iter().map(|s| s.as_slice()).collect();
-        let t0 = std::time::Instant::now();
+        let t0 = crate::vfs::Instant::now();
         let (e, used) = kern::edit_matrix(self.reads, qnames, &sr)?;
         let t1 = t0.elapsed().as_secs_f64();
         let keep = self.keep_rows(g, qnames, &e, &used);
@@ -439,7 +443,7 @@ impl<'a> Ctx<'a> {
                 p[c * nr + r] = (-LAM * row[c].min(12.0)).exp();
             }
         }
-        let t2 = std::time::Instant::now();
+        let t2 = crate::vfs::Instant::now();
         let bg = (-LAM * BG_EDITS).exp();
         let prior: Vec<f64> = cand.iter().map(|&i| self.allele_prior(g, &al[i])).collect();
         let pairs: Vec<(usize, usize)> = (0..nc).flat_map(|i| (i..nc).map(move |j| (i, j))).collect();

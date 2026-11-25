@@ -8,13 +8,13 @@
 use serde_json::{Value, json};
 use std::io::Write;
 use std::sync::Mutex;
-use std::time::Instant;
+use crate::vfs::Instant;
 
 pub const SCHEMA: &str = "genome.log.v1";
 
 struct Sink {
-    json: std::fs::File,
-    txt: std::fs::File,
+    json: Box<dyn Write + Send>,
+    txt: Box<dyn Write + Send>,
     seq: u64,
 }
 
@@ -30,8 +30,8 @@ pub fn secs() -> f64 {
 /// open PREFIX.log.jsonl and PREFIX.log.txt (replacing older ones)
 pub fn start(prefix: &str) -> std::io::Result<()> {
     secs();
-    let json = std::fs::File::create(format!("{prefix}.log.jsonl"))?;
-    let txt = std::fs::File::create(format!("{prefix}.log.txt"))?;
+    let json = crate::vfs::create_send(&format!("{prefix}.log.jsonl"))?;
+    let txt = crate::vfs::create_send(&format!("{prefix}.log.txt"))?;
     *SINK.lock().unwrap() = Some(Sink { json, txt, seq: 0 });
     Ok(())
 }
@@ -140,11 +140,11 @@ impl Step {
 /// whole-genome BAM is not read twice
 pub fn checksum(p: &str) -> Option<(u64, String, &'static str)> {
     use std::io::{Read, Seek, SeekFrom};
-    let mut f = std::fs::File::open(p).ok()?;
-    let size = f.metadata().ok()?.len();
+    let size = crate::vfs::file_len(p).ok()??;
+    let mut f = crate::vfs::open(p).ok()?;
     let mut c = flate2::Crc::new();
     let mut buf = vec![0u8; 1 << 20];
-    let mut feed = |f: &mut std::fs::File, mut n: u64| -> Option<()> {
+    let mut feed = |f: &mut Box<dyn crate::vfs::ReadSeek + Send>, mut n: u64| -> Option<()> {
         while n > 0 {
             let k = f.read(&mut buf[..(n.min(1 << 20)) as usize]).ok()?;
             if k == 0 {
@@ -238,7 +238,12 @@ pub const KNOBS: &[(&str, &str)] = &[
 
 /// header of a run: tool, version, commit, platform, command, parameters, inputs, reference
 pub fn header(mode: &str, args: &[String], params: Value, inputs: Vec<Value>, reference: Value) {
-    let set: serde_json::Map<String, Value> = std::env::vars().filter(|(k, _)| k.starts_with("HLA_") || k == "GENES").map(|(k, v)| (k, json!(v))).collect();
+    // the browser build has no environment (std::env::vars panics there)
+    #[cfg(target_arch = "wasm32")]
+    let vars: Vec<(String, String)> = vec![];
+    #[cfg(not(target_arch = "wasm32"))]
+    let vars: Vec<(String, String)> = std::env::vars().collect();
+    let set: serde_json::Map<String, Value> = vars.into_iter().filter(|(k, _)| k.starts_with("HLA_") || k == "GENES").map(|(k, v)| (k, json!(v))).collect();
     let defaults: serde_json::Map<String, Value> = KNOBS.iter().map(|(k, d)| (k.to_string(), json!(d))).collect();
     let v = json!({
         "tool": "hla-wgs", "version": env!("CARGO_PKG_VERSION"), "commit": option_env!("HLA_WGS_COMMIT").unwrap_or("unknown"),
@@ -296,7 +301,7 @@ pub fn tar(files: &[(String, Vec<u8>)]) -> Vec<u8> {
         put(&mut h, 108, 8, "0000000\0");
         put(&mut h, 116, 8, "0000000\0");
         put(&mut h, 124, 12, &format!("{:011o}\0", data.len()));
-        put(&mut h, 136, 12, &format!("{:011o}\0", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)));
+        put(&mut h, 136, 12, &format!("{:011o}\0", crate::vfs::unix_time()));
         h[148..156].copy_from_slice(b"        ");
         h[156] = b'0';
         put(&mut h, 257, 6, "ustar\0");

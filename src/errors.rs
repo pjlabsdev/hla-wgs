@@ -44,6 +44,10 @@ pub fn fail(code: &str, msg: &str) -> ! {
         eprintln!("  what to do: {}", c.fix);
     }
     crate::runlog::error(code, msg);
+    // the browser build has no process to end: the page shows the message of the panic
+    #[cfg(target_arch = "wasm32")]
+    panic!("error {code}: {msg}");
+    #[cfg(not(target_arch = "wasm32"))]
     std::process::exit(1)
 }
 

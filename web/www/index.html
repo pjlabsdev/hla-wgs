@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hla-wgs im Browser · HLA typing in your browser</title>
+<meta name="description" content="HLA-Typisierung aus BAM, CRAM oder FASTQ direkt im Browser. Die Genomdaten verlassen den Computer nicht.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-lang="de">
+<header class="bar"><div class="bar-in">
+  <div class="brand">pjlabs <i>·</i> hla-wgs <span class="ver" id="ver"></span></div>
+  <nav class="seg lang" aria-label="Sprache / language">
+    <button type="button" data-set="de">DE</button><button type="button" data-set="en">EN</button>
+  </nav>
+</div></header>
+
+<main>
+  <div class="eyebrow"><span data-de>Forschungswerkzeug</span><span data-en>Research tool</span></div>
+  <h1><span data-de>HLA-Typisierung im Browser</span><span data-en>HLA typing in your browser</span></h1>
+  <p class="lead">
+    <span data-de>hla-wgs läuft hier vollständig auf Ihrem Computer. Ihre BAM-, CRAM- oder FASTQ-Dateien werden nicht hochgeladen; die Seite liest nur die HLA-Region auf Chromosom 6 über den Index. Ergebnis und Dateien sind dieselben wie beim Programm für macOS, Linux und Windows.</span>
+    <span data-en>hla-wgs runs entirely on your computer here. Your BAM, CRAM or FASTQ files are not uploaded; the page reads only the HLA region on chromosome 6 through the index. Result and files are the same as from the program for macOS, Linux and Windows.</span>
+  </p>
+
+  <section class="step" id="step-ref">
+    <h2><span class="n">1</span><span data-de>Referenz IPD-IMGT/HLA</span><span data-en>Reference IPD-IMGT/HLA</span></h2>
+    <div class="panel">
+      <p id="ref-status" class="status"></p>
+      <div class="row">
+        <button type="button" id="ref-build" class="btn ghost"><span data-de>Jetzt einrichten</span><span data-en>Set up now</span></button>
+        <label class="btn ghost" for="ref-dir"><span data-de>Referenzordner der Desktop-Version wählen</span><span data-en>Choose the reference folder of the desktop version</span></label>
+        <input type="file" id="ref-dir" webkitdirectory hidden>
+        <button type="button" id="ref-clear" class="btn link" hidden><span data-de>Gespeicherte Referenz löschen</span><span data-en>Delete the stored reference</span></button>
+      </div>
+      <p class="note">
+        <span data-de>Beim ersten Mal lädt die Seite die Datenbank hla.dat (Release 3.66, 45 MB) direkt von IPD-IMGT/HLA auf GitHub und baut daraus die Referenz, einmalig etwa 5 bis 10 Minuten. Danach bleibt sie im Browser gespeichert. Wer hla-wgs schon installiert hat, kann stattdessen den Ordner <code>ref/hladb</code> neben der Startdatei wählen.</span>
+        <span data-en>The first time, the page downloads the database hla.dat (release 3.66, 45 MB) directly from IPD-IMGT/HLA on GitHub and builds the reference from it, once, in about 5 to 10 minutes. After that it stays stored in the browser. If hla-wgs is already installed, choose the folder <code>ref/hladb</code> next to the start file instead.</span>
+      </p>
+    </div>
+  </section>
+
+  <section class="step" id="step-in">
+    <h2><span class="n">2</span><span data-de>Dateien wählen</span><span data-en>Choose files</span></h2>
+    <label class="drop" id="drop" for="files">
+      <b><span data-de>Dateien hierher ziehen oder klicken</span><span data-en>Drop files here or click</span></b>
+      <span data-de>BAM mit .bai, oder CRAM mit .crai und der Referenz-FASTA (.fa mit .fa.fai), oder FASTQ R1 und R2</span>
+      <span data-en>BAM with .bai, or CRAM with .crai and the reference FASTA (.fa with .fa.fai), or FASTQ R1 and R2</span>
+    </label>
+    <input type="file" id="files" multiple hidden>
+    <ul id="file-list" class="files"></ul>
+    <p id="file-msg" class="note warn"></p>
+  </section>
+
+  <section class="step" id="step-run">
+    <h2><span class="n">3</span><span data-de>Typisieren</span><span data-en>Type</span></h2>
+    <div class="row">
+      <button type="button" id="start" class="btn" disabled><span data-de>HLA-Typisierung starten</span><span data-en>Start HLA typing</span></button>
+      <span id="clock" class="clock"></span>
+    </div>
+    <div id="progress" class="panel progress" hidden>
+      <p id="phase" class="status"></p>
+      <div class="meter"><i id="meter"></i></div>
+      <details><summary><span data-de>Protokoll</span><span data-en>Log</span></summary><pre id="log"></pre></details>
+    </div>
+  </section>
+
+  <section class="step" id="step-out" hidden>
+    <h2><span class="n">4</span><span data-de>Ergebnis</span><span data-en>Result</span></h2>
+    <div class="row" id="downloads"></div>
+    <iframe id="result" title="Ergebnis / result" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"></iframe>
+  </section>
+
+  <footer>
+    <p>
+      <span data-de>hla-wgs ist ein Forschungswerkzeug und kein Medizinprodukt. Es ersetzt keine Typisierung in einem akkreditierten Labor.</span>
+      <span data-en>hla-wgs is a research tool, not a medical device. It does not replace typing in an accredited laboratory.</span>
+    </p>
+    <p>
+      <a href="https://pjlabs.dev/forschung/hla-wgs">pjlabs.dev/forschung/hla-wgs</a> ·
+      <a href="https://doi.org/10.5281/zenodo.24367469">DOI 10.5281/zenodo.24367469</a> ·
+      <a href="https://github.com/pjlabsdev/hla-wgs"><span data-de>Quelltext</span><span data-en>Source code</span></a>
+    </p>
+    <p class="note">
+      <span data-de>Referenzdaten: IPD-IMGT/HLA (Robinson et al.), Lizenz CC BY-ND 4.0, unverändert von github.com/ANHIG/IMGTHLA geladen und erst in Ihrem Browser verarbeitet.</span>
+      <span data-en>Reference data: IPD-IMGT/HLA (Robinson et al.), licence CC BY-ND 4.0, loaded unchanged from github.com/ANHIG/IMGTHLA and processed only in your browser.</span>
+    </p>
+  </footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

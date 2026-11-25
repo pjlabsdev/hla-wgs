@@ -23,10 +23,13 @@ mod errors;
 mod report;
 mod runlog;
 mod mcp;
+mod vfs;
+#[cfg(target_arch = "wasm32")]
+mod web;
 
 use ahash::{AHashMap, AHashSet};
 use names::{three, two};
-use std::time::Instant;
+use vfs::Instant;
 use rayon::prelude::*;
 
 pub const FOCUS: [&str; 26] = ["A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DRA", "E", "F", "G", "H", "K", "V", "DMA", "DMB", "DOA", "DOB", "MICA", "MICB", "TAP1", "TAP2"];
@@ -51,10 +54,10 @@ pub fn related(g: &str) -> &'static [&'static str] {
 /// or a read-only folder is reported at once and not after minutes of reading
 fn preflight(db: &str, panel: &str, input: &panel::Input, out: &str) {
     // codes: not found, empty, folder
-    let need_c = |p: &str, what: &str, c: [&str; 3]| match std::fs::metadata(p) {
+    let need_c = |p: &str, what: &str, c: [&str; 3]| match vfs::file_len(p) {
         Err(e) => errors::fail(c[0], &format!("{what} not found: {p} ({e})")),
-        Ok(m) if m.is_file() && m.len() == 0 => errors::fail(c[1], &format!("{what} is empty: {p}")),
-        Ok(m) if m.is_dir() => errors::fail(c[2], &format!("{what} is a folder, not a file: {p}")),
+        Ok(Some(0)) => errors::fail(c[1], &format!("{what} is empty: {p}")),
+        Ok(None) => errors::fail(c[2], &format!("{what} is a folder, not a file: {p}")),
         Ok(_) => {}
     };
     let need = |p: &str, what: &str| need_c(p, what, ["HW-E010", "HW-E011", "HW-E012"]);
@@ -73,7 +76,7 @@ fn preflight(db: &str, panel: &str, input: &panel::Input, out: &str) {
             } else {
                 vec![format!("{p}.bai"), format!("{p}.csi"), format!("{}.bai", &p[..p.len() - 4])]
             };
-            if !cands.iter().any(|c| std::path::Path::new(c).is_file()) {
+            if !cands.iter().any(|c| vfs::is_file(c)) {
                 errors::fail("HW-E013", &format!("index not found for {p}: expected {} (create it with: samtools index)", cands.join(" or ")));
             }
             if let Some(r) = reference {
@@ -82,6 +85,10 @@ fn preflight(db: &str, panel: &str, input: &panel::Input, out: &str) {
             }
         }
     }
+    #[cfg(target_arch = "wasm32")]
+    let _ = out;
+    #[cfg(not(target_arch = "wasm32"))]
+    {
     let probe = format!("{out}.tsv");
     let existed = std::path::Path::new(&probe).exists();
     match std::fs::OpenOptions::new().append(true).create(true).open(&probe) {
@@ -92,11 +99,17 @@ fn preflight(db: &str, panel: &str, input: &panel::Input, out: &str) {
         }
         Err(e) => errors::fail("HW-E020", &format!("cannot write results to {probe}: {e}")),
     }
+    }
 }
 
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 fn main() {
+    cli(std::env::args().collect());
+}
+
+/// the whole program for an argument list as on the command line (also used by the browser build)
+pub fn cli(mut a: Vec<String>) {
     errors::install_panic_hook();
-    let mut a: Vec<String> = std::env::args().collect();
     // --trace GENE[,GENE]: follow these genes in detail in the run log (also HLA_TRACE)
     let mut trace: Vec<String> = std::env::var("HLA_TRACE").map(|v| v.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect()).unwrap_or_default();
     while let Some(i) = a.iter().position(|x| x == "--trace") {
@@ -118,28 +131,28 @@ fn main() {
         // the result page again from PREFIX.json, e.g. after an update of the page
         Some("html") => {
             let Some(j) = a.get(2) else { errors::fail("HW-E001", "usage: hla-wgs html PREFIX.json") };
-            let rep: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(j).unwrap_or_else(|e| errors::fail("HW-E021", &format!("cannot read {j}: {e}")))).unwrap_or_else(|e| errors::fail("HW-E021", &format!("{j} is not a result file: {e}")));
+            let rep: serde_json::Value = serde_json::from_str(&vfs::read_to_string(j).unwrap_or_else(|e| errors::fail("HW-E021", &format!("cannot read {j}: {e}")))).unwrap_or_else(|e| errors::fail("HW-E021", &format!("{j} is not a result file: {e}")));
             let prefix = j.trim_end_matches(".json");
             let sample = std::path::Path::new(prefix).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-            std::fs::write(format!("{prefix}.html"), html::render(&rep, &sample)).unwrap_or_else(|e| errors::fail("HW-E020", &format!("cannot write {prefix}.html: {e}")));
+            vfs::write(&format!("{prefix}.html"), html::render(&rep, &sample).as_bytes()).unwrap_or_else(|e| errors::fail("HW-E020", &format!("cannot write {prefix}.html: {e}")));
             return;
         }
         Some("--version") | Some("-V") => return println!("hla-wgs {}", env!("CARGO_PKG_VERSION")),
         Some("--db-format") => return println!("{}", builddb::DB_FORMAT),
         _ => {}
     }
-    if a.len() >= 4 && !std::path::Path::new(&a[1]).exists() {
+    if a.len() >= 4 && !vfs::exists(&a[1]) {
         errors::fail("HW-E002", &format!("database not found: {} (build it with: hla-wgs build-db hla.dat freq.json DBDIR)", a[1]));
     }
     // a database directory stands for its two files
     let mut db_format: Option<u32> = None;
-    if a.get(1).map_or(false, |d| std::path::Path::new(d).is_dir()) {
+    if a.get(1).map_or(false, |d| vfs::is_dir(d)) {
         let d = a[1].trim_end_matches('/').to_string();
-        let f: u32 = std::fs::read_to_string(format!("{d}/format")).ok().and_then(|x| x.trim().parse().ok()).unwrap_or(1);
+        let f: u32 = vfs::read_to_string(&format!("{d}/format")).ok().and_then(|x| x.trim().parse().ok()).unwrap_or(1);
         // release of the database: DBDIR/release (written by build-db since 1.1), else the header of
         // the WMDA G group file of the same release ("# version: IPD-IMGT/HLA 3.66.0")
-        let rel = std::fs::read_to_string(format!("{d}/release")).ok().map(|r| r.trim().to_string()).filter(|r| !r.is_empty()).or_else(|| {
-            std::fs::read_to_string(format!("{d}/hla_nom_g.txt")).ok().and_then(|t| {
+        let rel = vfs::read_to_string(&format!("{d}/release")).ok().map(|r| r.trim().to_string()).filter(|r| !r.is_empty()).or_else(|| {
+            vfs::read_to_string(&format!("{d}/hla_nom_g.txt")).ok().and_then(|t| {
                 t.lines().take(10).find_map(|l| l.strip_prefix("# version:").map(|v| v.trim().trim_start_matches("IPD-IMGT/HLA").trim().to_string()))
             })
         });
@@ -181,6 +194,8 @@ fn main() {
     let base = |x: &String| std::path::Path::new(x).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let _ = output::INPUTS.set(if aligned { vec![base(&a[3])] } else { vec![base(&a[3]), base(&a[4])] });
     let threads: usize = a.get(ti).and_then(|x| x.parse().ok()).unwrap_or(4);
+    // the browser build has no threads: rayon then runs everything on the calling thread
+    #[cfg(not(target_arch = "wasm32"))]
     rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().ok();
     // run log next to the results (PREFIX.log.jsonl, PREFIX.log.txt), opened before the checks
     if !runlog::active() {
@@ -206,7 +221,7 @@ fn main() {
     }
     let t0 = Instant::now();
     let log = |s: String| {
-        eprintln!("[{:6.1}s] {}", t0.elapsed().as_secs_f64(), s);
+        vfs::log(&format!("[{:6.1}s] {}", t0.elapsed().as_secs_f64(), s));
         runlog::note(s.split_whitespace().next().unwrap_or(""), &s);
     };
     let st = runlog::begin("read_and_map");

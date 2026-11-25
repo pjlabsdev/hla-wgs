@@ -66,7 +66,7 @@ fn load_genome_decoys(dbpath: &str) -> AHashMap<String, Vec<Vec<u8>>> {
     let p = std::env::var("HLA_DECOYS").unwrap_or_else(|_| {
         std::path::Path::new(dbpath).with_file_name("repeat_decoys.fa").to_string_lossy().into_owned()
     });
-    let Ok(txt) = std::fs::read_to_string(&p) else { return out };
+    let Ok(txt) = crate::vfs::read_to_string(&p) else { return out };
     let mut cur: Option<String> = None;
     for line in txt.lines() {
         if let Some(h) = line.strip_prefix('>') {
@@ -82,7 +82,7 @@ fn load_genome_decoys(dbpath: &str) -> AHashMap<String, Vec<Vec<u8>>> {
 
 impl Db {
     pub fn load(path: &str) -> Db {
-        let f = std::fs::File::open(path).unwrap_or_else(|e| crate::errors::fail("HW-E003", &format!("{path}: {e}")));
+        let f = crate::vfs::open(path).unwrap_or_else(|e| crate::errors::fail("HW-E003", &format!("{path}: {e}")));
         let mut s = String::new();
         if path.ends_with(".gz") {
             flate2::read::GzDecoder::new(f).read_to_string(&mut s).unwrap_or_else(|e| crate::errors::fail("HW-E003", &format!("{path}: {e}")));
