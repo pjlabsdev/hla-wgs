@@ -1,0 +1,322 @@
+gene	fields	expected	candidate_ok	candidate_pct	released	released_ok	released_extra	released_on_new	released_unjudged	precision_pct	call_rate_pct	right_of_expected_pct	no_candidate	ref_ambiguous	ref_short	ref_new
+A	1	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+B	1	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+C	1	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+DRB1	1	60	59	98.3	60	59	0	0	0	98.3	100.0	98.3	0	0	0	0
+DQA1	1	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+DQB1	1	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+DPA1	1	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+DPB1	1	60	48	80.0	60	48	0	0	0	80.0	100.0	80.0	0	0	0	0
+ALL	1	480	467	97.3	480	467	0	0	0	97.3	100.0	97.3	0	0	0	0
+A	2	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+B	2	60	59	98.3	60	59	0	0	0	98.3	100.0	98.3	0	0	0	0
+C	2	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+DRB1	2	60	58	96.7	60	58	0	0	0	96.7	100.0	96.7	0	0	0	0
+DQA1	2	57	52	91.2	57	52	0	0	3	91.2	100.0	91.2	0	3	0	0
+DQB1	2	59	57	96.6	59	57	0	0	1	96.6	100.0	96.6	0	1	0	0
+DPA1	2	60	57	95.0	60	57	0	0	0	95.0	100.0	95.0	0	0	0	0
+DPB1	2	60	48	80.0	60	48	0	0	0	80.0	100.0	80.0	0	0	0	0
+ALL	2	476	451	94.7	476	451	0	0	4	94.7	100.0	94.7	0	4	0	0
+A	3	60	59	98.3	59	59	0	0	0	100.0	98.3	98.3	0	0	0	0
+B	3	55	53	96.4	55	53	0	0	5	96.4	100.0	96.4	0	5	0	0
+C	3	57	56	98.2	56	56	0	0	3	100.0	98.2	98.2	0	3	0	0
+DRB1	3	57	55	96.5	56	55	0	0	1	98.2	98.2	96.5	0	0	3	0
+DQA1	3	54	49	90.7	54	49	0	0	6	90.7	100.0	90.7	0	6	0	0
+DQB1	3	59	57	96.6	59	57	0	0	1	96.6	100.0	96.6	0	1	0	0
+DPA1	3	58	55	94.8	58	55	0	0	2	94.8	100.0	94.8	0	2	0	0
+DPB1	3	60	48	80.0	60	48	0	0	0	80.0	100.0	80.0	0	0	0	0
+ALL	3	460	432	93.9	457	432	0	0	18	94.5	99.3	93.9	0	17	3	0
+A	4	60	57	95.0	58	57	0	0	0	98.3	96.7	95.0	0	0	0	0
+B	4	54	32	59.3	50	32	0	4	1	59.3	92.6	59.3	0	0	1	5
+C	4	57	39	68.4	55	39	0	3	0	67.2	96.5	68.4	0	0	0	3
+DRB1	4	28	6	21.4	24	6	0	22	1	13.0	85.7	21.4	0	0	1	31
+DQA1	4	50	21	42.0	48	21	0	6	0	38.9	96.0	42.0	0	3	0	7
+DQB1	4	57	40	70.2	56	40	0	1	1	70.2	98.2	70.2	0	1	1	1
+DPA1	4	57	24	42.1	57	24	0	3	0	40.0	100.0	42.1	0	0	0	3
+DPB1	4	51	17	33.3	49	17	0	9	0	29.3	96.1	33.3	0	0	0	9
+ALL	4	414	236	57.0	397	236	0	48	3	53.0	95.9	57.0	0	4	3	59
+
+gene	copies_expected	copies_called	copies_missing_file	copy_number_wrong	gene_no_call	ref_unresolved
+A	60	60	0	0	0	0
+B	60	60	0	0	0	0
+C	60	60	0	0	0	0
+DRB1	60	60	0	0	0	0
+DQA1	60	60	0	0	0	0
+DQB1	60	60	0	0	0	0
+DPA1	60	60	0	0	0	0
+DPB1	60	60	0	0	0	0
+ALL	480	480	0	0	0	0
+
+# sample	gene	issue
+HG00099	C	wrong at 4 fields: released C*07:04:01:01 (candidate C*07:04:01:01), truth C*07:04:01:03
+HG00099	DRB1	wrong at 4 fields: released DRB1*11:01:01:01 (candidate DRB1*11:01:01:01), truth DRB1*11:01:01:03
+HG00099	DQA1	wrong at 4 fields: released DQA1*05:05:01:01 (candidate DQA1*05:05:01:01), truth DQA1*05:05:01:02
+HG00099	DPB1	wrong at 4 fields: released DPB1*04:01:01:40 (candidate DPB1*04:01:01:40), truth DPB1*04:01:01:01
+HG00128	DRB1	wrong at 4 fields: released DRB1*12:01:01:01 on a haplotype that is no database allele (nearest DRB1*12:01:01:14)
+HG00128	DQA1	wrong at 4 fields: released DQA1*05:05:01:03 (candidate DQA1*05:05:01:03), truth DQA1*05:05:01:15
+HG00128	DQB1	wrong at 4 fields: released DQB1*05:01:01:01 (candidate DQB1*05:01:01:01), truth DQB1*05:01:01:03
+HG00128	DPA1	wrong at 4 fields: released DPA1*02:01:01:01 (candidate DPA1*02:01:01:01), truth DPA1*02:01:01:02
+HG00128	DPB1	wrong at 1 fields: released DPB1*34:01:01:01 (candidate DPB1*34:01:01:01), truth DPB1*04:01:01:01
+HG00128	DPB1	wrong at 2 fields: released DPB1*34:01:01:01 (candidate DPB1*34:01:01:01), truth DPB1*04:01:01:01
+HG00128	DPB1	wrong at 3 fields: released DPB1*34:01:01:01 (candidate DPB1*34:01:01:01), truth DPB1*04:01:01:01
+HG00128	DPB1	wrong at 4 fields: released DPB1*34:01:01:01 (candidate DPB1*34:01:01:01), truth DPB1*04:01:01:01
+HG00128	DPB1	wrong at 1 fields: released DPB1*17:01:01:01 (candidate DPB1*17:01:01:01), truth DPB1*10:01:01:01
+HG00128	DPB1	wrong at 2 fields: released DPB1*17:01:01:01 (candidate DPB1*17:01:01:01), truth DPB1*10:01:01:01
+HG00128	DPB1	wrong at 3 fields: released DPB1*17:01:01:01 (candidate DPB1*17:01:01:01), truth DPB1*10:01:01:01
+HG00128	DPB1	wrong at 4 fields: released DPB1*17:01:01:01 (candidate DPB1*17:01:01:01), truth DPB1*10:01:01:01
+HG00321	B	wrong at 4 fields: released B*40:01:02:01 (candidate B*40:01:02:01), truth B*40:01:02:04
+HG00321	DRB1	wrong at 4 fields: released DRB1*15:01:01:01 (candidate DRB1*15:01:01:01), truth DRB1*15:01:01:03
+HG00321	DQA1	wrong at 4 fields: released DQA1*04:01:01:02 (candidate DQA1*04:01:01:02), truth DQA1*04:01:01:03
+HG00344	B	wrong at 4 fields: released B*07:02:01:29 (candidate B*07:02:01:29), truth B*07:02:01:01
+HG00344	B	wrong at 4 fields: released B*07:02:01:29 (candidate B*07:02:01:29), truth B*07:02:01:01
+HG00344	C	wrong at 4 fields: released C*07:02:01:03 (candidate C*07:02:01:03), truth C*07:02:01:186
+HG00344	DRB1	wrong at 4 fields: released DRB1*15:01:01:01 (candidate DRB1*15:01:01:01), truth DRB1*15:01:01:07
+HG00344	DRB1	wrong at 4 fields: released DRB1*15:01:01:01 (candidate DRB1*15:01:01:01), truth DRB1*15:01:01:03
+HG00344	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 on a haplotype that is no database allele (nearest DPA1*01:03:01:04)
+HG00344	DPA1	wrong at 2 fields: released DPA1*02:02:02:01 (candidate DPA1*02:02:02:01), truth DPA1*02:06:01:01
+HG00344	DPA1	wrong at 3 fields: released DPA1*02:02:02:01 (candidate DPA1*02:02:02:01), truth DPA1*02:06:01:01
+HG00344	DPA1	wrong at 4 fields: released DPA1*02:02:02:01 (candidate DPA1*02:02:02:01), truth DPA1*02:06:01:01
+HG00408	DRB1	wrong at 4 fields: released DRB1*15:01:01:01 (candidate DRB1*15:01:01:01), truth DRB1*15:01:01:03
+HG00408	DQA1	wrong at 2 fields: released DQA1*01:01:01:01 (candidate DQA1*01:01:01:01), truth DQA1*01:04:01:01
+HG00408	DQA1	wrong at 3 fields: released DQA1*01:01:01:01 (candidate DQA1*01:01:01:01), truth DQA1*01:04:01:01
+HG00408	DQA1	wrong at 4 fields: released DQA1*01:01:01:01 (candidate DQA1*01:01:01:01), truth DQA1*01:04:01:01
+HG00408	DQA1	wrong at 4 fields: released DQA1*01:02:01:01 (candidate DQA1*01:02:01:01), truth DQA1*01:02:01:03
+HG00408	DQB1	wrong at 4 fields: released DQB1*05:02:01:04 (candidate DQB1*05:02:01:04), truth DQB1*05:02:01:01
+HG00408	DPB1	wrong at 1 fields: released DPB1*05:01:01:01 (candidate DPB1*05:01:01:01), truth DPB1*135:01:01:03
+HG00408	DPB1	wrong at 2 fields: released DPB1*05:01:01:01 (candidate DPB1*05:01:01:01), truth DPB1*135:01:01:03
+HG00408	DPB1	wrong at 3 fields: released DPB1*05:01:01:01 (candidate DPB1*05:01:01:01), truth DPB1*135:01:01:03
+HG00408	DPB1	wrong at 4 fields: released DPB1*05:01:01:01 (candidate DPB1*05:01:01:01), truth DPB1*135:01:01:03
+HG00408	DPB1	wrong at 4 fields: released DPB1*02:02:01:01 (candidate DPB1*02:02:01:01), truth DPB1*02:02:01:05
+HG00706	B	wrong at 4 fields: released B*13:01:01:01 (candidate B*13:01:01:01), truth B*13:01:01:11
+HG00706	C	wrong at 4 fields: released C*03:04:01:01 (candidate C*03:04:01:01), truth C*03:04:01:02
+HG00706	C	wrong at 4 fields: released C*08:01:01:01 on a haplotype that is no database allele (nearest C*08:01:01:01,C*08:01:01:02,C*08:01:36)
+HG00706	DRB1	wrong at 4 fields: released DRB1*15:01:01:01 on a haplotype that is no database allele (nearest DRB1*15:01:01:03)
+HG00706	DRB1	wrong at 4 fields: released DRB1*15:01:01:01 on a haplotype that is no database allele (nearest DRB1*15:01:01:04)
+HG00706	DQA1	wrong at 4 fields: released DQA1*01:02:01:01 (candidate DQA1*01:02:01:01), truth DQA1*01:02:01:03
+HG00706	DQA1	wrong at 4 fields: released DQA1*01:02:01:01 (candidate DQA1*01:02:01:01), truth DQA1*01:02:01:03
+HG00706	DPA1	wrong at 4 fields: released DPA1*02:01:01:01 (candidate DPA1*02:01:01:01), truth DPA1*02:01:01:02
+HG00706	DPB1	wrong at 1 fields: released DPB1*19:01:01:01 (candidate DPB1*19:01:01:01), truth DPB1*14:01:01:05
+HG00706	DPB1	wrong at 2 fields: released DPB1*19:01:01:01 (candidate DPB1*19:01:01:01), truth DPB1*14:01:01:05
+HG00706	DPB1	wrong at 3 fields: released DPB1*19:01:01:01 (candidate DPB1*19:01:01:01), truth DPB1*14:01:01:05
+HG00706	DPB1	wrong at 4 fields: released DPB1*19:01:01:01 (candidate DPB1*19:01:01:01), truth DPB1*14:01:01:05
+HG00706	DPB1	wrong at 1 fields: released DPB1*17:01:01:01 (candidate DPB1*17:01:01:01), truth DPB1*02:02:01:02
+HG00706	DPB1	wrong at 2 fields: released DPB1*17:01:01:01 (candidate DPB1*17:01:01:01), truth DPB1*02:02:01:02
+HG00706	DPB1	wrong at 3 fields: released DPB1*17:01:01:01 (candidate DPB1*17:01:01:01), truth DPB1*02:02:01:02
+HG00706	DPB1	wrong at 4 fields: released DPB1*17:01:01:01 (candidate DPB1*17:01:01:01), truth DPB1*02:02:01:02
+HG01261	B	wrong at 2 fields: released B*51:01:01:01 (candidate B*51:01:01:01), truth B*51:193:01
+HG01261	B	wrong at 3 fields: released B*51:01:01:01 (candidate B*51:01:01:01), truth B*51:193:01
+HG01261	DRB1	wrong at 4 fields: released DRB1*09:01:02:01 (candidate DRB1*09:01:02:01), truth DRB1*09:01:02:05
+HG01261	DQA1	wrong at 4 fields: released DQA1*04:01:01:02 (candidate DQA1*04:01:01:02), truth DQA1*04:01:01:09
+HG01261	DQB1	wrong at 4 fields: released DQB1*03:03:02:01 (candidate DQB1*03:03:02:01), truth DQB1*03:03:02:02
+HG01261	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:03:01:15
+HG01261	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:03:01:15
+HG01261	DPB1	wrong at 4 fields: released DPB1*04:02:01:01 (candidate DPB1*04:02:01:01), truth DPB1*04:02:01:02
+HG01261	DPB1	wrong at 4 fields: released DPB1*04:02:01:01 (candidate DPB1*04:02:01:01), truth DPB1*04:02:01:02
+HG01496	DRB1	wrong at 4 fields: released DRB1*04:03:01:01 on a haplotype that is no database allele (nearest DRB1*04:03:01:03)
+HG01496	DQA1	wrong at 4 fields: released DQA1*01:01:01:02 (candidate DQA1*01:01:01:02), truth DQA1*01:01:01:01
+HG01496	DQB1	wrong at 4 fields: released DQB1*05:01:01:01 (candidate DQB1*05:01:01:01), truth DQB1*05:01:01:03
+HG01496	DPA1	wrong at 4 fields: released DPA1*01:03:01:16 (candidate DPA1*01:03:01:16), truth DPA1*01:03:01:15
+HG01496	DPB1	wrong at 4 fields: released DPB1*04:02:01:01 (candidate DPB1*04:02:01:01), truth DPB1*04:02:01:02
+HG01530	B	wrong at 3 fields: released B*07:02:10 (candidate B*07:02:10), truth B*07:02:01:01
+HG01530	B	wrong at 4 fields: released B*35:03:01:01 on a haplotype that is no database allele (nearest B*35:03:01:01,B*35:03:01:08,B*35:03:01:36)
+HG01530	DQB1	wrong at 4 fields: released DQB1*05:01:01:01 (candidate DQB1*05:01:01:01), truth DQB1*05:01:01:03
+HG01530	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:03:01:05
+HG01530	DPB1	wrong at 4 fields: released DPB1*04:02:01:01 (candidate DPB1*04:02:01:01), truth DPB1*04:02:01:02
+HG01530	DPB1	wrong at 1 fields: released DPB1*105:01:01:01 (candidate DPB1*105:01:01:01), truth DPB1*02:01:02:07
+HG01530	DPB1	wrong at 2 fields: released DPB1*105:01:01:01 (candidate DPB1*105:01:01:01), truth DPB1*02:01:02:07
+HG01530	DPB1	wrong at 3 fields: released DPB1*105:01:01:01 (candidate DPB1*105:01:01:01), truth DPB1*02:01:02:07
+HG01530	DPB1	wrong at 4 fields: released DPB1*105:01:01:01 (candidate DPB1*105:01:01:01), truth DPB1*02:01:02:07
+HG01786	B	wrong at 4 fields: released B*15:17:01:03 on a haplotype that is no database allele (nearest B*15:17:01:03,B*15:17:02,B*15:17:01:05)
+HG01786	C	wrong at 4 fields: released C*05:01:01:02 (candidate C*05:01:01:02), truth C*05:01:01:45
+HG01786	DRB1	wrong at 4 fields: released DRB1*11:01:01:01 on a haplotype that is no database allele (nearest DRB1*11:01:01:18,DRB1*11:01:01:07,DRB1*11:01:01:13)
+HG01786	DRB1	wrong at 4 fields: released DRB1*13:02:01:01 on a haplotype that is no database allele (nearest DRB1*13:02:01:07)
+HG01786	DQA1	wrong at 4 fields: released DQA1*01:02:01:06 (candidate DQA1*01:02:01:06), truth DQA1*01:02:01:04
+HG01786	DQA1	wrong at 2 fields: released DQA1*05:01:01:02 (candidate DQA1*05:01:01:02), truth DQA1*05:05:01:04,DQA1*05:05:01:51,DQA1*05:05:01:33
+HG01786	DQA1	wrong at 4 fields: released DQA1*05:01:01:02 on a haplotype that is no database allele (nearest DQA1*05:05:01:04,DQA1*05:05:01:51,DQA1*05:05:01:33)
+HG01786	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:03:01:04
+HG01786	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:03:01:04
+HG01786	DPB1	wrong at 4 fields: released DPB1*04:01:01:01 (candidate DPB1*04:01:01:01), truth DPB1*04:01:01:04
+HG01786	DPB1	wrong at 4 fields: released DPB1*04:01:01:01 (candidate DPB1*04:01:01:01), truth DPB1*04:01:01:10
+HG01884	B	wrong at 4 fields: released B*57:03:01:04 (candidate B*57:03:01:04), truth B*57:03:01:05
+HG01884	B	wrong at 4 fields: released B*35:01:01:05 (candidate B*35:01:01:05), truth B*35:01:01:06
+HG01884	C	wrong at 4 fields: released C*07:18:01:01 on a haplotype that is no database allele (nearest C*07:18:04,C*07:18:15,C*07:18:14)
+HG01884	DRB1	wrong at 4 fields: released DRB1*13:01:01:01 on a haplotype that is no database allele (nearest DRB1*13:01:01:10,DRB1*13:01:01:18)
+HG01884	DRB1	wrong at 2 fields: released DRB1*13:01:01:01 (candidate DRB1*13:01:01:01), truth DRB1*13:04
+HG01884	DQA1	wrong at 4 fields: released DQA1*01:02:01:04 (candidate DQA1*01:02:01:04), truth DQA1*01:02:01:14
+HG01884	DQA1	wrong at 4 fields: released DQA1*05:05:01:19 on a haplotype that is no database allele (nearest DQA1*05:05:01:53)
+HG01884	DQB1	wrong at 4 fields: released DQB1*05:01:01:01 (candidate DQB1*05:01:01:01), truth DQB1*05:01:01:03
+HG01884	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:03:01:34
+HG01884	DPA1	wrong at 4 fields: released DPA1*01:03:01:01 (candidate DPA1*01:03:01:01), truth DPA1*01:03:01:35
+HG01884	DPB1	wrong at 4 fields: released DPB1*02:01:02:03 on a haplotype that is no database allele (nearest DPB1*02:01:02:26)
+HG01884	DPB1	wrong at 4 fields: released DPB1*104:01:01:01 on a haplotype that is no database allele (nearest DPB1*104:01:01:02)
+HG01960	B	wrong at 4 fields: released B*35:01:01:05 (candidate B*35:01:01:05), truth B*35:01:01:61
+HG01960	B	wrong at 4 fields: released B*35:01:01:05 (candidate B*35:01:01:05), truth B*35:01:01:06
+HG01960	C	wrong at 4 fields: released C*04:01:01:01 (candidate C*04:01:01:01), truth C*04:01:01:14
+HG01960	C	wrong at 4 fields: released C*04:01:01:01 (candidate C*04:01:01:01), truth C*04:01:01:14
+HG01960	DRB1	wrong at 4 fields: released DRB1*07:01:01:01 on a haplotype that is no database allele (nearest DRB1*07:01:01:04)
+HG01960	DRB1	wrong at 4 fields: released DRB1*13:01:01:01 on a haplotype that is no database allele (nearest DRB1*13:01:01:10,DRB1*13:01:01:18)
+HG01960	DQA1	wrong at 4 fields: released DQA1*01:02:01:06 (candidate DQA1*01:02:01:06), truth DQA1*01:02:01:14
+HG01960	DQA1	wrong at 4 fields: released DQA1*02:01:01:02 (candidate DQA1*02:01:01:02), truth DQA1*02:01:01:01
+HG01960	DQB1	wrong at 4 fields: released DQB1*05:01:01:01 (candidate DQB1*05:01:01:01), truth DQB1*05:01:01:03
+HG01960	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:03:01:34
+HG01960	DPB1	wrong at 1 fields: released DPB1*03:01:01:02 (candidate DPB1*03:01:01:02), truth DPB1*104:01:01:02
+HG01960	DPB1	wrong at 2 fields: released DPB1*03:01:01:02 (candidate DPB1*03:01:01:02), truth DPB1*104:01:01:02
+HG01960	DPB1	wrong at 3 fields: released DPB1*03:01:01:02 (candidate DPB1*03:01:01:02), truth DPB1*104:01:01:02
+HG01960	DPB1	wrong at 4 fields: released DPB1*03:01:01:02 on a haplotype that is no database allele (nearest DPB1*104:01:01:02)
+HG02391	B	wrong at 4 fields: released B*40:01:02:01 (candidate B*40:01:02:01), truth B*40:01:02:04
+HG02391	C	wrong at 4 fields: released C*03:04:01:01 (candidate C*03:04:01:01), truth C*03:04:01:02
+HG02391	DRB1	wrong at 4 fields: released DRB1*16:02:01:01 (candidate DRB1*16:02:01:01), truth DRB1*16:02:01:05
+HG02391	DRB1	wrong at 4 fields: released DRB1*15:01:01:01 (candidate DRB1*15:01:01:01), truth DRB1*15:01:01:03
+HG02391	DQA1	wrong at 4 fields: released DQA1*01:02:01:01 (candidate DQA1*01:02:01:01), truth DQA1*01:02:01:03
+HG02391	DPB1	wrong at 4 fields: released DPB1*02:01:02:01 (candidate DPB1*02:01:02:01), truth DPB1*02:01:02:11
+HG02392	B	wrong at 4 fields: released B*40:01:02:01 (candidate B*40:01:02:01), truth B*40:01:02:04
+HG02392	C	wrong at 4 fields: released C*03:04:01:01 (candidate C*03:04:01:01), truth C*03:04:01:02
+HG02392	C	wrong at 4 fields: released C*04:01:01:01 (candidate C*04:01:01:01), truth C*04:01:01:14
+HG02392	DRB1	wrong at 4 fields: released DRB1*15:02:01:01 on a haplotype that is no database allele (nearest DRB1*15:02:01:05)
+HG02392	DRB1	wrong at 4 fields: released DRB1*15:01:01:01 (candidate DRB1*15:01:01:01), truth DRB1*15:01:01:03
+HG02392	DQB1	wrong at 2 fields: released DQB1*05:03:01:03 (candidate DQB1*05:03:01:03), truth DQB1*05:02:01:01
+HG02392	DQB1	wrong at 3 fields: released DQB1*05:03:01:03 (candidate DQB1*05:03:01:03), truth DQB1*05:02:01:01
+HG02392	DQB1	wrong at 4 fields: released DQB1*05:03:01:03 on a haplotype that is no database allele (nearest DQB1*05:02:01:01)
+HG02392	DPB1	wrong at 4 fields: released DPB1*13:01:01:01 (candidate DPB1*13:01:01:01), truth DPB1*13:01:01:06
+HG02583	C	wrong at 4 fields: released C*17:01:01:02 (candidate C*17:01:01:02), truth C*17:01:01:30
+HG02583	DRB1	wrong at 4 fields: released DRB1*10:01:01:01 (candidate DRB1*10:01:01:01), truth DRB1*10:01:01:03
+HG02583	DQA1	wrong at 4 fields: released DQA1*01:05:01:01 (candidate DQA1*01:05:01:01), truth DQA1*01:05:01:02
+HG02583	DQB1	wrong at 4 fields: released DQB1*05:01:01:02 (candidate DQB1*05:01:01:02), truth DQB1*05:01:01:37
+HG02583	DPA1	wrong at 4 fields: released DPA1*01:03:01:01 (candidate DPA1*01:03:01:01), truth DPA1*01:03:01:35
+HG02583	DPB1	wrong at 4 fields: released DPB1*02:01:02:01 on a haplotype that is no database allele (nearest DPB1*02:01:02:01)
+HG02583	DPB1	wrong at 4 fields: released DPB1*11:01:01:01 on a haplotype that is no database allele (nearest DPB1*11:01:01:01)
+HG02922	A	wrong at 4 fields: released A*30:01:01:02 (candidate A*30:01:01:02), truth A*30:01:01:01
+HG02922	B	wrong at 4 fields: released B*15:10:01:06 (candidate B*15:10:01:06), truth B*15:10:01:01
+HG02922	DQA1	wrong at 4 fields: released DQA1*04:01:02:01 (candidate DQA1*04:01:02:01), truth DQA1*04:01:02:02
+HG02922	DQA1	wrong at 4 fields: released DQA1*01:02:01:01 (candidate DQA1*01:02:01:01), truth DQA1*01:02:01:03
+HG02922	DQB1	wrong at 4 fields: released DQB1*06:02:01:01 (candidate DQB1*06:02:01:01), truth DQB1*06:02:01:06
+HG02922	DPA1	wrong at 4 fields: released DPA1*03:01:01:01 (candidate DPA1*03:01:01:01), truth DPA1*03:01:01:05
+HG02922	DPA1	wrong at 4 fields: released DPA1*02:01:01:01 (candidate DPA1*02:01:01:01), truth DPA1*02:01:01:02
+HG02922	DPB1	wrong at 1 fields: released DPB1*04:02:01:10 (candidate DPB1*04:02:01:10), truth DPB1*105:01:01:21
+HG02922	DPB1	wrong at 2 fields: released DPB1*04:02:01:10 (candidate DPB1*04:02:01:10), truth DPB1*105:01:01:21
+HG02922	DPB1	wrong at 3 fields: released DPB1*04:02:01:10 (candidate DPB1*04:02:01:10), truth DPB1*105:01:01:21
+HG02922	DPB1	wrong at 4 fields: released DPB1*04:02:01:10 (candidate DPB1*04:02:01:10), truth DPB1*105:01:01:21
+HG03050	C	wrong at 4 fields: released C*06:02:01:01 on a haplotype that is no database allele (nearest C*06:02:29,C*06:02:131,C*06:02:82)
+HG03050	DRB1	wrong at 4 fields: released DRB1*09:01:02:01 on a haplotype that is no database allele (nearest DRB1*09:01:02:07)
+HG03050	DRB1	wrong at 1 fields: released DRB1*14:02:01:01 (candidate DRB1*14:02:01:01), truth DRB1*03:02:01:01
+HG03050	DRB1	wrong at 2 fields: released DRB1*14:02:01:01 (candidate DRB1*14:02:01:01), truth DRB1*03:02:01:01
+HG03050	DRB1	wrong at 3 fields: released DRB1*14:02:01:01 (candidate DRB1*14:02:01:01), truth DRB1*03:02:01:01
+HG03050	DRB1	wrong at 4 fields: released DRB1*14:02:01:01 on a haplotype that is no database allele (nearest DRB1*03:02:01:01)
+HG03050	DQA1	wrong at 4 fields: released DQA1*04:01:01:01 (candidate DQA1*04:01:01:01), truth DQA1*04:01:01:05
+HG03050	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:03:01:34
+HG03050	DPA1	wrong at 3 fields: released DPA1*03:01:01:01 (candidate DPA1*03:01:01:01), truth DPA1*03:01:02:02
+HG03050	DPA1	wrong at 4 fields: released DPA1*03:01:01:01 (candidate DPA1*03:01:01:01), truth DPA1*03:01:02:02
+HG03050	DPB1	wrong at 4 fields: released DPB1*105:01:01:01 on a haplotype that is no database allele (nearest DPB1*105:01:01:03)
+HG03050	DPB1	wrong at 4 fields: released DPB1*104:01:01:01 (candidate DPB1*104:01:01:01), truth DPB1*104:01:01:02
+HG03270	B	wrong at 4 fields: released B*07:02:01:03 (candidate B*07:02:01:03), truth B*07:02:01:14
+HG03270	C	wrong at 4 fields: released C*04:01:01:01 (candidate C*04:01:01:01), truth C*04:01:01:75
+HG03270	C	wrong at 4 fields: released C*07:02:01:01 (candidate C*07:02:01:01), truth C*07:02:01:193
+HG03270	DQA1	wrong at 4 fields: released DQA1*01:02:01:01 on a haplotype that is no database allele (nearest DQA1*01:02:01:02)
+HG03270	DQA1	wrong at 4 fields: released DQA1*01:02:01:01 (candidate DQA1*01:02:01:01), truth DQA1*01:02:01:03
+HG03270	DQB1	wrong at 4 fields: released DQB1*06:02:01:01 (candidate DQB1*06:02:01:01), truth DQB1*06:02:01:04
+HG03270	DPA1	wrong at 4 fields: released DPA1*03:01:01:01 (candidate DPA1*03:01:01:01), truth DPA1*03:01:01:05
+HG03270	DPA1	wrong at 4 fields: released DPA1*03:01:01:01 (candidate DPA1*03:01:01:01), truth DPA1*03:01:01:05
+HG03742	B	wrong at 4 fields: released B*37:01:01:03 (candidate B*37:01:01:03), truth B*37:01:01:01
+HG03742	B	wrong at 4 fields: released B*52:01:01:05 (candidate B*52:01:01:05), truth B*52:01:01:01
+HG03742	DRB1	wrong at 4 fields: released DRB1*10:01:01:01 (candidate DRB1*10:01:01:01), truth DRB1*10:01:01:03
+HG03742	DRB1	wrong at 4 fields: released DRB1*04:03:01:01 on a haplotype that is no database allele (nearest DRB1*04:03:01:03,DRB1*04:03:01:04)
+HG03742	DQB1	wrong at 4 fields: released DQB1*05:01:01:02 (candidate DQB1*05:01:01:02), truth DQB1*05:01:01:05
+HG03742	DPA1	wrong at 2 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:04:01:01,DPA1*01:04:04
+HG03742	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 on a haplotype that is no database allele (nearest DPA1*01:04:01:01,DPA1*01:04:04)
+HG03784	B	wrong at 4 fields: released B*35:01:01:12 (candidate B*35:01:01:12), truth B*35:01:01:05
+HG03784	B	wrong at 4 fields: released B*35:03:01:02 (candidate B*35:03:01:02), truth B*35:03:01:01
+HG03784	C	wrong at 4 fields: released C*03:04:01:01 (candidate C*03:04:01:01), truth C*03:04:01:02
+HG03784	C	wrong at 4 fields: released C*04:01:01:01 (candidate C*04:01:01:01), truth C*04:01:01:14
+HG03784	DRB1	wrong at 4 fields: released DRB1*12:01:01:01 (candidate DRB1*12:01:01:01), truth DRB1*12:01:01:03
+HG03784	DRB1	wrong at 4 fields: released DRB1*14:04:01:01 on a haplotype that is no database allele (nearest DRB1*14:04:01:02)
+HG03784	DQA1	wrong at 2 fields: released DQA1*05:01:01:02 (candidate DQA1*05:01:01:02), truth DQA1*05:05:01:03
+HG03784	DQA1	wrong at 3 fields: released DQA1*05:01:01:02 (candidate DQA1*05:01:01:02), truth DQA1*05:05:01:03
+HG03784	DQA1	wrong at 4 fields: released DQA1*05:01:01:02 (candidate DQA1*05:01:01:02), truth DQA1*05:05:01:03
+HG03784	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:03:01:156
+HG03784	DPA1	wrong at 4 fields: released DPA1*01:03:01:01 (candidate DPA1*01:03:01:01), truth DPA1*01:03:01:109
+HG03784	DPB1	wrong at 1 fields: released DPB1*105:01:01:01 (candidate DPB1*105:01:01:01), truth DPB1*02:01:02:52
+HG03784	DPB1	wrong at 2 fields: released DPB1*105:01:01:01 (candidate DPB1*105:01:01:01), truth DPB1*02:01:02:52
+HG03784	DPB1	wrong at 3 fields: released DPB1*105:01:01:01 (candidate DPB1*105:01:01:01), truth DPB1*02:01:02:52
+HG03784	DPB1	wrong at 4 fields: released DPB1*105:01:01:01 (candidate DPB1*105:01:01:01), truth DPB1*02:01:02:52
+HG03784	DPB1	wrong at 4 fields: released DPB1*04:02:01:01 on a haplotype that is no database allele (nearest DPB1*04:02:01:02)
+HG04160	DRB1	wrong at 4 fields: released DRB1*10:01:01:01 (candidate DRB1*10:01:01:01), truth DRB1*10:01:01:03
+HG04160	DQA1	wrong at 4 fields: released DQA1*01:02:01:01 on a haplotype that is no database allele (nearest DQA1*01:02:01:03)
+HG04160	DQB1	wrong at 4 fields: released DQB1*05:02:01:04 (candidate DQB1*05:02:01:04), truth DQB1*05:02:01:01
+HG04160	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:03:01:03
+HG04160	DPA1	wrong at 2 fields: released DPA1*02:02:02:01 (candidate DPA1*02:02:02:01), truth DPA1*02:07:01:04,DPA1*02:07:02,DPA1*02:07:03
+HG04160	DPA1	wrong at 4 fields: released DPA1*02:02:02:01 on a haplotype that is no database allele (nearest DPA1*02:07:01:04,DPA1*02:07:02,DPA1*02:07:03)
+HG04160	DPB1	wrong at 4 fields: released DPB1*04:01:01:01 (candidate DPB1*04:01:01:01), truth DPB1*04:01:01:171
+HG04160	DPB1	wrong at 4 fields: released DPB1*03:01:01:02 (candidate DPB1*03:01:01:02), truth DPB1*03:01:01:01
+HG04187	C	wrong at 4 fields: released C*04:01:01:01 (candidate C*04:01:01:01), truth C*04:01:01:178
+HG04187	DRB1	wrong at 4 fields: released DRB1*11:01:01:01 on a haplotype that is no database allele (nearest DRB1*11:01:01:10)
+HG04187	DRB1	wrong at 4 fields: released DRB1*03:01:01:01 (candidate DRB1*03:01:01:01), truth DRB1*03:01:01:03
+HG04187	DQA1	wrong at 2 fields: released DQA1*05:05:01:01 (candidate DQA1*05:05:01:01), truth DQA1*05:09:01:03
+HG04187	DQA1	wrong at 3 fields: released DQA1*05:05:01:01 (candidate DQA1*05:05:01:01), truth DQA1*05:09:01:03
+HG04187	DQA1	wrong at 4 fields: released DQA1*05:05:01:01 (candidate DQA1*05:05:01:01), truth DQA1*05:09:01:03
+HG04187	DQA1	wrong at 4 fields: released DQA1*05:01:01:02 on a haplotype that is no database allele (nearest DQA1*05:01:01:01,DQA1*05:01:01:02,DQA1*05:01:01:03)
+HG04187	DQB1	wrong at 2 fields: released DQB1*02:01:01 (candidate DQB1*02:01:01), truth DQB1*02:07:01
+HG04187	DQB1	wrong at 3 fields: released DQB1*02:01:01 (candidate DQB1*02:01:01), truth DQB1*02:07:01
+HG04187	DPA1	wrong at 4 fields: released DPA1*02:01:01:01 (candidate DPA1*02:01:01:01), truth DPA1*02:01:01:02
+HG04187	DPA1	wrong at 4 fields: released DPA1*02:01:01:01 (candidate DPA1*02:01:01:01), truth DPA1*02:01:01:03
+NA18565	DRB1	wrong at 4 fields: released DRB1*09:01:02:01 on a haplotype that is no database allele (nearest DRB1*09:01:02:04,DRB1*09:01:02:10)
+NA18565	DRB1	wrong at 4 fields: released DRB1*12:02:01:01 on a haplotype that is no database allele (nearest DRB1*12:02:01:05)
+NA18565	DQB1	wrong at 4 fields: released DQB1*03:01:01:07 (candidate DQB1*03:01:01:07), truth DQB1*03:01:01:71
+NA18565	DQB1	wrong at 4 fields: released DQB1*03:03:02:01 (candidate DQB1*03:03:02:01), truth DQB1*03:03:02:02
+NA18565	DPA1	wrong at 4 fields: released DPA1*01:03:01:01 (candidate DPA1*01:03:01:01), truth DPA1*01:03:01:83
+NA18565	DPB1	wrong at 4 fields: released DPB1*02:01:02:01 (candidate DPB1*02:01:02:01), truth DPB1*02:01:02:32
+NA18565	DPB1	wrong at 4 fields: released DPB1*05:01:01:01 (candidate DPB1*05:01:01:01), truth DPB1*05:01:01:33
+NA18570	DRB1	wrong at 4 fields: released DRB1*11:01:01:01 on a haplotype that is no database allele (nearest DRB1*11:01:01:10)
+NA18570	DQA1	wrong at 3 fields: released DQA1*05:05:02 (candidate DQA1*05:05:02), truth DQA1*05:05:01:02
+NA18570	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:03:01:03
+NA18570	DPB1	wrong at 1 fields: released DPB1*16:01:01:01 (candidate DPB1*16:01:01:01), truth DPB1*03:01:01:01
+NA18570	DPB1	wrong at 2 fields: released DPB1*16:01:01:01 (candidate DPB1*16:01:01:01), truth DPB1*03:01:01:01
+NA18570	DPB1	wrong at 3 fields: released DPB1*16:01:01:01 (candidate DPB1*16:01:01:01), truth DPB1*03:01:01:01
+NA18570	DPB1	wrong at 4 fields: released DPB1*16:01:01:01 (candidate DPB1*16:01:01:01), truth DPB1*03:01:01:01
+NA18570	DPB1	wrong at 1 fields: released DPB1*17:01:01:01 (candidate DPB1*17:01:01:01), truth DPB1*02:01:02:29,DPB1*02:01:02:30
+NA18570	DPB1	wrong at 2 fields: released DPB1*17:01:01:01 (candidate DPB1*17:01:01:01), truth DPB1*02:01:02:29,DPB1*02:01:02:30
+NA18570	DPB1	wrong at 3 fields: released DPB1*17:01:01:01 (candidate DPB1*17:01:01:01), truth DPB1*02:01:02:29,DPB1*02:01:02:30
+NA18570	DPB1	wrong at 4 fields: released DPB1*17:01:01:01 on a haplotype that is no database allele (nearest DPB1*02:01:02:29,DPB1*02:01:02:30)
+NA18974	B	wrong at 4 fields: released B*39:01:03:01 on a haplotype that is no database allele (nearest B*39:01:03:01,B*39:01:16)
+NA18974	B	wrong at 4 fields: released B*40:01:02:01 (candidate B*40:01:02:01), truth B*40:01:02:06
+NA18974	DRB1	wrong at 4 fields: released DRB1*15:01:01:01 (candidate DRB1*15:01:01:01), truth DRB1*15:01:01:03
+NA18974	DRB1	wrong at 4 fields: released DRB1*09:01:02:01 on a haplotype that is no database allele (nearest DRB1*09:01:02:03,DRB1*09:01:02:08,DRB1*09:01:02:11)
+NA18974	DQA1	wrong at 4 fields: released DQA1*01:02:01:01 (candidate DQA1*01:02:01:01), truth DQA1*01:02:01:03
+NA18974	DQB1	wrong at 4 fields: released DQB1*03:03:02:01 (candidate DQB1*03:03:02:01), truth DQB1*03:03:02:02
+NA18974	DPA1	wrong at 4 fields: released DPA1*01:03:01:01 (candidate DPA1*01:03:01:01), truth DPA1*01:03:01:83
+NA18974	DPA1	wrong at 4 fields: released DPA1*01:03:01:01 (candidate DPA1*01:03:01:01), truth DPA1*01:03:01:83
+NA18974	DPB1	wrong at 4 fields: released DPB1*02:01:02:01 (candidate DPB1*02:01:02:01), truth DPB1*02:01:02:32
+NA18974	DPB1	wrong at 4 fields: released DPB1*02:01:02:01 (candidate DPB1*02:01:02:01), truth DPB1*02:01:02:32
+NA18982	DRB1	wrong at 4 fields: released DRB1*15:02:01:01 on a haplotype that is no database allele (nearest DRB1*15:02:01:03)
+NA18982	DRB1	wrong at 4 fields: released DRB1*15:01:01:01 (candidate DRB1*15:01:01:01), truth DRB1*15:01:01:03
+NA18982	DQA1	wrong at 4 fields: released DQA1*01:03:01:03 (candidate DQA1*01:03:01:03), truth DQA1*01:03:01:01
+NA18982	DQA1	wrong at 2 fields: released DQA1*05:01:01:02 (candidate DQA1*05:01:01:02), truth DQA1*05:05:01:15
+NA18982	DQA1	wrong at 3 fields: released DQA1*05:01:01:02 (candidate DQA1*05:01:01:02), truth DQA1*05:05:01:15
+NA18982	DQA1	wrong at 4 fields: released DQA1*05:01:01:02 (candidate DQA1*05:01:01:02), truth DQA1*05:05:01:15
+NA18982	DPA1	wrong at 3 fields: released DPA1*02:01:08:01 (candidate DPA1*02:01:08:01), truth DPA1*02:01:01:02
+NA18982	DPA1	wrong at 4 fields: released DPA1*02:01:08:01 (candidate DPA1*02:01:08:01), truth DPA1*02:01:01:02
+NA19700	B	wrong at 4 fields: released B*15:10:01:01 (candidate B*15:10:01:01), truth B*15:10:01:02
+NA19700	DRB1	wrong at 4 fields: released DRB1*09:01:02:01 on a haplotype that is no database allele (nearest DRB1*09:01:02:07)
+NA19700	DQA1	wrong at 4 fields: released DQA1*01:02:02:01 (candidate DQA1*01:02:02:01), truth DQA1*01:02:02:02
+NA19700	DQB1	wrong at 4 fields: released DQB1*05:02:01:04 (candidate DQB1*05:02:01:04), truth DQB1*05:02:01:08
+NA19700	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:03:01:34
+NA19700	DPB1	wrong at 1 fields: released DPB1*23:01:01:02 (candidate DPB1*23:01:01:02), truth DPB1*835:01:01:03
+NA19700	DPB1	wrong at 2 fields: released DPB1*23:01:01:02 (candidate DPB1*23:01:01:02), truth DPB1*835:01:01:03
+NA19700	DPB1	wrong at 3 fields: released DPB1*23:01:01:02 (candidate DPB1*23:01:01:02), truth DPB1*835:01:01:03
+NA19700	DPB1	wrong at 4 fields: released DPB1*23:01:01:02 (candidate DPB1*23:01:01:02), truth DPB1*835:01:01:03
+NA19700	DPB1	wrong at 4 fields: released DPB1*104:01:01:01 (candidate DPB1*104:01:01:01), truth DPB1*104:01:01:14
+NA19909	DQA1	wrong at 4 fields: released DQA1*04:01:01:01 (candidate DQA1*04:01:01:01), truth DQA1*04:01:01:05
+NA19909	DQA1	wrong at 4 fields: released DQA1*04:01:01:01 (candidate DQA1*04:01:01:01), truth DQA1*04:01:01:05
+NA19909	DPA1	wrong at 4 fields: released DPA1*02:02:02:01 (candidate DPA1*02:02:02:01), truth DPA1*02:02:02:12
+NA19909	DPA1	wrong at 4 fields: released DPA1*02:02:02:01 (candidate DPA1*02:02:02:01), truth DPA1*02:02:02:12
+NA19909	DPB1	wrong at 4 fields: released DPB1*01:01:01:01 (candidate DPB1*01:01:01:01), truth DPB1*01:01:01:02
+NA19909	DPB1	wrong at 4 fields: released DPB1*01:01:01:01 (candidate DPB1*01:01:01:01), truth DPB1*01:01:01:02
+NA20850	B	wrong at 4 fields: released B*38:02:01:01 on a haplotype that is no database allele (nearest B*38:02:13,B*38:02:14,B*38:02:01:02)
+NA20850	C	wrong at 4 fields: released C*04:01:01:01 (candidate C*04:01:01:01), truth C*04:01:01:14
+NA20850	DRB1	wrong at 4 fields: released DRB1*07:01:01:01 (candidate DRB1*07:01:01:01), truth DRB1*07:01:01:02
+NA20850	DQA1	wrong at 4 fields: released DQA1*01:02:01:01 on a haplotype that is no database allele (nearest DQA1*01:02:01:03)
+NA20850	DPA1	wrong at 4 fields: released DPA1*01:03:01:02 (candidate DPA1*01:03:01:02), truth DPA1*01:03:01:04
+NA20850	DPB1	wrong at 4 fields: released DPB1*13:01:01:01 (candidate DPB1*13:01:01:01), truth DPB1*13:01:01:17
+NA20850	DPB1	wrong at 4 fields: released DPB1*04:01:01:40 (candidate DPB1*04:01:01:40), truth DPB1*04:01:01:01
+NA21106	DRB1	wrong at 4 fields: released DRB1*15:02:01:01 on a haplotype that is no database allele (nearest DRB1*15:02:01:03)
+NA21106	DRB1	wrong at 4 fields: released DRB1*15:01:01:01 (candidate DRB1*15:01:01:01), truth DRB1*15:01:01:03
+NA21106	DPB1	wrong at 4 fields: released DPB1*02:01:02:01 on a haplotype that is no database allele (nearest DPB1*02:01:02:107,DPB1*02:01:02:77,DPB1*02:01:02:94)
