@@ -294,8 +294,15 @@ construction outside the rule above.
 |---|---|---|---|---|---|
 | hla-wgs (then main) | 17.1 s | 17.0 s | 20.1 s | 1241 MB | [documented] `timing_main.tsv` |
 | T1K 1.0.10 | 193.9 s | 197.1 s | 236.8 s | 3525 MB | [documented] `timing_main.tsv` |
+| SpecHLA 1.0.12 | 666.5 s | 678.2 s | 802.7 s | 867 MB (largest single process) | [measured] `timing_spechla.tsv` |
 
-Both used the same 4-vCPU machine type, 4 threads and the extracted reads.
+All three used the same 4-vCPU machine type, 4 threads and the same extracted reads (MHC plus unmapped).
+
+SpecHLA was run alone on the idle machine:
+- Command: `SpecHLA.sh -n S -1 S.R1.fq.gz -2 S.R2.fq.gz -j 4`.
+- Mean CPU time: 1728 s.
+- Its own `ExtractHLAread.sh` would first shrink a BAM to HLA reads (about 14 s per sample in the
+  quality runs) and so shorten the typing step.
 
 ### From complete inputs, pj's Mac [measured]
 
