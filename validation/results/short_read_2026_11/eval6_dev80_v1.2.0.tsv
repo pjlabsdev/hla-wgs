@@ -1,0 +1,22 @@
+gene	n	exact	nearest	known	known_ok	new	new_nearest	safe4	safe4_exact	safe4_wrong_noflag	safe4_wrong_real	flag_on_exact	flag_on_inexact	site_snv	site_snv_found	site_det	site_det_true	skip	site_x_snv	site_x_snv_found	site_x_indel	site_x_indel_found	site_x_this	site_x_other_phase	site_x_rep_length	site_x_false	site_x_mark
+A	160	155	159	155	155	5	4	146	146	0	0	0	5	5	5	6	5	0	5	5	0	0	5	0	0	1	0
+B	160	138	149	140	138	20	11	142	137	5	4	0	16	34	30	35	31	0	34	30	5	3	33	0	0	2	0
+C	160	157	158	157	157	3	1	150	150	0	0	2	3	3	3	8	5	0	3	3	0	0	3	2	0	3	0
+DRB1	158	56	136	58	56	100	80	19	15	4	0	40	97	66	42	76	51	1	66	42	114	6	48	0	17	11	0
+DRB3	80	39	62	41	39	39	23	0	0	0	0	39	41	34	20	33	25	0	34	20	33	4	24	0	3	6	0
+DRB4	37	19	27	23	19	14	8	0	0	0	0	19	18	10	9	11	11	0	10	9	16	2	11	0	0	0	0
+DRB5	18	9	15	9	9	9	6	6	6	0	0	0	6	2	1	12	2	1	2	1	11	4	5	0	3	4	0
+DQA1	160	128	143	138	128	22	15	101	100	1	1	23	28	9	5	11	7	0	9	5	25	2	7	0	2	2	0
+DQB1	160	154	158	155	154	5	4	145	144	1	1	2	4	16	3	4	3	0	16	3	23	1	4	0	0	0	0
+DPA1	160	146	158	147	146	13	12	128	128	0	0	4	13	12	12	18	18	0	12	12	3	2	14	4	0	0	0
+DPB1	160	139	157	139	139	21	18	140	137	3	2	0	17	52	46	56	54	0	52	46	8	3	49	7	0	0	0
+DRA	158	144	156	144	144	14	12	135	134	1	1	2	13	17	16	22	21	1	17	16	1	1	17	4	0	1	0
+E	158	154	158	154	154	4	4	147	147	0	0	3	4	4	4	7	7	1	4	4	0	0	4	3	0	0	0
+F	160	152	157	154	152	6	5	151	149	2	2	0	6	7	6	7	7	0	7	6	2	0	6	0	0	1	0
+G	160	155	160	155	155	5	5	144	144	0	0	0	5	4	4	5	5	0	4	4	1	1	5	0	0	0	0
+H	140	133	140	133	133	7	7	119	119	0	0	1	7	7	7	8	8	0	7	7	0	0	7	1	0	0	0
+K	140	66	140	66	66	74	74	27	27	0	0	0	74	773	748	850	838	0	773	737	106	86	823	0	3	26	0
+V	160	99	159	99	99	61	60	99	97	2	2	2	59	439	421	532	520	0	439	421	73	71	492	37	0	3	0
+ALL	2489	2043	2392	2067	2043	422	349	1799	1780	19	13	137	416	1494	1382	1701	1618	4	1494	1371	421	186	1557	58	28	60	0
+known alleles 4F exact 2043/2067 (98.8%) | new haplotypes 422, nearest allele chosen 349 | safe4 exact 1780/1799, inexact unflagged 19, inexact beyond hp/STR 13 | SNV sites found 1382/1494 | reported sites true 1618/1701
+strict site comparison: SNVs found 1371/1494 (position and base), insertions/deletions found 186/421 (same resulting sequence) | reported sites 1703: same change on this haplotype 1557, only on the other haplotype and marked phase uncertain 58, repeat length matched 28, false 60, marks without a change 0

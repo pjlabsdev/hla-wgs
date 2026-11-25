@@ -69,13 +69,13 @@ SAMPLES=newg/dev80.txt     T4OUT=truth/truth4.tsv       GENES=26 hla-wgs-validat
 |---|---|---|---|---|---|---|
 | ho30 | 2 | 932 | 889 (95.4 %) | 99.9 % | 889 (95.4 %) | 99.9 % |
 | ho30 | 3 | 880 | 843 (95.8 %) | 99.8 % | 843 (95.8 %) | 99.8 % |
-| ho30 | 4 | 759 | 682 (89.9 %) | 98.7 % | 682 (89.9 %) | **99.0 %** |
+| ho30 | 4 | 759 | 683 (90.0 %) | 98.8 % | 683 (90.0 %) | **99.1 %** |
 | hgsvc59 | 2 | 1824 | 1732 (95.0 %) | 99.9 % | 1732 (95.0 %) | 99.9 % |
 | hgsvc59 | 3 | 1713 | 1650 (96.3 %) | 99.8 % | 1650 (96.3 %) | 99.8 % |
-| hgsvc59 | 4 | 1498 | 1332 (88.9 %) | 98.4 % | 1329 (88.7 %) | 98.5 % |
+| hgsvc59 | 4 | 1498 | 1335 (89.1 %) | 98.6 % | 1332 (88.9 %) | 98.7 % |
 | dev80 | 2 | 2479 | 2344 (94.6 %) | 99.8 % | 2344 (94.6 %) | 99.8 % |
 | dev80 | 3 | 2306 | 2211 (95.9 %) | 99.6 % | 2211 (95.9 %) | 99.6 % |
-| dev80 | 4 | 1973 | 1768 (89.6 %) | 98.3 % | 1765 (89.5 %) | 98.3 % |
+| dev80 | 4 | 1973 | 1776 (90.0 %) | 98.8 % | 1773 (89.9 %) | 98.8 % |
 
 - The 1.2.0 numbers reproduce the published `hgsvc59_main` and `dev80_main` results exactly.
   `eval6`: safe four-field calls exact 1334 / 1350 and 1780 / 1799.
@@ -91,6 +91,21 @@ SAMPLES=newg/dev80.txt     T4OUT=truth/truth4.tsv       GENES=26 hla-wgs-validat
 
 - In every lost case the deciding repeat (51 to 75 bp) had at most 1 spanning read.
 - HGSVC3 `eval6` with the new rule: safe four-field exact 1332 / 1346 (was 1334 / 1350); new sites unchanged.
+- The tables were recomputed after three fixes of the evaluator (CHANGELOG): pairing of equal
+  candidates by released fields, site positions of alleles with a borrowed flank, and repeat-length
+  matches only inside the reported repeat. The pairing fix raises the 1.2.0 four-field counts
+  slightly (HGSVC3 1328 instead of 1325 right); the effect of the new rule is unchanged.
+- New sites with the corrected evaluator [measured]:
+
+| Set | SNV sites found (strict) | Indels found | Reported sites: same change | other haplotype, phase uncertain | repeat length | false |
+|---|---|---|---|---|---|---|
+| hgsvc59 | 739 / 822 | 118 / 277 | 857 / 973 | 40 | 15 | 61 |
+| ho30 | 338 / 377 | 71 / 145 | 409 / 458 | 23 | 5 | 21 |
+| dev80 | 1371 / 1494 | 186 / 421 | 1557 / 1703 | 58 | 28 | 60 |
+
+  The same for 1.2.0 and the new rule. The older position-±2 counts of the published results were
+  too low for the same reason: HGSVC3 SNV sites found 742 (published 729) of 822, reported sites
+  true 885 (published 869) of 973.
 - Two and three fields are unchanged everywhere.
 
 ### DRB1 at four fields [measured]
@@ -154,8 +169,8 @@ a threshold. It uses the 1.2.0 result files and the same `eval23`.
 - **Without any prior** (`HLA_NOFREQ=1`). These runs used an intermediate version of the rule
   (without the 01 exemption), so they are compared with that version (`eval23_*_c1.tsv`).
   - hgsvc59: two fields 1725 instead of 1732 released, three fields 1644 instead of 1650, four
-    fields 1319 instead of 1326. Precision is unchanged.
-  - ho30: two fields 885 instead of 889, three fields 839 instead of 843, four fields 681 both.
+    fields 1322 instead of 1329. Precision is unchanged.
+  - ho30: two fields 885 instead of 889, three fields 839 instead of 843, four fields 682 both.
     Precision is unchanged.
   - The prior adds calls and costs no precision. It stays on.
 
@@ -181,10 +196,10 @@ same extracted reads, T1K's own index from IPD-IMGT/HLA), evaluated with `eval23
 |---|---|---|---|---|---|---|
 | ho30 | 2 | 882 | 882 (100.0 %) | 98.4 % | 840 (95.2 %) | 100.0 % |
 | ho30 | 3 | 831 | 828 (99.6 %) | 98.7 % | 795 (95.7 %) | 99.9 % |
-| ho30 | 4 | 737 | 3 (0.4 %) | 0.0 % | 678 (92.0 %) | 98.8 % |
+| ho30 | 4 | 737 | 3 (0.4 %) | 0.0 % | 679 (92.1 %) | 99.0 % |
 | dev80 | 2 | 2345 | 2345 (100.0 %) | 98.1 % | 2217 (94.5 %) | 99.8 % |
 | dev80 | 3 | 2176 | 2174 (99.9 %) | 97.8 % | 2087 (95.9 %) | 99.6 % |
-| dev80 | 4 | 1900 | 10 (0.5 %) | 0.0 % | 1762 (92.7 %) | 98.3 % |
+| dev80 | 4 | 1900 | 10 (0.5 %) | 0.0 % | 1770 (93.2 %) | 98.8 % |
 
 - T1K always reports an answer. In absolute right two-field calls it is ahead on these 15 genes:
   ho30 878 against 840, dev80 2338 against 2216.

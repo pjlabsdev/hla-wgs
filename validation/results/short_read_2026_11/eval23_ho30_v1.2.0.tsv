@@ -96,7 +96,7 @@ E	4	60	60	100.0	58	58	0	0	0	100.0	96.7	96.7	0	0	0	0
 F	4	58	58	100.0	58	58	0	1	0	98.3	100.0	100.0	0	0	0	2
 G	4	53	53	100.0	53	53	0	0	0	100.0	100.0	100.0	0	0	7	0
 H	4	49	49	100.0	47	47	0	0	0	100.0	95.9	95.9	0	0	1	3
-K	4	12	12	100.0	11	11	0	1	0	91.7	91.7	91.7	0	0	19	22
+K	4	12	12	100.0	12	12	0	0	0	100.0	100.0	100.0	0	0	19	22
 V	4	39	39	100.0	35	35	0	0	0	100.0	89.7	89.7	0	0	0	21
 MICA	4	0	0	n/a	0	0	0	0	0	n/a	n/a	n/a	0	0	0	0
 MICB	4	0	0	n/a	0	0	0	0	0	n/a	n/a	n/a	0	0	0	0
@@ -106,7 +106,7 @@ DMA	4	0	0	n/a	0	0	0	0	0	n/a	n/a	n/a	0	0	0	0
 DMB	4	0	0	n/a	0	0	0	0	0	n/a	n/a	n/a	0	0	0	0
 DOA	4	0	0	n/a	0	0	0	0	0	n/a	n/a	n/a	0	0	0	0
 DOB	4	0	0	n/a	0	0	0	0	0	n/a	n/a	n/a	0	0	0	0
-ALL	4	759	750	98.8	682	682	0	9	3	98.7	89.9	89.9	0	4	33	140
+ALL	4	759	750	98.8	683	683	0	8	3	98.8	90.0	90.0	0	4	33	140
 
 gene	copies_expected	copies_called	copies_missing_file	copy_number_wrong	gene_no_call	ref_unresolved
 A	60	60	0	0	0	0
@@ -151,7 +151,6 @@ HG02392	DQB1	wrong at 3 fields: released DQB1*05:02:02 (candidate DQB1*05:02:02)
 HG02392	F	wrong at 4 fields: released F*01:01:01:09 on a haplotype that is no database allele (nearest F*01:01:01:09)
 NA18570	DPB1	wrong at 4 fields: released DPB1*02:01:02:29 on a haplotype that is no database allele (nearest DPB1*02:01:02:29,DPB1*02:01:02:30)
 HG00706	C	wrong at 4 fields: released C*08:01:01:01 on a haplotype that is no database allele (nearest C*08:01:01:01,C*08:01:01:02,C*08:01:36)
-HG01261	K	wrong at 4 fields: released K*01:01:01:01 on a haplotype that is no database allele (nearest K*01:01:01:01)
 HG03270	DQA1	wrong at 4 fields: released DQA1*01:02:01:02 on a haplotype that is no database allele (nearest DQA1*01:02:01:02)
 HG00344	DRB5	wrong at 4 fields: released DRB5*01:01:01:03 on a haplotype that is no database allele (nearest DRB5*01:01:01:12)
 NA21106	DRB1	wrong at 4 fields: released DRB1*15:02:01:03 on a haplotype that is no database allele (nearest DRB1*15:02:01:03)

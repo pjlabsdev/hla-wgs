@@ -89,15 +89,15 @@ DRB4	4	23	19	82.6	0	0	0	0	0	n/a	0.0	0.0	0	0	0	14
 DRB5	4	9	9	100.0	6	6	0	0	0	100.0	66.7	66.7	0	0	0	9
 DQA1	4	131	121	92.4	92	91	0	0	6	98.9	70.2	69.5	0	7	0	22
 DQB1	4	149	149	100.0	140	140	0	1	4	99.3	94.0	94.0	0	4	2	5
-DPA1	4	145	144	99.3	127	127	0	1	0	99.2	87.6	87.6	0	0	2	13
+DPA1	4	145	144	99.3	128	128	0	0	0	100.0	88.3	88.3	0	0	2	13
 DPB1	4	137	137	100.0	137	137	0	3	0	97.9	100.0	100.0	0	0	2	21
 DRA	4	138	138	100.0	135	135	1	1	0	98.5	97.8	97.8	0	0	7	14
 E	4	152	152	100.0	147	147	2	0	0	98.7	96.7	96.7	0	0	2	4
-F	4	153	151	98.7	150	148	0	1	0	98.0	98.0	96.7	0	0	1	6
+F	4	153	151	98.7	151	149	0	0	0	98.7	98.7	97.4	0	0	1	6
 G	4	144	144	100.0	144	144	0	0	0	100.0	100.0	100.0	0	0	11	5
 H	4	121	121	100.0	119	119	0	0	0	100.0	98.3	98.3	0	0	12	7
 K	4	27	27	100.0	27	27	0	0	0	100.0	100.0	100.0	0	0	39	74
-V	4	99	99	100.0	91	91	0	8	0	91.9	91.9	91.9	0	0	0	61
+V	4	99	99	100.0	97	97	0	2	0	98.0	98.0	98.0	0	0	0	61
 MICA	4	0	0	n/a	0	0	0	0	0	n/a	n/a	n/a	0	0	0	0
 MICB	4	0	0	n/a	0	0	0	0	0	n/a	n/a	n/a	0	0	0	0
 TAP1	4	0	0	n/a	0	0	0	0	0	n/a	n/a	n/a	0	0	0	0
@@ -106,7 +106,7 @@ DMA	4	0	0	n/a	0	0	0	0	0	n/a	n/a	n/a	0	0	0	0
 DMB	4	0	0	n/a	0	0	0	0	0	n/a	n/a	n/a	0	0	0	0
 DOA	4	0	0	n/a	0	0	0	0	0	n/a	n/a	n/a	0	0	0	0
 DOB	4	0	0	n/a	0	0	0	0	0	n/a	n/a	n/a	0	0	0	0
-ALL	4	1973	1950	98.8	1765	1760	3	22	10	98.3	89.5	89.2	0	11	84	423
+ALL	4	1973	1950	98.8	1773	1768	3	14	10	98.8	89.9	89.6	0	11	84	423
 
 gene	copies_expected	copies_called	copies_missing_file	copy_number_wrong	gene_no_call	ref_unresolved
 A	160	160	0	0	0	0
@@ -147,9 +147,6 @@ ALL	2493	2496	0	2	0	2
 -	DOA	gene not in the truth table: not evaluated
 -	DOB	gene not in the truth table: not evaluated
 HG00438	B	wrong at 4 fields: released B*54:01:01:01 on a haplotype that is no database allele (nearest B*54:01:01:01,B*54:01:13,B*54:01:01:02)
-HG00621	V	wrong at 4 fields: released V*01:01:01:01 on a haplotype that is no database allele (nearest V*01:01:01:01)
-HG00673	DPA1	wrong at 4 fields: released DPA1*02:02:02:01 on a haplotype that is no database allele (nearest DPA1*02:02:02:01)
-HG00735	V	wrong at 4 fields: released V*01:01:01:01 on a haplotype that is no database allele (nearest V*01:01:01:02)
 HG01071	DQB1	wrong at 3 fields: released DQB1*02:02:01:01 (candidate DQB1*02:02:01:01), truth DQB1*02:02:27
 HG01071	DQB1	wrong at 4 fields: released DQB1*02:02:01:01 on a haplotype that is no database allele (nearest DQB1*02:02:27)
 HG01106	B	wrong at 4 fields: released B*14:02:01:32 (candidate B*14:02:01:32), truth B*14:02:01:01
@@ -162,13 +159,10 @@ HG02080	F	wrong at 4 fields: released F*01:01:02:08 (candidate F*01:01:02:08), t
 HG02135	B	wrong at 4 fields: released B*15:01:01:01 on a haplotype that is no database allele (nearest B*15:01:01:01,B*15:01:11,B*15:01:80)
 HG02135	DRB1	wrong at 4 fields: released DRB1*15:02:01:04 on a haplotype that is no database allele (nearest DRB1*15:02:01:04)
 HG02145	DRB1	wrong at 4 fields: released DRB1*15:03:01:01 on a haplotype that is no database allele (nearest DRB1*15:03:01:01)
-HG02155	V	wrong at 4 fields: released V*01:01:01:01 on a haplotype that is no database allele (nearest V*01:01:01:01)
 HG02178	DRB1	wrong at 4 fields: released DRB1*15:02:01:05 on a haplotype that is no database allele (nearest DRB1*15:02:01:05)
 HG02257	B	wrong at 4 fields: released B*41:01:01:01 on a haplotype that is no database allele (nearest B*41:01:01:02,B*41:01:01:04,B*41:01:01:09)
-HG02280	F	wrong at 4 fields: released F*01:01:01:09 on a haplotype that is no database allele (nearest F*01:01:01:09)
 HG02622	DRB1	wrong at 3 fields: released DRB1*07:01:01 (candidate DRB1*07:01:01:01), truth DRB1*07:01:31
 HG02622	DRA	wrong at 3 fields: released DRA*01:01:01 (candidate DRA*01:01:01:02), truth DRA*01:01:08
-HG02630	V	wrong at 4 fields: released V*01:01:01:01 on a haplotype that is no database allele (nearest V*01:01:01:01)
 HG02668	DPB1	wrong at 1 fields: released DPB1*519 (candidate DPB1*519:01), truth DPB1*13:01:01:03,DPB1*13:01:01:21
 HG02717	B	wrong at 3 fields: released B*15:03:01 (candidate B*15:03:01:01), truth B*15:03:03
 HG02717	DRA	wrong at 3 fields: released DRA*01:01:01 (candidate DRA*01:01:01:02), truth DRA*01:01:08
@@ -176,11 +170,9 @@ HG02738	V	wrong at 4 fields: released V*01:01:01:03 on a haplotype that is no da
 HG03098	V	wrong at 4 fields: released V*01:01:01:02 on a haplotype that is no database allele (nearest V*01:01:01:02)
 HG03225	DRB3	wrong at 3 fields: released DRB3*02:02:34 (candidate DRB3*02:02:34), truth DRB3*02:02:01:71
 HG03225	DRA	wrong at 4 fields: released DRA*01:01:01:01 on a haplotype that is no database allele (nearest DRA*01:01:01:01)
-HG03710	V	wrong at 4 fields: released V*01:01:01:02 on a haplotype that is no database allele (nearest V*01:01:01:02)
 HG04115	F	wrong at 4 fields: released F*01:01:01:59 (candidate F*01:01:01:59), truth F*01:01:01:01
 NA12878	DRA	copy number: truth 1 called 2
 NA12878	E	copy number: truth 0 called 2
-NA18508	V	wrong at 4 fields: released V*01:01:01:03 on a haplotype that is no database allele (nearest V*01:01:01:03)
 NA18970	DQA1	wrong at 4 fields: released DQA1*01:04:01:02 (candidate DQA1*01:04:01:02), truth DQA1*01:04:01:01
 NA18970	DQB1	wrong at 2 fields: released DQB1*03:01:01 (candidate DQB1*03:01:01:01), truth DQB1*03:276N
 NA21093	DPB1	wrong at 4 fields: released DPB1*02:01:02:01 on a haplotype that is no database allele (nearest DPB1*02:01:02:01)
