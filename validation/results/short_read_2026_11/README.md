@@ -192,8 +192,36 @@ same extracted reads, T1K's own index from IPD-IMGT/HLA), evaluated with `eval23
 - T1K stops at three fields.
 - Tables: `tools15_<set>_<tool>.tsv`.
 
-**SpecHLA 1.0.12** [measured]: see `tools8_ho30_*.tsv` and the section below. It ships its own
-database, IPD-IMGT/HLA 3.38.0, so alleles named after 3.38 cannot be called by it.
+**SpecHLA 1.0.12** [measured]:
+
+Setup:
+- Samples: all 30 held-out samples, its 8 genes.
+- Install: Bioconda, with freebayes raised to 1.3.10 (the resolved 1.0.2 fails with "invalid FORMAT: AD").
+- Input: the MHC-plus-unmapped BAM of each sample, read by its own `ExtractHLAread.sh -r hg38`, then
+  `SpecHLA.sh -j 4`.
+- Database: its own bundled one, IPD-IMGT/HLA 3.38.0, so alleles named after 3.38 cannot be called by it.
+
+Same 30 samples and 8 genes for every tool (`tools8_ho30_<tool>.tsv`):
+
+| Tool | Fields | Released (call rate) | Precision |
+|---|---|---|---|
+| SpecHLA 1.0.12 | 2 | 476 / 476 (100.0 %) | 94.7 % |
+| SpecHLA 1.0.12 | 3 | 457 / 460 (99.3 %) | 94.5 % |
+| SpecHLA 1.0.12 | 4 | 397 / 414 (95.9 %) | 53.0 % |
+| T1K 1.0.10 | 2 | 476 / 476 (100.0 %) | 99.4 % |
+| T1K 1.0.10 | 3 | 458 / 460 (99.6 %) | 98.9 % |
+| T1K 1.0.10 | 4 | 3 / 414 (0.7 %) | 0.0 % |
+| hla-wgs 1.2.0 | 2 | 474 / 476 (99.6 %) | 100.0 % |
+| hla-wgs 1.2.0 | 3 | 454 / 460 (98.7 %) | 99.8 % |
+| hla-wgs 1.2.0 | 4 | 368 / 414 (88.9 %) | 98.4 % |
+| hla-wgs new | 2 | 474 / 476 (99.6 %) | 100.0 % |
+| hla-wgs new | 3 | 454 / 460 (98.7 %) | 99.8 % |
+| hla-wgs new | 4 | 368 / 414 (88.9 %) | 98.9 % |
+
+- SpecHLA's two-field errors are mostly in DPB1 (48 / 60 right), DQA1 (52 / 57) and DPA1 (57 / 60).
+  A, B, C, DRB1 and DQB1 are at 96.6 to 100 %.
+- At four fields, 48 of SpecHLA's released calls fall on haplotypes that are new against IPD-IMGT/HLA
+  3.66, and only 236 of 397 are right.
 
 **HLA\*LA** [not run]: its graph (`PRG_MHC_GRCh38_withIMGT`) is downloaded from
 `www.well.ox.ac.uk`, which the network of the cloud machine refuses (HTTP 403). The missing

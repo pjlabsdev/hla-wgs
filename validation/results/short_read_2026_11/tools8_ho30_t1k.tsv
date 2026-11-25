@@ -1,0 +1,62 @@
+gene	fields	expected	candidate_ok	candidate_pct	released	released_ok	released_extra	released_on_new	released_unjudged	precision_pct	call_rate_pct	right_of_expected_pct	no_candidate	ref_ambiguous	ref_short	ref_new
+A	1	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+B	1	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+C	1	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+DRB1	1	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+DQA1	1	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+DQB1	1	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+DPA1	1	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+DPB1	1	60	59	98.3	60	59	0	0	0	98.3	100.0	98.3	0	0	0	0
+ALL	1	480	479	99.8	480	479	0	0	0	99.8	100.0	99.8	0	0	0	0
+A	2	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+B	2	60	58	96.7	60	58	0	0	0	96.7	100.0	96.7	0	0	0	0
+C	2	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+DRB1	2	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+DQA1	2	57	57	100.0	57	57	0	0	3	100.0	100.0	100.0	0	3	0	0
+DQB1	2	59	59	100.0	59	59	0	0	1	100.0	100.0	100.0	0	1	0	0
+DPA1	2	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+DPB1	2	60	59	98.3	60	59	0	0	0	98.3	100.0	98.3	0	0	0	0
+ALL	2	476	473	99.4	476	473	0	0	4	99.4	100.0	99.4	0	4	0	0
+A	3	60	60	100.0	60	60	0	0	0	100.0	100.0	100.0	0	0	0	0
+B	3	55	51	92.7	53	51	0	0	5	96.2	96.4	92.7	0	5	0	0
+C	3	57	56	98.2	57	56	0	0	3	98.2	100.0	98.2	0	3	0	0
+DRB1	3	57	57	100.0	57	57	0	0	0	100.0	100.0	100.0	0	0	3	0
+DQA1	3	54	54	100.0	54	54	0	0	6	100.0	100.0	100.0	0	6	0	0
+DQB1	3	59	59	100.0	59	59	0	0	1	100.0	100.0	100.0	0	1	0	0
+DPA1	3	58	58	100.0	58	58	0	0	2	100.0	100.0	100.0	0	2	0	0
+DPB1	3	60	58	96.7	60	58	0	0	0	96.7	100.0	96.7	0	0	0	0
+ALL	3	460	453	98.5	458	453	0	0	17	98.9	99.6	98.5	0	17	3	0
+A	4	60	0	0.0	0	0	0	0	0	n/a	0.0	0.0	0	0	0	0
+B	4	54	0	0.0	2	0	0	0	0	0.0	3.7	0.0	0	0	1	5
+C	4	57	0	0.0	1	0	0	0	0	0.0	1.8	0.0	0	0	0	3
+DRB1	4	28	0	0.0	0	0	0	0	0	n/a	0.0	0.0	0	0	1	31
+DQA1	4	50	0	0.0	0	0	0	0	0	n/a	0.0	0.0	0	3	0	7
+DQB1	4	57	0	0.0	0	0	0	0	0	n/a	0.0	0.0	0	1	1	1
+DPA1	4	57	0	0.0	0	0	0	0	0	n/a	0.0	0.0	0	0	0	3
+DPB1	4	51	0	0.0	0	0	0	0	0	n/a	0.0	0.0	0	0	0	9
+ALL	4	414	0	0.0	3	0	0	0	0	0.0	0.7	0.0	0	4	3	59
+
+gene	copies_expected	copies_called	copies_missing_file	copy_number_wrong	gene_no_call	ref_unresolved
+A	60	60	0	0	0	0
+B	60	60	0	0	0	0
+C	60	60	0	0	0	0
+DRB1	60	60	0	0	0	0
+DQA1	60	60	0	0	0	0
+DQB1	60	60	0	0	0	0
+DPA1	60	60	0	0	0	0
+DPB1	60	60	0	0	0	0
+ALL	480	480	0	0	0	0
+
+# sample	gene	issue
+HG02391	DPB1	wrong at 3 fields: released DPB1*02:01:34 (candidate DPB1*02:01:34), truth DPB1*02:01:02:11
+HG02583	B	wrong at 2 fields: released B*41:81 (candidate B*41:81), truth B*41:02:01:01
+HG03050	DPB1	wrong at 1 fields: released DPB1*02:01:02 (candidate DPB1*02:01:02), truth DPB1*105:01:01:03
+HG03050	DPB1	wrong at 2 fields: released DPB1*02:01:02 (candidate DPB1*02:01:02), truth DPB1*105:01:01:03
+HG03050	DPB1	wrong at 3 fields: released DPB1*02:01:02 (candidate DPB1*02:01:02), truth DPB1*105:01:01:03
+HG03742	B	wrong at 3 fields: released B*37:01:01,B*37:01:39 (candidate B*37:01:01,B*37:01:39), truth B*37:01:01:01
+HG03742	B	wrong at 4 fields: released B*37:01:01,B*37:01:39 (candidate B*37:01:01,B*37:01:39), truth B*37:01:01:01
+HG04187	C	wrong at 3 fields: released C*04:01:01,C*04:01:109,C*04:09L,C*04:409,C*04:470,C*04:502,C*04:521 (candidate C*04:01:01,C*04:01:109,C*04:09L,C*04:409,C*04:470,C*04:502,C*04:521), truth C*04:01:01:178
+HG04187	C	wrong at 4 fields: released C*04:01:01,C*04:01:109,C*04:09L,C*04:409,C*04:470,C*04:502,C*04:521 (candidate C*04:01:01,C*04:01:109,C*04:09L,C*04:409,C*04:470,C*04:502,C*04:521), truth C*04:01:01:178
+NA18565	B	wrong at 3 fields: released B*51:01:01,B*51:01:64 (candidate B*51:01:01,B*51:01:64), truth B*51:01:01:01
+NA18565	B	wrong at 4 fields: released B*51:01:01,B*51:01:64 (candidate B*51:01:01,B*51:01:64), truth B*51:01:01:01
+NA18570	B	wrong at 2 fields: released B*15:542 (candidate B*15:542), truth B*15:01:01:01
