@@ -1,0 +1,121 @@
+gene	fields	expected	candidate_ok	candidate_pct	released	released_ok	released_extra	released_on_new	released_unjudged	precision_pct	call_rate_pct	right_of_expected_pct	no_candidate	ref_ambiguous	ref_short	ref_new
+A	1	160	160	100.0	160	160	0	0	0	100.0	100.0	100.0	0	0	0	0
+B	1	160	160	100.0	160	160	0	0	0	100.0	100.0	100.0	0	0	0	0
+C	1	160	160	100.0	160	160	0	0	0	100.0	100.0	100.0	0	0	0	0
+DRB1	1	159	159	100.0	159	159	0	0	0	100.0	100.0	100.0	0	0	0	0
+DQA1	1	160	160	100.0	160	160	0	0	0	100.0	100.0	100.0	0	0	0	0
+DQB1	1	160	160	100.0	160	160	0	0	0	100.0	100.0	100.0	0	0	0	0
+DPA1	1	160	160	100.0	160	160	0	0	0	100.0	100.0	100.0	0	0	0	0
+DPB1	1	160	159	99.4	160	159	0	0	0	99.4	100.0	99.4	0	0	0	0
+DRA	1	159	159	100.0	159	159	1	0	0	99.4	100.0	100.0	0	0	0	0
+E	1	158	158	100.0	158	158	2	0	0	98.8	100.0	100.0	0	0	0	0
+F	1	160	160	100.0	160	160	0	0	0	100.0	100.0	100.0	0	0	0	0
+G	1	160	160	100.0	160	160	0	0	0	100.0	100.0	100.0	0	0	0	0
+H	1	140	140	100.0	140	140	0	0	0	100.0	100.0	100.0	0	0	0	0
+K	1	140	140	100.0	140	140	0	0	0	100.0	100.0	100.0	0	0	0	0
+V	1	160	160	100.0	160	160	0	0	0	100.0	100.0	100.0	0	0	0	0
+ALL	1	2356	2355	100.0	2356	2355	3	0	0	99.8	100.0	100.0	0	0	0	0
+A	2	160	160	100.0	158	158	0	0	0	100.0	98.8	98.8	0	0	0	0
+B	2	160	160	100.0	160	160	0	0	0	100.0	100.0	100.0	0	0	0	0
+C	2	160	160	100.0	158	158	0	0	0	100.0	98.8	98.8	0	0	0	0
+DRB1	2	159	159	100.0	159	159	0	0	0	100.0	100.0	100.0	0	0	0	0
+DQA1	2	153	153	100.0	152	152	0	0	7	100.0	99.3	99.3	0	7	0	0
+DQB1	2	156	155	99.4	155	154	0	0	4	99.4	99.4	98.7	0	4	0	0
+DPA1	2	160	160	100.0	158	158	0	0	0	100.0	98.8	98.8	0	0	0	0
+DPB1	2	160	159	99.4	159	159	0	0	0	100.0	99.4	99.4	0	0	0	0
+DRA	2	159	159	100.0	158	158	1	0	0	99.4	99.4	99.4	0	0	0	0
+E	2	158	158	100.0	154	154	2	0	0	98.7	97.5	97.5	0	0	0	0
+F	2	160	160	100.0	159	159	0	0	0	100.0	99.4	99.4	0	0	0	0
+G	2	160	160	100.0	159	159	0	0	0	100.0	99.4	99.4	0	0	0	0
+H	2	140	140	100.0	140	140	0	0	0	100.0	100.0	100.0	0	0	0	0
+K	2	140	140	100.0	71	71	0	0	0	100.0	50.7	50.7	0	0	0	0
+V	2	160	160	100.0	117	117	0	0	0	100.0	73.1	73.1	0	0	0	0
+ALL	2	2345	2343	99.9	2217	2216	3	0	11	99.8	94.5	94.5	0	11	0	0
+A	3	157	157	100.0	155	155	0	0	2	100.0	98.7	98.7	0	2	1	0
+B	3	143	142	99.3	143	142	0	0	16	99.3	100.0	99.3	0	16	1	0
+C	3	157	157	100.0	155	155	0	0	2	100.0	98.7	98.7	0	2	1	0
+DRB1	3	148	147	99.3	148	147	0	0	10	99.3	100.0	99.3	0	10	1	0
+DQA1	3	141	141	100.0	140	140	0	0	19	100.0	99.3	99.3	0	19	0	0
+DQB1	3	154	153	99.4	153	152	0	0	5	99.3	99.4	98.7	0	4	2	0
+DPA1	3	154	154	100.0	146	146	0	0	6	100.0	94.8	94.8	0	6	0	0
+DPB1	3	158	157	99.4	157	157	0	0	2	100.0	99.4	99.4	0	2	0	0
+DRA	3	151	149	98.7	150	148	1	0	0	98.0	99.3	98.0	0	0	8	0
+E	3	157	157	100.0	153	153	2	0	0	98.7	97.5	97.5	0	0	1	0
+F	3	160	160	100.0	159	159	0	0	0	100.0	99.4	99.4	0	0	0	0
+G	3	157	157	100.0	156	156	0	0	1	100.0	99.4	99.4	0	1	2	0
+H	3	126	126	100.0	126	126	0	0	0	100.0	100.0	100.0	0	0	14	0
+K	3	53	53	100.0	29	29	0	0	0	100.0	54.7	54.7	0	0	87	0
+V	3	160	160	100.0	117	117	0	0	0	100.0	73.1	73.1	0	0	0	0
+ALL	3	2176	2170	99.7	2087	2082	3	0	63	99.6	95.9	95.7	0	62	118	0
+A	4	153	153	100.0	146	146	0	0	0	100.0	95.4	95.4	0	0	2	5
+B	4	139	137	98.6	139	137	0	3	0	96.5	100.0	98.6	0	0	1	20
+C	4	154	154	100.0	150	150	0	0	0	100.0	97.4	97.4	0	0	3	3
+DRB1	4	58	56	96.6	15	15	0	4	0	78.9	25.9	25.9	0	0	0	101
+DQA1	4	131	121	92.4	95	94	0	0	6	98.9	72.5	71.8	0	7	0	22
+DQB1	4	149	149	100.0	140	140	0	1	4	99.3	94.0	94.0	0	4	2	5
+DPA1	4	145	144	99.3	127	127	0	1	0	99.2	87.6	87.6	0	0	2	13
+DPB1	4	137	137	100.0	137	137	0	3	0	97.9	100.0	100.0	0	0	2	21
+DRA	4	138	138	100.0	135	135	1	1	0	98.5	97.8	97.8	0	0	7	14
+E	4	152	152	100.0	147	147	2	0	0	98.7	96.7	96.7	0	0	2	4
+F	4	153	151	98.7	150	148	0	1	0	98.0	98.0	96.7	0	0	1	6
+G	4	144	144	100.0	144	144	0	0	0	100.0	100.0	100.0	0	0	11	5
+H	4	121	121	100.0	119	119	0	0	0	100.0	98.3	98.3	0	0	12	7
+K	4	27	27	100.0	27	27	0	0	0	100.0	100.0	100.0	0	0	39	74
+V	4	99	99	100.0	91	91	0	8	0	91.9	91.9	91.9	0	0	0	61
+ALL	4	1900	1883	99.1	1762	1757	3	22	10	98.3	92.7	92.5	0	11	84	361
+
+gene	copies_expected	copies_called	copies_missing_file	copy_number_wrong	gene_no_call	ref_unresolved
+A	160	160	0	0	0	0
+B	160	160	0	0	0	0
+C	160	160	0	0	0	0
+DRB1	160	160	0	0	0	1
+DQA1	160	160	0	0	0	0
+DQB1	160	160	0	0	0	0
+DPA1	160	160	0	0	0	0
+DPB1	160	160	0	0	0	0
+DRA	159	160	0	1	0	0
+E	158	160	0	1	0	0
+F	160	160	0	0	0	0
+G	160	160	0	0	0	0
+H	140	140	0	0	0	0
+K	140	140	0	0	0	0
+V	160	160	0	0	0	0
+ALL	2357	2360	0	2	0	1
+
+# sample	gene	issue
+HG00438	B	wrong at 4 fields: released B*54:01:01:01 on a haplotype that is no database allele (nearest B*54:01:01:01,B*54:01:13,B*54:01:01:02)
+HG00621	V	wrong at 4 fields: released V*01:01:01:01 on a haplotype that is no database allele (nearest V*01:01:01:01)
+HG00673	DPA1	wrong at 4 fields: released DPA1*02:02:02:01 on a haplotype that is no database allele (nearest DPA1*02:02:02:01)
+HG00735	V	wrong at 4 fields: released V*01:01:01:01 on a haplotype that is no database allele (nearest V*01:01:01:02)
+HG01071	DQB1	wrong at 3 fields: released DQB1*02:02:01:01 (candidate DQB1*02:02:01:01), truth DQB1*02:02:27
+HG01071	DQB1	wrong at 4 fields: released DQB1*02:02:01:01 on a haplotype that is no database allele (nearest DQB1*02:02:27)
+HG01106	B	wrong at 4 fields: released B*14:02:01:32 (candidate B*14:02:01:32), truth B*14:02:01:01
+HG01175	DRB1	wrong at 4 fields: released DRB1*15:01:01:01 on a haplotype that is no database allele (nearest DRB1*15:01:01:01,DRB1*15:01:01:27)
+HG01243	DPB1	wrong at 4 fields: released DPB1*04:02:01:31 on a haplotype that is no database allele (nearest DPB1*04:02:01:16,DPB1*04:02:01:31,DPB1*04:02:01:45)
+HG01243	DPB1	wrong at 4 fields: released DPB1*105:01:01:01 on a haplotype that is no database allele (nearest DPB1*105:01:01:01)
+HG01928	B	wrong at 4 fields: released B*35:01:01:05 (candidate B*35:01:01:05), truth B*35:01:01:84
+HG02080	F	wrong at 4 fields: released F*01:01:02:08 (candidate F*01:01:02:08), truth F*01:01:02:10
+HG02135	B	wrong at 4 fields: released B*15:01:01:01 on a haplotype that is no database allele (nearest B*15:01:01:01,B*15:01:11,B*15:01:80)
+HG02135	DRB1	wrong at 4 fields: released DRB1*15:02:01:04 on a haplotype that is no database allele (nearest DRB1*15:02:01:04)
+HG02145	DRB1	wrong at 4 fields: released DRB1*15:03:01:01 on a haplotype that is no database allele (nearest DRB1*15:03:01:01)
+HG02155	V	wrong at 4 fields: released V*01:01:01:01 on a haplotype that is no database allele (nearest V*01:01:01:01)
+HG02178	DRB1	wrong at 4 fields: released DRB1*15:02:01:05 on a haplotype that is no database allele (nearest DRB1*15:02:01:05)
+HG02257	B	wrong at 4 fields: released B*41:01:01:01 on a haplotype that is no database allele (nearest B*41:01:01:02,B*41:01:01:04,B*41:01:01:09)
+HG02280	F	wrong at 4 fields: released F*01:01:01:09 on a haplotype that is no database allele (nearest F*01:01:01:09)
+HG02622	DRB1	wrong at 3 fields: released DRB1*07:01:01 (candidate DRB1*07:01:01:01), truth DRB1*07:01:31
+HG02622	DRA	wrong at 3 fields: released DRA*01:01:01 (candidate DRA*01:01:01:02), truth DRA*01:01:08
+HG02630	V	wrong at 4 fields: released V*01:01:01:01 on a haplotype that is no database allele (nearest V*01:01:01:01)
+HG02668	DPB1	wrong at 1 fields: released DPB1*519 (candidate DPB1*519:01), truth DPB1*13:01:01:03,DPB1*13:01:01:21
+HG02717	B	wrong at 3 fields: released B*15:03:01 (candidate B*15:03:01:01), truth B*15:03:03
+HG02717	DRA	wrong at 3 fields: released DRA*01:01:01 (candidate DRA*01:01:01:02), truth DRA*01:01:08
+HG02738	V	wrong at 4 fields: released V*01:01:01:03 on a haplotype that is no database allele (nearest V*01:01:01:03)
+HG03098	V	wrong at 4 fields: released V*01:01:01:02 on a haplotype that is no database allele (nearest V*01:01:01:02)
+HG03225	DRA	wrong at 4 fields: released DRA*01:01:01:01 on a haplotype that is no database allele (nearest DRA*01:01:01:01)
+HG03710	V	wrong at 4 fields: released V*01:01:01:02 on a haplotype that is no database allele (nearest V*01:01:01:02)
+HG04115	F	wrong at 4 fields: released F*01:01:01:59 (candidate F*01:01:01:59), truth F*01:01:01:01
+NA12878	DRA	copy number: truth 1 called 2
+NA12878	E	copy number: truth 0 called 2
+NA18508	V	wrong at 4 fields: released V*01:01:01:03 on a haplotype that is no database allele (nearest V*01:01:01:03)
+NA18970	DQA1	wrong at 4 fields: released DQA1*01:04:01:02 (candidate DQA1*01:04:01:02), truth DQA1*01:04:01:01
+NA18970	DQB1	wrong at 2 fields: released DQB1*03:01:01 (candidate DQB1*03:01:01:01), truth DQB1*03:276N
+NA21093	DPB1	wrong at 4 fields: released DPB1*02:01:02:01 on a haplotype that is no database allele (nearest DPB1*02:01:02:01)

@@ -170,8 +170,8 @@ fn tandem(s: &[u8]) -> bool {
     false
 }
 
-const G18: [&str; 18] = ["A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DRA", "E", "F", "G", "H", "K", "V"];
-const G8: [&str; 8] = ["MICA", "MICB", "TAP1", "TAP2", "DMA", "DMB", "DOA", "DOB"];
+pub const G18: [&str; 18] = ["A", "B", "C", "DRB1", "DRB3", "DRB4", "DRB5", "DQA1", "DQB1", "DPA1", "DPB1", "DRA", "E", "F", "G", "H", "K", "V"];
+pub const G8: [&str; 8] = ["MICA", "MICB", "TAP1", "TAP2", "DMA", "DMB", "DOA", "DOB"];
 
 struct Call {
     name: String,
@@ -181,6 +181,158 @@ struct Call {
     either: HashSet<i64>,
     nn: i64,
     detail: String,
+    /// the sites with their change, for the comparison with the assembly
+    sites: Vec<Det>,
+}
+
+/// a reported new site: 1-based position on the allele, change as written by hla-wgs
+#[derive(Clone, Debug)]
+pub struct Det {
+    pub pos: i64,
+    pub what: String,
+    pub either: bool,
+}
+
+/// a difference between an allele and a haplotype: allele[pos..pos+del] is replaced by `ins`
+/// (0-based position on the forward allele)
+#[derive(Clone, Debug, PartialEq)]
+pub struct Var {
+    pub pos: usize,
+    pub del: usize,
+    pub ins: Vec<u8>,
+}
+
+fn comp(c: u8) -> u8 {
+    match c.to_ascii_uppercase() {
+        b'A' => b'T',
+        b'C' => b'G',
+        b'G' => b'C',
+        b'T' => b'A',
+        x => x,
+    }
+}
+
+/// the differences of an alignment of the allele (query) to the haplotype (target), as changes
+/// of the allele towards the haplotype, on the forward allele
+pub fn variants(p: &Paf) -> Vec<Var> {
+    let (qs, qe) = (p.qs, p.qe);
+    let cs = p.cs.as_bytes();
+    let mut i = 0;
+    let mut pos = 0usize; // position in the query in target orientation, from the aligned start
+    let mut out = vec![];
+    let rc = |v: &[u8]| -> Vec<u8> { v.iter().rev().map(|c| comp(*c)).collect() };
+    while i < cs.len() {
+        let op = cs[i];
+        let mut j = i + 1;
+        while j < cs.len() && !matches!(cs[j], b':' | b'*' | b'+' | b'-' | b'~') {
+            j += 1;
+        }
+        let v = &cs[i + 1..j];
+        i = j;
+        match op {
+            b':' => pos += std::str::from_utf8(v).unwrap().parse::<usize>().unwrap(),
+            b'*' => {
+                // *xy: x on the target (haplotype), y on the query (allele)
+                let x = v[0].to_ascii_uppercase();
+                if p.fwd {
+                    out.push(Var { pos: qs + pos, del: 1, ins: vec![x] });
+                } else {
+                    out.push(Var { pos: qe - 1 - pos, del: 1, ins: vec![comp(x)] });
+                }
+                pos += 1;
+            }
+            b'+' => {
+                // bases only in the allele: the haplotype lacks them
+                let l = v.len();
+                if p.fwd {
+                    out.push(Var { pos: qs + pos, del: l, ins: vec![] });
+                } else {
+                    out.push(Var { pos: qe - pos - l, del: l, ins: vec![] });
+                }
+                pos += l;
+            }
+            b'-' => {
+                // bases only in the haplotype: inserted before the allele position
+                let up: Vec<u8> = v.iter().map(|c| c.to_ascii_uppercase()).collect();
+                if p.fwd {
+                    out.push(Var { pos: qs + pos, del: 0, ins: up });
+                } else {
+                    out.push(Var { pos: qe - pos, del: 0, ins: rc(&up) });
+                }
+            }
+            _ => {}
+        }
+    }
+    out.sort_by_key(|v| v.pos);
+    out
+}
+
+/// a reported site as a change of the allele; None for marks that name no sequence change
+pub fn det_var(d: &Det) -> Option<Var> {
+    let w = d.what.split('(').next().unwrap_or("");
+    let p = (d.pos - 1).max(0) as usize;
+    if let Some(x) = w.strip_prefix("del") {
+        return Some(Var { pos: p, del: x.len(), ins: vec![] });
+    }
+    if let Some(x) = w.strip_prefix("ins") {
+        return Some(Var { pos: p, del: 0, ins: x.as_bytes().to_vec() });
+    }
+    let b = w.as_bytes();
+    if b.len() == 3 && b[1] == b'>' {
+        return Some(Var { pos: p, del: 1, ins: vec![b[2]] });
+    }
+    None
+}
+
+/// the allele window [lo, hi) with one change applied
+fn apply(a: &[u8], lo: usize, hi: usize, v: &Var) -> Vec<u8> {
+    let mut o = a[lo..v.pos.min(hi)].to_vec();
+    o.extend_from_slice(&v.ins);
+    o.extend_from_slice(&a[(v.pos + v.del).min(hi)..hi]);
+    o
+}
+
+/// both changes give the same sequence (SNV: same position and base; indels: also another
+/// placement of the same insertion or deletion within a repeat)
+pub fn same_change(a: &[u8], x: &Var, y: &Var) -> bool {
+    if x.pos.abs_diff(y.pos) > 60 || x.pos + x.del > a.len() || y.pos + y.del > a.len() {
+        return false;
+    }
+    let lo = x.pos.min(y.pos).saturating_sub(40);
+    let hi = ((x.pos + x.del).max(y.pos + y.del) + 40).min(a.len());
+    apply(a, lo, hi, x) == apply(a, lo, hi, y)
+}
+
+/// how a reported site compares with the haplotypes
+#[derive(PartialEq, Debug)]
+pub enum SiteHit {
+    /// the same change on the haplotype of this allele
+    This,
+    /// only on the other haplotype, and the site is marked phase uncertain
+    OtherPhaseUncertain,
+    /// a repeat length change matched by an insertion or deletion of the same net length
+    RepLength,
+    False,
+    /// a mark without a sequence change (blind stretch, break, unverified repeat)
+    NotASite,
+}
+
+pub fn site_hit(a: &[u8], d: &Det, this: &[Var], other: &[Var]) -> SiteHit {
+    let w = d.what.split('(').next().unwrap_or("");
+    if let Some(n) = w.strip_prefix("rep") {
+        let Ok(n) = n.parse::<i64>() else { return SiteHit::NotASite };
+        let p = (d.pos - 1).max(0) as usize;
+        let near = |v: &&Var| v.pos + 5 >= p && v.pos <= p + 120 && v.ins.len() as i64 - v.del as i64 == n;
+        return if this.iter().any(|v| near(&v)) { SiteHit::RepLength } else { SiteHit::False };
+    }
+    let Some(v) = det_var(d) else { return SiteHit::NotASite };
+    if this.iter().any(|t| same_change(a, &v, t)) {
+        SiteHit::This
+    } else if d.either && other.iter().any(|t| same_change(a, &v, t)) {
+        SiteHit::OtherPhaseUncertain
+    } else {
+        SiteHit::False
+    }
 }
 
 fn tuple_list(v: &[(i64, String)]) -> String {
@@ -213,14 +365,14 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
         let mut conf: OMap<String, Vec<Call>> = OMap::default();
         // the table lists at most 20 sites per allele; PREFIX.novel.tsv has all of them
         let nf = format!("{dir}/{smp}.novel.tsv");
-        let mut novel: HashMap<(String, String), Vec<(i64, bool)>> = HashMap::new();
+        let mut novel: HashMap<(String, String), Vec<(i64, bool, String)>> = HashMap::new();
         if exists(&nf) {
             for l in read(&nf).lines().filter(|l| !l.starts_with('#') && !l.starts_with("gene\t")) {
                 let f: Vec<&str> = l.split('\t').collect();
                 if f.len() > 5 {
                     if let Ok(p) = f[4].parse::<i64>() {
-                        let unsure = f.get(13).map_or(false, |x| x.starts_with("phase uncertain"));
-                        novel.entry((f[0].to_string(), f[1].to_string())).or_default().push((p, unsure));
+                        let unsure = f.get(13).map_or(false, |x| x.starts_with("phase uncertain")) || f.get(11).map_or(false, |x| *x == "either allele");
+                        novel.entry((f[0].to_string(), f[1].to_string())).or_default().push((p, unsure, f[5].to_string()));
                     }
                 }
             }
@@ -228,6 +380,7 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
         for r in conf_lines(&cf) {
             let mut det = HashSet::new();
             let mut either = HashSet::new();
+            let mut sites: Vec<Det> = vec![];
             let nn = if r.len() > 11 && r[11] != "-" { r[11].parse().unwrap() } else { 0 };
             if r.len() > 12 && r[12] != "-" {
                 let src = if r[12].starts_with("known:") { "" } else { r[12].as_str() };
@@ -235,6 +388,7 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
                     if !x.is_empty() && !x.contains("blind") && !x.contains("unphased") && !x.contains("repunverified") {
                         let p = x.split(':').next().unwrap().parse::<i64>().unwrap();
                         det.insert(p);
+                        sites.push(Det { pos: p, what: x.split(':').nth(1).unwrap_or("").to_string(), either: x.ends_with(":either") });
                         if x.ends_with(":either") {
                             either.insert(p);
                         }
@@ -243,8 +397,9 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
                 let listed = src.split(',').filter(|x| !x.is_empty()).count() as i64;
                 if !src.is_empty() && nn > listed {
                     let shown: HashSet<i64> = src.split(',').filter_map(|x| x.split(':').next()?.parse().ok()).collect();
-                    for (p, unsure) in novel.get(&(r[0].clone(), r[1].clone())).into_iter().flatten() {
-                        if !shown.contains(p) {
+                    for (p, unsure, what) in novel.get(&(r[0].clone(), r[1].clone())).into_iter().flatten() {
+                        if !shown.contains(p) && !what.contains("blind") && !what.contains("unphased") && !what.contains("repunverified") {
+                            sites.push(Det { pos: *p, what: what.clone(), either: *unsure });
                             det.insert(*p);
                             if *unsure {
                                 either.insert(*p);
@@ -253,10 +408,11 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
                     }
                 }
             }
-            conf.entry(r[0].clone()).push(Call { name: r[2].clone(), res: r[4].parse().unwrap(), det, either, nn, detail: if r.len() > 12 { r[12].clone() } else { "-".into() } });
+            conf.entry(r[0].clone()).push(Call { name: r[2].clone(), res: r[4].parse().unwrap(), det, either, nn, detail: if r.len() > 12 { r[12].clone() } else { "-".into() }, sites });
         }
         let names: BTreeSet<String> = conf.iter().flat_map(|(_, v)| v.iter().map(|x| x.name.clone())).collect();
         let mut hits: HashMap<(String, String), (i64, Vec<(i64, String)>)> = HashMap::new();
+        let mut vars: HashMap<(String, String), Vec<Var>> = HashMap::new();
         for h in ["h1", "h2", "mat", "pat"] {
             let fa = format!("truth/{smp}.{h}.mhc.fa");
             if !exists(&fa) {
@@ -270,6 +426,7 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
                     let d = p.nm as i64 + clip;
                     let k = (h.to_string(), n.clone());
                     if hits.get(&k).map_or(true, |x| d < x.0) {
+                        vars.insert(k.clone(), variants(&p));
                         hits.insert(k, (d, dl));
                     }
                 }
@@ -345,6 +502,29 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
                 k.add("site_det_true", tp);
                 k.add("site_snv", true_snv.len() as i64);
                 k.add("site_snv_found", true_snv.iter().filter(|q| c.det.iter().any(|p| (p - **q).abs() <= 2)).count() as i64);
+                // strict comparison: SNVs by position and base change, insertions and deletions by
+                // the sequence they produce, phase-uncertain hits on the other haplotype apart
+                let a = seq[&c.name].as_bytes();
+                let nov: Vec<Var> = vec![];
+                let this_v = vars.get(&(h.to_string(), c.name.clone())).unwrap_or(&nov);
+                let other_v = hh.iter().filter(|x| **x != *h).filter_map(|x| vars.get(&(x.to_string(), c.name.clone()))).next().unwrap_or(&nov);
+                for d in &c.sites {
+                    let key = match site_hit(a, d, this_v, other_v) {
+                        SiteHit::This => "site_x_this",
+                        SiteHit::OtherPhaseUncertain => "site_x_other_phase",
+                        SiteHit::RepLength => "site_x_rep_length",
+                        SiteHit::False => "site_x_false",
+                        SiteHit::NotASite => "site_x_mark",
+                    };
+                    k.add(key, 1);
+                }
+                let dv: Vec<Var> = c.sites.iter().filter_map(det_var).collect();
+                for t in this_v {
+                    let snv = t.del == 1 && t.ins.len() == 1;
+                    let found = dv.iter().any(|v| same_change(a, v, t));
+                    k.add(if snv { "site_x_snv" } else { "site_x_indel" }, 1);
+                    k.add(if snv { "site_x_snv_found" } else { "site_x_indel_found" }, found as i64);
+                }
                 if exact && c.nn > 0 {
                     k.add("flag_on_exact", 1);
                 }
@@ -362,7 +542,7 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
             }
         }
     }
-    let cols = ["n", "exact", "nearest", "known", "known_ok", "new", "new_nearest", "safe4", "safe4_exact", "safe4_wrong_noflag", "safe4_wrong_real", "flag_on_exact", "flag_on_inexact", "site_snv", "site_snv_found", "site_det", "site_det_true", "skip"];
+    let cols = ["n", "exact", "nearest", "known", "known_ok", "new", "new_nearest", "safe4", "safe4_exact", "safe4_wrong_noflag", "safe4_wrong_real", "flag_on_exact", "flag_on_inexact", "site_snv", "site_snv_found", "site_det", "site_det_true", "skip", "site_x_snv", "site_x_snv_found", "site_x_indel", "site_x_indel_found", "site_x_this", "site_x_other_phase", "site_x_rep_length", "site_x_false", "site_x_mark"];
     let mut out = format!("gene\t{}\n", cols.join("\t"));
     let mut tot = Counter::default();
     let gl: Vec<&str> = if eight { G8.to_vec() } else { G18.to_vec() };
@@ -378,6 +558,12 @@ pub fn eval6(dir: &str, verbose: bool, eight: bool) {
         "known alleles 4F exact {}/{} ({}%) | new haplotypes {}, nearest allele chosen {} | safe4 exact {}/{}, inexact unflagged {}, inexact beyond hp/STR {} | SNV sites found {}/{} | reported sites true {}/{}\n",
         t.get("known_ok"), t.get("known"), fx(100.0 * t.get("known_ok") as f64 / t.get("known").max(1) as f64, 1), t.get("new"), t.get("new_nearest"),
         t.get("safe4_exact"), t.get("safe4"), t.get("safe4_wrong_noflag"), t.get("safe4_wrong_real"), t.get("site_snv_found"), t.get("site_snv"), t.get("site_det_true"), t.get("site_det")
+    );
+    out += &format!(
+        "strict site comparison: SNVs found {}/{} (position and base), insertions/deletions found {}/{} (same resulting sequence) | reported sites {}: same change on this haplotype {}, only on the other haplotype and marked phase uncertain {}, repeat length matched {}, false {}, marks without a change {}\n",
+        t.get("site_x_snv_found"), t.get("site_x_snv"), t.get("site_x_indel_found"), t.get("site_x_indel"),
+        t.get("site_x_this") + t.get("site_x_other_phase") + t.get("site_x_rep_length") + t.get("site_x_false") + t.get("site_x_mark"),
+        t.get("site_x_this"), t.get("site_x_other_phase"), t.get("site_x_rep_length"), t.get("site_x_false"), t.get("site_x_mark")
     );
     for e in ex {
         out += &e;
@@ -721,5 +907,52 @@ pub fn sim_eval(truth_path: &str, assign: &str) {
             format!("{k}={v} ({}%)", fx(100.0 * v as f64 / tot as f64, 2))
         }).collect();
         println!("{label} {tot} {}", parts.join(" "));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn d(pos: i64, what: &str, either: bool) -> Det {
+        Det { pos, what: what.into(), either }
+    }
+
+    #[test]
+    fn snv_needs_position_and_base() {
+        let a = b"ACGTACGTAC";
+        let t = vec![Var { pos: 4, del: 1, ins: b"G".to_vec() }];
+        assert_eq!(site_hit(a, &d(5, "A>G", false), &t, &[]), SiteHit::This);
+        assert_eq!(site_hit(a, &d(5, "A>T", false), &t, &[]), SiteHit::False, "same position, other base");
+        assert_eq!(site_hit(a, &d(6, "C>G", false), &t, &[]), SiteHit::False, "neighbouring position");
+    }
+
+    #[test]
+    fn indel_placements_in_a_repeat_are_the_same() {
+        // AAAA run: deleting the first or the last A gives the same sequence
+        let a = b"GCGTAAAACTGC";
+        let t = vec![Var { pos: 7, del: 1, ins: vec![] }];
+        assert_eq!(site_hit(a, &d(5, "delA", false), &t, &[]), SiteHit::This);
+        let ti = vec![Var { pos: 8, del: 0, ins: b"A".to_vec() }];
+        assert_eq!(site_hit(a, &d(5, "insA", false), &ti, &[]), SiteHit::This);
+        assert_eq!(site_hit(a, &d(5, "insC", false), &ti, &[]), SiteHit::False);
+    }
+
+    #[test]
+    fn other_haplotype_only_when_phase_uncertain() {
+        let a = b"ACGTACGTAC";
+        let o = vec![Var { pos: 2, del: 1, ins: b"T".to_vec() }];
+        assert_eq!(site_hit(a, &d(3, "G>T", true), &[], &o), SiteHit::OtherPhaseUncertain);
+        assert_eq!(site_hit(a, &d(3, "G>T", false), &[], &o), SiteHit::False);
+        assert_eq!(site_hit(a, &d(3, "blind500bp", false), &[], &o), SiteHit::NotASite);
+    }
+
+    #[test]
+    fn variants_of_a_reverse_alignment_are_on_the_forward_allele() {
+        // allele ACGGT aligned in reverse: target = revcomp with one SNV
+        let p = Paf { qname: "x".into(), qlen: 5, qs: 0, qe: 5, fwd: false, tname: "t".into(), ts: 0, te: 5, nm: 1, cs: ":1*gc:3".into(), ops: vec![] };
+        // query in target orientation is ACCGT (revcomp of ACGGT); position 1 C (query) vs G (target)
+        // forward allele position 5-1-1 = 3 (G), haplotype base complement of G = C
+        assert_eq!(variants(&p), vec![Var { pos: 3, del: 1, ins: b"C".to_vec() }]);
     }
 }
